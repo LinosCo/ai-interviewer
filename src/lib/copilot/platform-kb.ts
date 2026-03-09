@@ -10,6 +10,10 @@ export interface KBEntry {
     keywords: string[];
 }
 
+function escapeRegexLiteral(value: string): string {
+    return String(value || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
 // Platform knowledge base content
 export const PLATFORM_KB: KBEntry[] = [
     // Getting Started
@@ -655,10 +659,11 @@ Clicca sull'icona del Copilot nella sidebar o usa la scorciatoia da tastiera.
 - Vai su Progetto > Integrazioni
 - Verifica che il progetto selezionato sia quello corretto
 
-**Step 2: Collega canali CMS**
-- WordPress MCP: per pagine, blog e news
-- WooCommerce MCP: per descrizioni prodotto e catalogo
-- CMS API: se usi un CMS custom
+**Step 2: Collega WordPress/WooCommerce via MCP (prerequisito plugin)**
+- Installa e attiva un plugin/server MCP compatibile nel sito WordPress
+- Verifica endpoint MCP raggiungibile (es. /wp-json/mcp/v1)
+- WordPress MCP: usa Username + Application Password
+- WooCommerce MCP: usa Consumer Key + Consumer Secret (REST API key read/write)
 
 **Step 3: Collega canali analytics**
 - GA4: comportamento utenti (sessioni, bounce, pagine)
@@ -676,9 +681,19 @@ Clicca sull'icona del Copilot nella sidebar o usa la scorciatoia da tastiera.
 - WordPress o CMS API attivo
 - GA4 attivo
 - GSC attivo
-- (Opzionale) WooCommerce attivo per use case prodotto`,
+- (Opzionale) WooCommerce attivo per use case prodotto
+
+**Documentazione rapida (link ufficiali)**
+- WordPress - installare plugin: https://wordpress.org/support/article/plugins-add-new-screen/
+- WordPress MCP (esempio setup): https://mcp-wp.github.io/docs/mcp-server/installation
+- WordPress Application Passwords: https://developer.wordpress.org/advanced-administration/security/application-passwords/
+- WooCommerce REST API keys: https://woocommerce.com/document/woocommerce-rest-api/
+- Google Service Account: https://cloud.google.com/iam/docs/service-accounts-create
+- Google Service Account JSON key: https://cloud.google.com/iam/docs/keys-create-delete
+- GA4 permessi: https://support.google.com/analytics/answer/9305788?hl=it
+- GSC permessi: https://support.google.com/webmasters/answer/7687615?hl=it`,
         category: 'copilot',
-        keywords: ['setup', 'integrazioni', 'wordpress', 'woocommerce', 'ga4', 'gsc', 'connessione', 'test']
+        keywords: ['setup', 'integrazioni', 'wordpress', 'woocommerce', 'mcp', 'plugin', 'ga4', 'gsc', 'connessione', 'test']
     },
     {
         id: 'cop-6',
@@ -854,20 +869,36 @@ Clicca sull'icona del Copilot nella sidebar o usa la scorciatoia da tastiera.
 
 **Lato tool esterno (passo-passo):**
 - WordPress:
-  1) Crea Application Password in Utenti > Profilo
+  1) Installa/attiva plugin MCP compatibile
   2) Verifica endpoint /wp-json/mcp/v1 raggiungibile
-  3) Controlla permessi utente per creazione/modifica contenuti
+  3) Crea Application Password in Utenti > Profilo
+  4) Controlla permessi utente per creazione/modifica contenuti
 - WooCommerce:
-  1) Genera REST API key (read/write)
-  2) Verifica endpoint store e permessi prodotti
+  1) Installa/attiva plugin MCP compatibile su WordPress
+  2) Genera REST API key WooCommerce (read/write)
+  3) Verifica endpoint store e permessi prodotti
 - Google:
-  1) Service Account con accesso a GA4 e GSC
-  2) API abilitate in Google Cloud
-  3) Property ID GA4 e URL proprieta GSC corretti
+  1) Crea Service Account + chiave JSON
+  2) Assegna accesso account a GA4 e GSC
+  3) Abilita Analytics Data API e Search Console API
+  4) Inserisci Property ID GA4 e URL proprieta GSC corretti
 - n8n:
   1) Crea workflow con nodo Webhook
   2) Usa webhook URL pubblico
   3) Esegui test ricezione payload
+
+**Documentazione esterna consigliata**
+- WordPress install plugin: https://wordpress.org/support/article/plugins-add-new-screen/
+- WordPress MCP (esempio setup): https://mcp-wp.github.io/docs/mcp-server/installation
+- WordPress Application Passwords: https://developer.wordpress.org/advanced-administration/security/application-passwords/
+- WooCommerce REST API keys: https://woocommerce.com/document/woocommerce-rest-api/
+- Google Service Account: https://cloud.google.com/iam/docs/service-accounts-create
+- Google JSON key: https://cloud.google.com/iam/docs/keys-create-delete
+- GA4 permessi: https://support.google.com/analytics/answer/9305788?hl=it
+- GSC permessi: https://support.google.com/webmasters/answer/7687615?hl=it
+- Analytics Data API: https://console.cloud.google.com/apis/library/analyticsdata.googleapis.com
+- Search Console API: https://console.cloud.google.com/apis/library/searchconsole.googleapis.com
+- n8n Webhook node: https://docs.n8n.io/integrations/builtin/core-nodes/n8n-nodes-base.webhook/
 
 **Formato risposta consigliato del Copilot:**
 1. "Fatto in BT"
@@ -1202,7 +1233,10 @@ export function keywordSearchPlatformKB(
         }
 
         for (const word of queryWords) {
-            const matches = (entry.content.toLowerCase().match(new RegExp(word, 'g')) || []).length;
+            const safeWord = escapeRegexLiteral(word);
+            const matches = safeWord
+                ? (entry.content.toLowerCase().match(new RegExp(safeWord, 'g')) || []).length
+                : 0;
             score += matches * 2;
         }
 

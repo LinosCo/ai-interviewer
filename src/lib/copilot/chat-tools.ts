@@ -16,6 +16,7 @@ import { getDefaultStrategicMarketingKnowledge, getStrategicMarketingKnowledgeBy
 import { ProjectTipService } from '@/lib/projects/project-tip.service';
 import { parseProvidedSitemap } from '@/lib/visibility/site-crawler-engine';
 import { indexKnowledgeSource } from '@/lib/kb/semantic-search';
+import { TokenTrackingService } from '@/services/tokenTrackingService';
 
 type ToolContext = {
     userId: string;
@@ -140,6 +141,74 @@ export function createPlatformHelpSearchTool() {
             } catch (error: any) {
                 console.error('[Copilot Tool] Error searching platform help:', error);
                 return { error: 'Failed to search platform help', details: error.message || 'Unknown error' };
+            }
+        }
+    };
+}
+
+export function createAccountUsageTool(context: ToolContext) {
+    return {
+        description: 'Fetch the current organization plan, credit usage, remaining balance, reset date and monthly usage breakdown by tool.',
+        inputSchema: z.object({
+            includeToolBreakdown: z.boolean().optional().default(true).describe('If true, include monthly usage grouped by tool.'),
+        }),
+        execute: async ({ includeToolBreakdown }: { includeToolBreakdown?: boolean }) => {
+            try {
+                await assertOrganizationAccess(context.userId, context.organizationId, 'VIEWER');
+
+                const [organization, usageStats] = await Promise.all([
+                    prisma.organization.findUnique({
+                        where: { id: context.organizationId },
+                        select: {
+                            id: true,
+                            name: true,
+                            plan: true,
+                            monthlyCreditsLimit: true,
+                            monthlyCreditsUsed: true,
+                            packCreditsAvailable: true,
+                            creditsResetDate: true,
+                            currentPeriodEnd: true,
+                        }
+                    }),
+                    TokenTrackingService.getOrganizationStats(context.organizationId)
+                ]);
+
+                if (!organization || !usageStats) {
+                    return { error: 'Organization usage data not available.' };
+                }
+
+                const toolBreakdown = includeToolBreakdown !== false
+                    ? usageStats.byTool.slice(0, 8).map((entry) => ({
+                        tool: entry.tool,
+                        creditsUsed: Number(entry.creditsUsed),
+                        transactionCount: entry.transactionCount,
+                        percentage: entry.percentage
+                    }))
+                    : [];
+
+                return {
+                    organization: {
+                        id: organization.id,
+                        name: organization.name,
+                        plan: organization.plan,
+                        selectedProjectId: context.projectId || null,
+                    },
+                    credits: {
+                        limit: Number(organization.monthlyCreditsLimit),
+                        used: Number(organization.monthlyCreditsUsed),
+                        remaining: usageStats.credits.remaining,
+                        pack: Number(organization.packCreditsAvailable),
+                        total: usageStats.credits.total,
+                        percentage: usageStats.credits.percentage,
+                        warningLevel: usageStats.credits.warningLevel,
+                        isUnlimited: usageStats.credits.isUnlimited,
+                        resetDate: organization.creditsResetDate || usageStats.credits.resetDate || organization.currentPeriodEnd || null,
+                    },
+                    usageByTool: toolBreakdown,
+                };
+            } catch (error: any) {
+                console.error('[Copilot Tool] Error fetching account usage:', error);
+                return { error: 'Failed to fetch account usage', details: error.message || 'Unknown error' };
             }
         }
     };

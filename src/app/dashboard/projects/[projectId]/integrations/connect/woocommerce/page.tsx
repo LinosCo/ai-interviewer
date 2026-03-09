@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { ArrowLeft, Link2, AlertCircle, ShoppingCart } from 'lucide-react';
+import { ArrowLeft, Link2, AlertCircle, ShoppingCart, ExternalLink } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -39,6 +39,12 @@ export default function ConnectWooCommercePage() {
     });
     const [error, setError] = useState<string | null>(null);
     const [existingConnection, setExistingConnection] = useState<ExistingConnection | null>(null);
+
+    const docs = {
+        pluginInstall: 'https://wordpress.org/support/article/plugins-add-new-screen/',
+        mcpPluginInstall: 'https://mcp-wp.github.io/docs/mcp-server/installation',
+        wooRestApi: 'https://woocommerce.com/document/woocommerce-rest-api/',
+    };
 
     useEffect(() => {
         const loadExistingConnection = async () => {
@@ -219,6 +225,51 @@ export default function ConnectWooCommercePage() {
                 )}
 
                 <div className="pt-4">
+                    <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
+                        <h4 className="text-sm font-semibold text-blue-900 mb-2 flex items-center gap-2">
+                            <ExternalLink className="w-4 h-4" />
+                            Prerequisito MCP + WooCommerce API
+                        </h4>
+                        <div className="text-xs text-blue-900 leading-relaxed space-y-2">
+                            <p>
+                                1. Sul sito WordPress installa e attiva un plugin/server MCP compatibile.
+                                {' '}
+                                <a
+                                    href={docs.pluginInstall}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="underline font-semibold"
+                                >
+                                    Installare plugin su WordPress
+                                </a>
+                                {' '}
+                                |
+                                {' '}
+                                <a
+                                    href={docs.mcpPluginInstall}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="underline font-semibold"
+                                >
+                                    Esempio setup MCP
+                                </a>
+                            </p>
+                            <p>2. Verifica che l&apos;endpoint MCP risponda (es. <code>https://tuostore.it/wp-json/mcp/v1</code>).</p>
+                            <p>
+                                3. In WooCommerce genera API key con permessi Lettura/Scrittura (Consumer Key + Consumer Secret).
+                                {' '}
+                                <a
+                                    href={docs.wooRestApi}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="underline font-semibold"
+                                >
+                                    Guida REST API WooCommerce
+                                </a>
+                            </p>
+                        </div>
+                    </div>
+
                     <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 mb-6">
                         <h4 className="text-sm font-semibold text-amber-900 mb-1 flex items-center gap-2">
                             <ShoppingCart className="w-4 h-4" />

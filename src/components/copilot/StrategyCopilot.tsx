@@ -7,6 +7,7 @@ import { useProject } from '@/contexts/ProjectContext';
 import { useOrganization } from '@/contexts/OrganizationContext';
 import ReactMarkdown from 'react-markdown';
 import { usePathname } from 'next/navigation';
+import { getCopilotConversationStorageKey } from '@/lib/copilot/storage';
 
 interface Message {
     id: string;
@@ -151,6 +152,10 @@ export function StrategyCopilot({ userTier }: StrategyCopilotProps) {
     const { currentOrganization } = useOrganization();
     const pathname = usePathname() || '';
     const hasProjectAccess = ['PRO', 'BUSINESS', 'ENTERPRISE', 'ADMIN', 'PARTNER'].includes(userTier.toUpperCase());
+    const scopedProjectId = selectedProject?.id && selectedProject.id !== '__ALL__'
+        ? selectedProject.id
+        : null;
+    const conversationStorageKey = getCopilotConversationStorageKey(currentOrganization?.id, scopedProjectId);
 
     const clearLoadingTimers = () => {
         if (loadingStageTimerRef.current) {
@@ -244,14 +249,28 @@ export function StrategyCopilot({ userTier }: StrategyCopilotProps) {
     };
 
 
-    // Restore conversation from localStorage when opening
+    useEffect(() => {
+        if (!isOpen) return;
+        clearLoadingTimers();
+        setIsLoading(false);
+        setError(null);
+        setConversationId(null);
+        setMessages([]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [conversationStorageKey, isOpen]);
+
+    // Restore conversation from localStorage when opening or when the scope changes
     useEffect(() => {
         if (!isOpen || messages.length > 0) return;
 
-        const storedId = localStorage.getItem('copilot-conversation-id');
+        const storedId = localStorage.getItem(conversationStorageKey);
         if (storedId) {
             setConversationId(storedId);
-            fetch(`/api/copilot/chat?conversationId=${storedId}`)
+            const params = new URLSearchParams({ conversationId: storedId });
+            if (currentOrganization?.id) params.set('organizationId', currentOrganization.id);
+            if (scopedProjectId) params.set('projectId', scopedProjectId);
+
+            fetch(`/api/copilot/chat?${params.toString()}`)
                 .then(r => r.ok ? r.json() : null)
                 .then((data) => {
                     if (data?.messages?.length > 0) {
@@ -271,17 +290,19 @@ export function StrategyCopilot({ userTier }: StrategyCopilotProps) {
             showWelcome();
         }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [isOpen]);
+    }, [isOpen, messages.length, conversationStorageKey, currentOrganization?.id, scopedProjectId]);
 
     const showWelcome = () => {
-        const welcomeMsg = hasProjectAccess && selectedProject
+        const welcomeMsg = hasProjectAccess && selectedProject && selectedProject.id !== '__ALL__'
             ? `Ciao! Sono lo Strategy Copilot. Sto guardando il progetto **${selectedProject.name}**.\n\nPosso aiutarti a esplorare i dati, trovare insight o creare contenuti. Oppure chiedimi come usare la piattaforma.`
+            : hasProjectAccess
+                ? `Ciao! Sono lo Strategy Copilot. Sto lavorando in vista multi-progetto.\n\nPosso aiutarti a confrontare segnali, trovare priorità e guidarti nella piattaforma. Se vuoi un'azione operativa precisa, seleziona un progetto specifico.`
             : `Ciao! Sono lo Strategy Copilot di Business Tuner.\n\nPosso aiutarti a usare la piattaforma, spiegarti le funzionalita e risolvere problemi. Cosa ti serve?`;
         setMessages([{ id: 'welcome', role: 'assistant', content: welcomeMsg, timestamp: new Date() }]);
     };
 
     const startNewConversation = () => {
-        localStorage.removeItem('copilot-conversation-id');
+        localStorage.removeItem(conversationStorageKey);
         setConversationId(null);
         setMessages([]);
         showWelcome();
@@ -334,7 +355,7 @@ export function StrategyCopilot({ userTier }: StrategyCopilotProps) {
                 body: JSON.stringify({
                     message: trimmedContent,
                     conversationId: conversationId,
-                    projectId: selectedProject?.id !== '__ALL__' ? selectedProject?.id : null
+                    projectId: scopedProjectId
                 })
             });
 
@@ -349,39 +370,66 @@ export function StrategyCopilot({ userTier }: StrategyCopilotProps) {
             const decoder = new TextDecoder();
             let accumulated = '';
             let metaJson: Record<string, any> = {};
+            let metaBuffer = '';
+            let readingMeta = false;
 
             while (true) {
                 const { done, value } = await reader.read();
                 if (done) break;
 
-                const chunk = decoder.decode(value, { stream: true });
+                let chunk = decoder.decode(value, { stream: true });
 
-                // Check for replace signal (\x00 = KB fallback replacement)
-                if (chunk.includes('\x00')) {
-                    const parts = chunk.split('\x00');
-                    // Discard anything before the signal, use the replacement text
-                    accumulated = parts.slice(1).join('').replace(/\x01[\s\S]*$/, '');
-                } else if (chunk.includes('\x01')) {
-                    // Metadata frame — split and parse
-                    const parts = chunk.split('\x01');
-                    accumulated += parts[0].replace(/\nFOLLOW_UP:.*$/m, '');
-                    try { metaJson = JSON.parse(parts[1]); } catch { /* ignore */ }
+                if (readingMeta) {
+                    metaBuffer += chunk;
                 } else {
-                    // Remove FOLLOW_UP line if it appears in the streamed text
-                    const followUpIdx = chunk.indexOf('\nFOLLOW_UP:');
-                    accumulated += followUpIdx >= 0 ? chunk.substring(0, followUpIdx) : chunk;
+                    while (chunk.length > 0) {
+                        const replaceIdx = chunk.indexOf('\x00');
+                        const metaIdx = chunk.indexOf('\x01');
+                        const controlIndexes = [replaceIdx, metaIdx].filter((index) => index >= 0);
+                        const nextControl = controlIndexes.length > 0
+                            ? Math.min(...controlIndexes)
+                            : -1;
+
+                        if (nextControl === -1) {
+                            accumulated += chunk;
+                            chunk = '';
+                            continue;
+                        }
+
+                        accumulated += chunk.slice(0, nextControl);
+                        const controlChar = chunk[nextControl];
+                        chunk = chunk.slice(nextControl + 1);
+
+                        if (controlChar === '\x00') {
+                            accumulated = '';
+                            continue;
+                        }
+
+                        metaBuffer += chunk;
+                        readingMeta = true;
+                        chunk = '';
+                    }
                 }
 
+                const visibleContent = accumulated.replace(/\nFOLLOW_UP:[\s\S]*$/m, '');
                 // Update the in-place streaming message
                 setMessages(prev => prev.map(m =>
                     m.id === assistantMsgId
-                        ? { ...m, content: accumulated || ' ' }
+                        ? { ...m, content: visibleContent || ' ' }
                         : m
                 ));
             }
 
+            if (metaBuffer) {
+                try {
+                    metaJson = JSON.parse(metaBuffer);
+                } catch {
+                    metaJson = {};
+                }
+            }
+
             // Finalize with metadata
-            const finalContent = accumulated.trim() || 'Risposta non disponibile. Riprova.';
+            const finalContent = accumulated.replace(/\nFOLLOW_UP:[\s\S]*$/m, '').trim() || 'Risposta non disponibile. Riprova.';
             const hideSuggestions = shouldHideSuggestionsForReply(finalContent) || isLowSignalUserMessage(trimmedContent);
             setMessages(prev => prev.map(m =>
                 m.id === assistantMsgId
@@ -402,7 +450,7 @@ export function StrategyCopilot({ userTier }: StrategyCopilotProps) {
             // Persist conversationId for cross-refresh continuity
             if (metaJson.conversationId && metaJson.conversationId !== conversationId) {
                 setConversationId(metaJson.conversationId);
-                localStorage.setItem('copilot-conversation-id', metaJson.conversationId);
+                localStorage.setItem(conversationStorageKey, metaJson.conversationId);
             }
         } catch (err: unknown) {
             const isAbort = err instanceof DOMException && err.name === 'AbortError';

@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { ArrowLeft, Check, AlertCircle, ShieldCheck } from 'lucide-react';
+import { ArrowLeft, Check, AlertCircle, ShieldCheck, ExternalLink } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -23,6 +23,15 @@ export default function ConnectGooglePage() {
         gscSiteUrl: '',
     });
     const [error, setError] = useState<string | null>(null);
+
+    const docs = {
+        serviceAccountCreate: 'https://cloud.google.com/iam/docs/service-accounts-create',
+        serviceAccountKey: 'https://cloud.google.com/iam/docs/keys-create-delete',
+        ga4Permissions: 'https://support.google.com/analytics/answer/9305788?hl=it',
+        gscPermissions: 'https://support.google.com/webmasters/answer/7687615?hl=it',
+        analyticsDataApi: 'https://console.cloud.google.com/apis/library/analyticsdata.googleapis.com',
+        searchConsoleApi: 'https://console.cloud.google.com/apis/library/searchconsole.googleapis.com',
+    };
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -73,7 +82,7 @@ export default function ConnectGooglePage() {
                     <div>
                         <h1 className="text-2xl font-bold text-gray-900">Connetti Google</h1>
                         <p className="text-gray-500">
-                            Configura Google Analytics e Search Console con il tuo Service Account
+                            Configura Google Analytics e Search Console con Service Account (JSON richiesto in questa modalità)
                         </p>
                     </div>
                 </div>
@@ -104,6 +113,34 @@ export default function ConnectGooglePage() {
                         <p className="text-xs text-gray-500">
                             Incolla qui l'intero contenuto del file JSON scaricato dalla Google Cloud Console.
                         </p>
+                        <div className="text-xs text-gray-600 space-y-1">
+                            <p>
+                                Setup guidato:
+                                {' '}
+                                <a
+                                    href={docs.serviceAccountCreate}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="text-amber-700 hover:underline inline-flex items-center gap-1"
+                                >
+                                    crea Service Account
+                                    <ExternalLink className="w-3 h-3" />
+                                </a>
+                                {' '}
+                                e
+                                {' '}
+                                <a
+                                    href={docs.serviceAccountKey}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="text-amber-700 hover:underline inline-flex items-center gap-1"
+                                >
+                                    genera chiave JSON
+                                    <ExternalLink className="w-3 h-3" />
+                                </a>
+                                .
+                            </p>
+                        </div>
                     </div>
                 </div>
 
@@ -164,9 +201,54 @@ export default function ConnectGooglePage() {
                             Istruzioni Importanti
                         </h4>
                         <div className="text-xs text-amber-800 space-y-2 leading-relaxed">
-                            <p>1. Assicurati che l'email del Service Account (presente nel JSON) abbia accesso come <strong>Visualizzatore</strong> nella proprietà GA4.</p>
-                            <p>2. Aggiungi lo stesso account come utente su Search Console per l'URL indicato.</p>
-                            <p>3. Le API di Analytics e Search Console devono essere attive nel progetto Google Cloud.</p>
+                            <p>
+                                1. Assicurati che l'email del Service Account (presente nel JSON) abbia accesso come <strong>Visualizzatore</strong> nella proprietà GA4.
+                                {' '}
+                                <a
+                                    href={docs.ga4Permissions}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="underline font-semibold"
+                                >
+                                    Guida GA4
+                                </a>
+                            </p>
+                            <p>
+                                2. Aggiungi lo stesso account come utente su Search Console per l'URL indicato.
+                                {' '}
+                                <a
+                                    href={docs.gscPermissions}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="underline font-semibold"
+                                >
+                                    Guida GSC
+                                </a>
+                            </p>
+                            <p>
+                                3. Le API devono essere attive nel progetto Google Cloud:
+                                {' '}
+                                <a
+                                    href={docs.analyticsDataApi}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="underline font-semibold"
+                                >
+                                    Analytics Data API
+                                </a>
+                                {' '}
+                                e
+                                {' '}
+                                <a
+                                    href={docs.searchConsoleApi}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="underline font-semibold"
+                                >
+                                    Search Console API
+                                </a>
+                                .
+                            </p>
                         </div>
                     </div>
 

@@ -39,7 +39,7 @@ export function ProjectWorkspaceShell({
 }: ProjectWorkspaceShellProps) {
   return (
     <div className="space-y-6">
-      <section className="overflow-hidden rounded-[2rem] border border-slate-200 bg-[linear-gradient(135deg,#fff8ed_0%,#ffffff_40%,#f8fafc_100%)] shadow-sm">
+      <section className="overflow-hidden rounded-[2rem] border border-slate-200 bg-white shadow-sm">
         <div className="flex flex-col gap-6 px-6 py-6 lg:px-8">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
             <div className="space-y-3">
@@ -61,7 +61,7 @@ export function ProjectWorkspaceShell({
 
               <div className="space-y-2">
                 <div className="flex flex-wrap items-center gap-3">
-                  <h1 className="text-3xl font-black tracking-tight text-slate-900">{title}</h1>
+                  <h1 className="break-words text-2xl font-black tracking-tight text-slate-900 sm:text-3xl">{title}</h1>
                   {projectName ? (
                     <Badge className="border border-amber-200 bg-amber-50 text-[10px] font-black uppercase tracking-[0.18em] text-amber-700">
                       {projectName}
@@ -80,11 +80,11 @@ export function ProjectWorkspaceShell({
               {metrics.map((metric) => (
                 <div
                   key={metric.label}
-                  className={`rounded-2xl border px-4 py-3 ${metricToneClass(metric.tone)}`}
+                  className={`min-h-[124px] overflow-hidden rounded-2xl border px-4 py-3 ${metricToneClass(metric.tone)}`}
                 >
-                  <p className="text-[10px] font-black uppercase tracking-[0.18em]">{metric.label}</p>
+                  <p className="text-[10px] font-black uppercase tracking-[0.14em] leading-tight break-words">{metric.label}</p>
                   <div className="mt-2 flex items-end justify-between gap-2">
-                    <p className="text-2xl font-black tracking-tight">{metric.value}</p>
+                    <p className="break-words text-[clamp(1.5rem,2.4vw,2rem)] font-black tracking-tight leading-none">{metric.value}</p>
                     <ArrowRight className="h-4 w-4 opacity-40" />
                   </div>
                 </div>

@@ -18,6 +18,24 @@ interface Message {
     suggestedPromptVariants?: string[];
 }
 
+function isLowSignalUserMessage(text: string): boolean {
+    const normalized = String(text || '').toLowerCase().trim();
+    if (!normalized) return true;
+    const compact = normalized.replace(/[!?.,;:]/g, '').trim();
+    if (new Set(['ok', 'grazie', 'si', 'sì', 'si grazie', 'sì grazie', 'ok grazie']).has(compact)) return true;
+    const words = compact.split(/\s+/).filter(Boolean);
+    return words.length <= 2 && compact.length <= 14;
+}
+
+function shouldHideSuggestionsForReply(reply: string): boolean {
+    const normalized = String(reply || '').toLowerCase();
+    return (
+        normalized.includes('risposta non disponibile') ||
+        normalized.includes('c\'e stato un problema') ||
+        normalized.includes('si e verificato un errore')
+    );
+}
+
 interface StrategyCopilotProps {
     userTier: string;
 }
@@ -364,16 +382,17 @@ export function StrategyCopilot({ userTier }: StrategyCopilotProps) {
 
             // Finalize with metadata
             const finalContent = accumulated.trim() || 'Risposta non disponibile. Riprova.';
+            const hideSuggestions = shouldHideSuggestionsForReply(finalContent) || isLowSignalUserMessage(trimmedContent);
             setMessages(prev => prev.map(m =>
                 m.id === assistantMsgId
                             ? {
                         ...m,
                         content: finalContent,
                         toolsUsed: metaJson.toolsUsed,
-                        suggestedFollowUp: typeof metaJson.suggestedFollowUp === 'string' && metaJson.suggestedFollowUp
+                        suggestedFollowUp: !hideSuggestions && typeof metaJson.suggestedFollowUp === 'string' && metaJson.suggestedFollowUp
                             ? metaJson.suggestedFollowUp
                             : undefined,
-                        suggestedPromptVariants: Array.isArray(metaJson.suggestedPromptVariants)
+                        suggestedPromptVariants: !hideSuggestions && Array.isArray(metaJson.suggestedPromptVariants)
                             ? metaJson.suggestedPromptVariants.filter((item: unknown): item is string => typeof item === 'string' && item.trim().length > 0)
                             : undefined
                     }

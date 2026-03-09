@@ -22,24 +22,28 @@ export function ProjectLoopNav({ projectId, activeSection }: ProjectLoopNavProps
             href={section.href}
             aria-current={isActive ? 'page' : undefined}
             className={[
-              'group rounded-2xl border px-4 py-3 transition-all',
+              'group h-full overflow-hidden rounded-2xl border px-4 py-3 transition-all',
               isActive
                 ? 'border-amber-300 bg-amber-50 shadow-sm'
                 : 'border-slate-200 bg-white hover:border-amber-200 hover:bg-amber-50/40',
             ].join(' ')}
           >
-            <div className="flex items-center gap-2">
+            <div className="flex h-full flex-col gap-3">
               <div
                 className={[
-                  'rounded-xl p-2 transition-colors',
+                  'w-fit rounded-xl p-2 transition-colors',
                   isActive ? 'bg-amber-500 text-white' : 'bg-slate-100 text-slate-500 group-hover:bg-amber-100 group-hover:text-amber-700',
                 ].join(' ')}
               >
                 <Icon className="h-4 w-4" />
               </div>
-              <div className="min-w-0">
-                <p className="text-xs font-black uppercase tracking-[0.18em] text-slate-700">{section.label}</p>
-                <p className="text-[11px] text-slate-500">{section.description}</p>
+              <div className="min-w-0 space-y-1">
+                <p className="break-words text-[11px] font-black uppercase tracking-[0.12em] leading-tight text-slate-700">
+                  {section.label}
+                </p>
+                <p className="break-words text-sm leading-5 text-slate-500">
+                  {section.description}
+                </p>
               </div>
             </div>
           </Link>

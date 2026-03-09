@@ -115,7 +115,56 @@ function shouldUseKnowledgeBaseFallback(
     return true;
 }
 
-function buildCopilotPromptVariants(prompt: string, suggestedFollowUp: string): string[] {
+function isLowSignalUserMessage(text: string): boolean {
+    const normalized = String(text || '').toLowerCase().trim();
+    if (!normalized) return true;
+
+    const compact = normalized.replace(/[!?.,;:]/g, '').trim();
+    const lowSignalSet = new Set([
+        'ok', 'va bene', 'perfetto', 'grazie', 'si', 'sì', 'si grazie', 'sì grazie',
+        'ottimo', 'chiaro', 'capito', 'yes', 'ok grazie'
+    ]);
+    if (lowSignalSet.has(compact)) return true;
+
+    const words = compact.split(/\s+/).filter(Boolean);
+    return words.length <= 2 && compact.length <= 14;
+}
+
+function isAssistantErrorLike(text: string): boolean {
+    const normalized = String(text || '').toLowerCase();
+    return (
+        normalized.includes('risposta non disponibile') ||
+        normalized.includes('si e verificato un errore') ||
+        normalized.includes('c\'e stato un problema') ||
+        normalized.includes('riprova')
+    );
+}
+
+function buildPromptContextFromConversation(
+    messages: Array<{ role: 'user' | 'assistant'; content: string }>
+): string | null {
+    const userMessages = messages
+        .filter((item) => item.role === 'user')
+        .map((item) => String(item.content || '').trim())
+        .filter((content) => content.length > 0 && !isLowSignalUserMessage(content));
+
+    if (userMessages.length === 0) return null;
+
+    const recent = userMessages.slice(-4);
+    const deduped: string[] = [];
+    for (const content of recent) {
+        if (!deduped.includes(content)) deduped.push(content);
+    }
+
+    // Build a compact context window so suggestions are grounded in topic + objective.
+    return deduped.join(' | ');
+}
+
+function buildCopilotPromptVariants(prompt: string, suggestedFollowUp: string, assistantText: string): string[] {
+    if (isLowSignalUserMessage(prompt) || isAssistantErrorLike(assistantText)) {
+        return suggestedFollowUp ? [suggestedFollowUp] : [];
+    }
+
     const normalized = prompt.toLowerCase();
 
     if (
@@ -480,6 +529,7 @@ export async function POST(req: Request) {
                     } catch (error) {
                         lastError = error;
                         if (!shouldFallbackFromAnthropic(error)) throw error;
+                        if (isAnthropicBillingError(error)) break;
                     }
                 }
                 if (lastError) throw lastError;
@@ -518,7 +568,10 @@ export async function POST(req: Request) {
                 if (followUpMatch) {
                     suggestedFollowUp = followUpMatch[1].trim();
                 }
-                const suggestedPromptVariants = buildCopilotPromptVariants(message, suggestedFollowUp);
+                const promptContext = buildPromptContextFromConversation(inputMessages);
+                const suggestedPromptVariants = promptContext
+                    ? buildCopilotPromptVariants(promptContext, suggestedFollowUp, fullText)
+                    : (suggestedFollowUp ? [suggestedFollowUp] : []);
 
                 // KB fallback for placeholder responses
                 let usedKnowledgeBase = false;

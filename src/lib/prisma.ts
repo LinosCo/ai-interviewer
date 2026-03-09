@@ -65,18 +65,21 @@ function createPrismaClient(): PrismaClient {
   });
   const adapter = new PrismaPg(pool);
 
-  const client = new PrismaClient({ adapter });
-
-  client.$use(async (params, next) => {
-    // Backward compatibility: some environments may lag behind migrations and miss
-    // optional VisibilityConfig columns used by Brand Monitor.
-    if (params.model === 'VisibilityConfig') {
-      await ensureVisibilityConfigSchemaCompatibility(client);
-    }
-    return next(params);
+  const baseClient = new PrismaClient({ adapter });
+  // Prisma Client created with adapter-pg can miss middleware APIs like $use.
+  // Use query extension instead to keep the compatibility patch.
+  const client = baseClient.$extends({
+    query: {
+      visibilityConfig: {
+        async $allOperations({ args, query }) {
+          await ensureVisibilityConfigSchemaCompatibility(baseClient);
+          return query(args);
+        },
+      },
+    },
   });
 
-  return client;
+  return client as PrismaClient;
 }
 
 // Returns the singleton PrismaClient, creating it on first call.

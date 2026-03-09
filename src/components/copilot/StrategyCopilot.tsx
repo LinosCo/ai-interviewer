@@ -38,7 +38,7 @@ function buildSurfaceQuickActions(pathname: string, hasProjectAccess: boolean) {
 
     if (pathname.includes('/integrations')) {
         return [
-            { label: 'Verifica le connections attive di questo progetto', icon: Lightbulb, category: 'connections' },
+            { label: 'Verifica le connessioni attive di questo progetto', icon: Lightbulb, category: 'connections' },
             { label: 'Suggerisci la prima regola di routing da creare', icon: Sparkles, category: 'execute' },
             ...base,
         ];
@@ -46,7 +46,7 @@ function buildSurfaceQuickActions(pathname: string, hasProjectAccess: boolean) {
 
     if (pathname.includes('/analytics')) {
         return [
-            { label: 'Qual e la metrica che richiede attenzione adesso?', icon: Lightbulb, category: 'measure' },
+            { label: 'Qual è la metrica che richiede attenzione adesso?', icon: Lightbulb, category: 'measure' },
             { label: 'Confronta trend e suggerisci la prossima mossa', icon: Sparkles, category: 'measure' },
             ...base,
         ];

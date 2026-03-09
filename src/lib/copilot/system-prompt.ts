@@ -172,7 +172,7 @@ ${ctx.projectContext.strategy?.positioning ? `- Positioning: ${ctx.projectContex
 ${ctx.strategicMarketingKnowledge ? `
 ## Knowledge Base Marketing Strategico (Organizzazione)
 Usa questa base come riferimento generale per marketing strategico, SEO, GEO/LLMO, digital trends e business development.
-Se i dati progetto suggeriscono deviazioni, spiega esplicitamente il perche.
+Se i dati progetto suggeriscono deviazioni, spiega esplicitamente il perché.
 
 ---
 ${ctx.strategicMarketingKnowledge}
@@ -198,5 +198,5 @@ ${ctx.strategicPlan}
 - Per le citazioni, usa il formato: > "citazione" - Nome, data
 - Per i numeri importanti, evidenziali in grassetto
 - Mantieni le risposte concise, espandi solo se richiesto
-- Per suggerimenti operativi usa una struttura breve: "Perche", "Azione", "Fonte/i", "Prossimo passo"`;
+- Per suggerimenti operativi usa una struttura breve: "Perché", "Azione", "Fonte/i", "Prossimo passo"`;
 }

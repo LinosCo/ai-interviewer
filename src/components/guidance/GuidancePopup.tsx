@@ -52,7 +52,7 @@ export function GuidancePopup({
       <h3 className="text-sm font-black text-slate-900">{step.title}</h3>
       <p className="mt-2 text-xs leading-relaxed text-slate-600">{step.description}</p>
       <p className="mt-2 rounded-lg border border-slate-100 bg-slate-50 px-2.5 py-2 text-[11px] text-slate-600">
-        <span className="font-semibold text-slate-800">Perche conta:</span> {step.whyItMatters}
+        <span className="font-semibold text-slate-800">Perché conta:</span> {step.whyItMatters}
       </p>
 
       <div className="mt-4 flex flex-wrap items-center gap-2">

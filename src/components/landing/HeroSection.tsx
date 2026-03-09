@@ -56,7 +56,7 @@ const CYCLE_PHASES: CyclePhase[] = [
   },
   {
     label: 'Decidi',
-    description: 'Il Copilot collega i segnali e suggerisce priorita operative concrete.',
+    description: 'Il Copilot collega i segnali e suggerisce priorità operative concrete.',
     icon: Lightbulb,
   },
   {

@@ -41,7 +41,7 @@ export function RelatedActionSuggestions({
               </div>
               <p className="mt-2 text-xs leading-5 text-slate-600">{suggestion.description}</p>
               <p className="mt-2 text-[11px] text-slate-500">
-                <span className="font-semibold text-slate-700">Perche:</span> {suggestion.rationale}
+                <span className="font-semibold text-slate-700">Perché:</span> {suggestion.rationale}
               </p>
               {promptSuggestions[index] ? (
                 <button

@@ -72,7 +72,7 @@ export function ProjectWorkspaceShell({
               </div>
             </div>
 
-            {action ? <div className="flex shrink-0 items-center gap-3">{action}</div> : null}
+            {action ? <div className="w-full lg:w-auto lg:shrink-0">{action}</div> : null}
           </div>
 
           {metrics.length > 0 ? (

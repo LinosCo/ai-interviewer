@@ -124,7 +124,7 @@ export default async function ProjectCockpitPage({ params }: { params: Promise<{
                 projectId={projectId}
                 projectName={project.name}
                 activeSection="overview"
-                eyebrow="Overview"
+                eyebrow="Quadro"
                 title="Cockpit progetto"
                 description="Controlla lo stato operativo del progetto, verifica quali tool stanno generando segnali e vedi se il workspace e pronto a passare da tip a routing."
                 metrics={[
@@ -139,7 +139,7 @@ export default async function ProjectCockpitPage({ params }: { params: Promise<{
                         <Link href={`/dashboard/projects/${projectId}/analytics`}>
                             <Button size="sm" variant="outline" className="border-slate-200 hover:bg-slate-50 text-slate-700 rounded-xl shadow-sm font-bold transition-all px-5">
                                 <BarChart3 className="w-4 h-4 mr-2" />
-                                Measure
+                                Misura
                             </Button>
                         </Link>
                         <Link href={`/dashboard/projects/${projectId}/settings`}>

@@ -1,6 +1,29 @@
 import { PrismaClient } from '@prisma/client';
 
 const globalForPrisma = globalThis as unknown as { prisma?: PrismaClient };
+let visibilitySchemaCompatibilityPromise: Promise<void> | null = null;
+
+async function ensureVisibilityConfigSchemaCompatibility(client: PrismaClient): Promise<void> {
+  if (!visibilitySchemaCompatibilityPromise) {
+    visibilitySchemaCompatibilityPromise = (async () => {
+      try {
+        await client.$executeRawUnsafe(
+          'ALTER TABLE "VisibilityConfig" ADD COLUMN IF NOT EXISTS "websiteUrl" TEXT',
+        );
+        await client.$executeRawUnsafe(
+          'ALTER TABLE "VisibilityConfig" ADD COLUMN IF NOT EXISTS "sitemapUrl" TEXT',
+        );
+        await client.$executeRawUnsafe(
+          'ALTER TABLE "VisibilityConfig" ADD COLUMN IF NOT EXISTS "additionalUrls" JSONB',
+        );
+      } catch (error) {
+        console.warn('[prisma] VisibilityConfig compatibility patch skipped:', error);
+      }
+    })();
+  }
+
+  await visibilitySchemaCompatibilityPromise;
+}
 
 function createPrismaClient(): PrismaClient {
   const connectionString = process.env.DIRECT_URL || process.env.DATABASE_URL;
@@ -42,7 +65,18 @@ function createPrismaClient(): PrismaClient {
   });
   const adapter = new PrismaPg(pool);
 
-  return new PrismaClient({ adapter });
+  const client = new PrismaClient({ adapter });
+
+  client.$use(async (params, next) => {
+    // Backward compatibility: some environments may lag behind migrations and miss
+    // optional VisibilityConfig columns used by Brand Monitor.
+    if (params.model === 'VisibilityConfig') {
+      await ensureVisibilityConfigSchemaCompatibility(client);
+    }
+    return next(params);
+  });
+
+  return client;
 }
 
 // Returns the singleton PrismaClient, creating it on first call.

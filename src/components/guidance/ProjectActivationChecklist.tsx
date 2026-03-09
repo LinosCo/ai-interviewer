@@ -74,10 +74,10 @@ export function ProjectActivationChecklist({ projectId }: ProjectActivationCheck
       },
       {
         id: 'integration',
-        label: 'Apri Connections e collega una destinazione',
+        label: 'Apri Connessioni e collega una destinazione',
         done: hasIntegration,
         href: `/dashboard/projects/${projectId}/integrations?tab=connections`,
-        cta: 'Apri Connections',
+        cta: 'Apri Connessioni',
       },
       {
         id: 'tips',
@@ -88,10 +88,10 @@ export function ProjectActivationChecklist({ projectId }: ProjectActivationCheck
       },
       {
         id: 'routing',
-        label: 'Passa in Execute e configura il routing',
+        label: 'Passa in Esecuzione e configura il routing',
         done: hasRouting,
         href: `/dashboard/projects/${projectId}/integrations?tab=routing`,
-        cta: 'Apri Execute',
+        cta: 'Apri Esecuzione',
       },
     ];
   }, [projectId, snapshot]);

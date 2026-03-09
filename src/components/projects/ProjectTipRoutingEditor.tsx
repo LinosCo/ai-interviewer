@@ -106,7 +106,7 @@ export function ProjectTipRoutingEditor({
         <textarea
           value={value.notes}
           onChange={(event) => onChange({ ...value, notes: event.target.value })}
-          placeholder="Aggiungi vincoli, priorita o controlli prima della pubblicazione."
+          placeholder="Aggiungi vincoli, priorità o controlli prima della pubblicazione."
           className="min-h-24 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700"
         />
       </label>

@@ -484,7 +484,7 @@ export default function SuggestionsPage() {
                         )}
 
                         <div className="mb-6">
-                            <h3 className="text-sm font-semibold text-gray-700 mb-2">Perche questo contenuto</h3>
+                            <h3 className="text-sm font-semibold text-gray-700 mb-2">Perché questo contenuto</h3>
                             <p className="text-sm text-gray-600 bg-gray-50 p-3 rounded">{selectedSuggestion.reasoning}</p>
                         </div>
 

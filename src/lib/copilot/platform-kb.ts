@@ -589,7 +589,7 @@ Clicca sull'icona del Copilot nella sidebar o usa la scorciatoia da tastiera.
 **Per ogni tip trovi:**
 - Coerenza strategica con Vision, Value Proposition e Piano Strategico Copilot
 - Evidenze sintetiche (numeri o segnali concreti)
-- Logica del suggerimento (perche e stato proposto)
+- Logica del suggerimento (perché è stato proposto)
 - Canali dati considerati
 
 **Tipologie principali:**
@@ -690,7 +690,7 @@ Clicca sull'icona del Copilot nella sidebar o usa la scorciatoia da tastiera.
 2. Attendi AI Tips con logica, evidenze e allineamento strategico
 
 **Fase 2: Revisione**
-1. Apri il tip e leggi \"Perche\" + \"Logica del suggerimento AI\"
+1. Apri il tip e leggi \"Perché\" + \"Logica del suggerimento AI\"
 2. Verifica coerenza con Piano Strategico Copilot
 3. Controlla se il tip e new content o update di contenuto esistente
 
@@ -750,7 +750,7 @@ Clicca sull'icona del Copilot nella sidebar o usa la scorciatoia da tastiera.
         content: `Configurazione consigliata per ottenere insight utili e confrontabili nel tempo.
 
 **Step 1: Definisci obiettivo ricerca**
-1. Scrivi una domanda decisionale concreta (es. \"Perche perdiamo lead?\")
+1. Scrivi una domanda decisionale concreta (es. \"Perché perdiamo lead?\")
 2. Definisci target utenti da intervistare
 3. Imposta metrica di successo (es. temi ricorrenti, sentiment, citazioni)
 
@@ -831,7 +831,7 @@ Clicca sull'icona del Copilot nella sidebar o usa la scorciatoia da tastiera.
 **Step 4: Esegui analisi**
 1. Avvia scan e website analysis
 2. Leggi score, coverage prompt e raccomandazioni
-3. Usa explainability per capire il perche di ogni tip
+3. Usa explainability per capire il perché di ogni tip
 
 **Step 5: Trasforma tip in esecuzione**
 1. Modifica bozza e routing pubblicazione

@@ -1,6 +1,6 @@
 'use client';
 
-import { Suspense, useActionState, useEffect, useRef, useTransition } from 'react';
+import { Suspense, useActionState, useEffect, useTransition } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -24,7 +24,6 @@ function LoginForm() {
     const searchParams = useSearchParams();
     const [serverError, dispatch, isPending] = useActionState(authenticate, undefined);
     const [, startTransition] = useTransition();
-    const formRef = useRef<HTMLFormElement>(null);
 
     const nextPathRaw = searchParams.get('next');
     const nextPath = nextPathRaw && nextPathRaw.startsWith('/') ? nextPathRaw : null;
@@ -49,11 +48,11 @@ function LoginForm() {
         }
     }, [serverError, isPending, isSubmitSuccessful, nextPath]);
 
-    const onSubmit = () => {
-        if (formRef.current) {
-            const formData = new FormData(formRef.current);
-            startTransition(() => { dispatch(formData); });
-        }
+    const onSubmit = (values: LoginInput) => {
+        const formData = new FormData();
+        formData.set('email', values.email);
+        formData.set('password', values.password);
+        startTransition(() => { dispatch(formData); });
     };
 
     return (
@@ -81,7 +80,7 @@ function LoginForm() {
                 </div>
 
                 <Card variant="glass" padding="2.5rem">
-                    <form ref={formRef} onSubmit={handleSubmit(onSubmit)}>
+                    <form onSubmit={handleSubmit(onSubmit)}>
                         <div style={{ marginBottom: '1.5rem' }}>
                             <Input
                                 label="Email"

@@ -362,7 +362,7 @@ export async function POST(req: Request) {
 
         // 3. Lead Generation Logic (Slot Filling)
         const candidateFields = normalizeCandidateFields(bot.candidateDataFields);
-        let candidateProfile = ((conversation.candidateProfile as Record<string, unknown> | null) || {}) as Record<string, unknown>;
+        const candidateProfile = ((conversation.candidateProfile as Record<string, unknown> | null) || {}) as Record<string, unknown>;
         const metadata = ((conversation.metadata as Record<string, unknown> | null) || {}) as Record<string, unknown>;
         const leadCapture = normalizeLeadCapture(metadata.leadCapture);
         const declinedFields = new Set(leadCapture.declinedFields);

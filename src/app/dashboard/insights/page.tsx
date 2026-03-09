@@ -926,8 +926,8 @@ export default function InsightHubPage() {
     const workspaceDescription = workspaceView === 'listen'
         ? 'Questa vista serve a capire da quali fonti arrivano i segnali, quanto sono coerenti e quali pattern meritano di diventare tip operativi.'
         : workspaceView === 'strategy'
-            ? 'Qui leggi priorita, metodo e sintesi strategica prima di decidere quali tip spingere in esecuzione.'
-            : 'Questa vista e il centro operativo dei tip: reasoning, related actions, routing e prossima mossa convivono nello stesso flusso.';
+            ? 'Qui leggi priorità, metodo e sintesi strategica prima di decidere quali tip spingere in esecuzione.'
+            : 'Questa vista è il centro operativo dei tip: motivazioni, azioni correlate, routing e prossima mossa convivono nello stesso flusso.';
     const activeSection = workspaceView === 'strategy' ? 'strategy' : workspaceView === 'listen' ? 'listen' : 'tips';
 
     return (
@@ -936,29 +936,29 @@ export default function InsightHubPage() {
                 projectId={projectId}
                 projectName={selectedProject && !isAllProjectsSelected ? selectedProject.name : null}
                 activeSection={activeSection}
-                eyebrow={workspaceView === 'tips' ? 'Tips' : workspaceView === 'listen' ? 'Listen' : 'Strategy'}
+                eyebrow={workspaceView === 'tips' ? 'Tips' : workspaceView === 'listen' ? 'Ascolto' : 'Strategia'}
                 title={workspaceTitle}
                 description={workspaceDescription}
                 metrics={[
                     { label: 'Tip canonici', value: String(canonicalTips.length), tone: canonicalTips.length > 0 ? 'success' : 'default' },
                     { label: 'Segnali attivi', value: String(insights.filter((insight) => normalizeInsightStatus(insight.status) === 'active').length), tone: 'accent' },
                     { label: 'Routing', value: showRoutingConnectionInvite ? 'Da attivare' : projectId ? 'Disponibile' : 'Seleziona progetto', tone: showRoutingConnectionInvite ? 'warning' : 'success' },
-                    { label: 'Focus', value: workspaceView === 'listen' ? 'Fonti' : workspaceView === 'strategy' ? 'Priorita' : 'Azione', tone: 'accent' },
+                    { label: 'Focus', value: workspaceView === 'listen' ? 'Fonti' : workspaceView === 'strategy' ? 'Priorità' : 'Azione', tone: 'accent' },
                 ]}
                 action={
-                    <div className="flex items-center gap-2">
+                    <div className="flex w-full flex-col items-stretch gap-2 sm:flex-row sm:items-center sm:justify-end">
                         <Button
                             onClick={handleExportCsv}
                             variant="outline"
                             className="rounded-full px-6"
                         >
                             <Download className="mr-2 h-4 w-4" />
-                            Export CSV
+                            Esporta CSV
                         </Button>
                         <Button
                             onClick={handleSync}
                             disabled={syncing}
-                            className="bg-amber-600 hover:bg-amber-700 text-white rounded-full px-8 shadow-lg shadow-amber-200 transition-all hover:scale-105 active:scale-95"
+                            className="bg-amber-600 hover:bg-amber-700 text-white rounded-full px-8 shadow-lg shadow-amber-200 transition-all sm:hover:scale-105 sm:active:scale-95"
                         >
                             {syncing ? <RefreshCw className="mr-2 h-4 w-4 animate-spin" /> : <Sparkles className="mr-2 h-4 w-4" />}
                             {syncing ? 'Analisi in corso...' : 'Aggiorna Analisi'}
@@ -975,7 +975,7 @@ export default function InsightHubPage() {
                         ← {selectedProject.name}
                     </button>
                     <span>/</span>
-                    <span className="text-slate-700 font-medium">{workspaceView === 'listen' ? 'Listen' : workspaceView === 'strategy' ? 'Strategy' : 'Tips'}</span>
+                    <span className="text-slate-700 font-medium">{workspaceView === 'listen' ? 'Ascolto' : workspaceView === 'strategy' ? 'Strategia' : 'Tips'}</span>
                 </div>
             )}
 
@@ -1006,7 +1006,7 @@ export default function InsightHubPage() {
                                 onClick={openRoutingUpgrade}
                                 className="rounded-full bg-amber-600 hover:bg-amber-700 text-white"
                             >
-                                Upgrade Business
+                                Passa a Business
                             </Button>
                         )}
                     </div>
@@ -1039,7 +1039,7 @@ export default function InsightHubPage() {
                 <Card className="border-slate-200">
                     <CardHeader className="pb-3">
                         <CardTitle className="text-sm font-bold uppercase tracking-wider text-slate-500">
-                            Storico AI Tips per tipologia
+                            Storico tip AI per tipologia
                         </CardTitle>
                     </CardHeader>
                     <CardContent className="pt-0">
@@ -1853,7 +1853,7 @@ export default function InsightHubPage() {
                                                                                             onClick={openRoutingUpgrade}
                                                                                             className="text-[11px] font-semibold text-amber-700 hover:text-amber-800 underline underline-offset-2"
                                                                                         >
-                                                                                            Upgrade Business
+                                                                                            Passa a Business
                                                                                         </button>
                                                                                     </div>
                                                                                 ) : routingConnectionLoading ? (

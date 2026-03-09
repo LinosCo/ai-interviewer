@@ -123,45 +123,45 @@ export default function ProjectAnalytics({ projectId, availableBots }: ProjectAn
 
     if (analytics.avgSentiment < 55) {
       return {
-        title: 'La percezione e fragile',
-        description: 'Il sentiment combinato indica attrito: serve un messaggio piu chiaro o un contenuto correttivo ad alta priorita.',
+        title: 'La percezione è fragile',
+        description: 'Il sentiment combinato indica attrito: serve un messaggio più chiaro o un contenuto correttivo ad alta priorità.',
         action: 'Apri Tips e cerca i temi con maggiore frizione.',
       };
     }
 
     if (analytics.completionRate < 45) {
       return {
-        title: 'Il volume c e, la conversione meno',
+        title: 'Il volume c’è, la conversione meno',
         description: 'Le conversazioni partono ma non arrivano abbastanza spesso a un esito utile.',
-        action: 'Rivedi il flusso di risposta e la qualita delle CTA.',
+        action: 'Rivedi il flusso di risposta e la qualità delle CTA.',
       };
     }
 
     return {
       title: 'Il progetto sta generando segnali leggibili',
-      description: 'Le metriche principali sono abbastanza coerenti da poter passare dalla lettura all attivazione.',
-      action: 'Usa le analytics per scegliere la prossima priorita operativa.',
+      description: 'Le metriche principali sono abbastanza coerenti da poter passare dalla lettura all’attivazione.',
+      action: 'Usa le analytics per scegliere la prossima priorità operativa.',
     };
   }, [analytics.avgSentiment, analytics.completionRate, analytics.knowledgeGaps.length]);
 
   const topPriorityCards = useMemo(() => {
     return [
       {
-        label: 'Listen',
+        label: 'Ascolto',
         value: `${analytics.interviewCount + analytics.chatbotCount}`,
         helper: 'fonti attive',
         tone: 'border-blue-200 bg-blue-50',
         icon: MessageSquare,
       },
       {
-        label: 'Measure',
+        label: 'Misura',
         value: `${analytics.avgSentiment.toFixed(0)}/100`,
         helper: 'reputazione combinata',
         tone: 'border-amber-200 bg-amber-50',
         icon: TrendingUp,
       },
       {
-        label: 'Activation',
+        label: 'Attivazione',
         value: `${analytics.leadsCaptured}`,
         helper: 'lead catturati',
         tone: 'border-emerald-200 bg-emerald-50',
@@ -175,7 +175,7 @@ export default function ProjectAnalytics({ projectId, availableBots }: ProjectAn
       {
         title: 'Dove ascoltare meglio',
         description: analytics.topThemes.length > 0
-          ? `Tema piu forte: ${analytics.topThemes[0].name}.`
+          ? `Tema più forte: ${analytics.topThemes[0].name}.`
           : 'Le fonti stanno ancora producendo pochi pattern consolidati.',
         nextMove: 'Controlla se il tema entra in Tips con una decisione canonica.',
         icon: Mic,
@@ -185,15 +185,15 @@ export default function ProjectAnalytics({ projectId, availableBots }: ProjectAn
         description: analytics.knowledgeGaps.length > 0
           ? `${analytics.knowledgeGaps.length} gap da trasformare in contenuti o FAQ.`
           : 'Non emergono gap urgenti: puoi lavorare su amplificazione e reuse.',
-        nextMove: 'Rivedi Tips e scegli cosa ha impatto piu rapido.',
+        nextMove: 'Rivedi Tips e scegli cosa ha impatto più rapido.',
         icon: Lightbulb,
       },
       {
         title: 'Dove misurare il prossimo impatto',
         description: analytics.completionRate < 45
-          ? 'Il completion rate e il collo di bottiglia piu evidente.'
-          : 'La metrica piu utile adesso e la qualita del traffico generato.',
-        nextMove: 'Confronta il trend e poi spingi Execute sui tip maturi.',
+          ? 'Il completion rate è il collo di bottiglia più evidente.'
+          : 'La metrica più utile adesso è la qualità del traffico generato.',
+        nextMove: 'Confronta il trend e poi spingi in Esecuzione i tip maturi.',
         icon: Clock3,
       },
     ];
@@ -292,8 +292,8 @@ export default function ProjectAnalytics({ projectId, availableBots }: ProjectAn
       <div className="grid gap-6 xl:grid-cols-[1.2fr_0.8fr]">
         <Card className="border-slate-200 shadow-sm">
           <CardHeader>
-            <CardTitle className="text-lg font-black text-slate-900">Trend di qualita</CardTitle>
-            <CardDescription>Osserva insieme sentiment e volume per capire se il progetto sta migliorando o semplicemente parlando di piu.</CardDescription>
+            <CardTitle className="text-lg font-black text-slate-900">Trend di qualità</CardTitle>
+            <CardDescription>Osserva insieme sentiment e volume per capire se il progetto sta migliorando o semplicemente parlando di più.</CardDescription>
           </CardHeader>
           <CardContent className="grid gap-6 lg:grid-cols-2">
             <div className="h-[260px]">
@@ -330,8 +330,8 @@ export default function ProjectAnalytics({ projectId, availableBots }: ProjectAn
 
         <Card className="border-slate-200 shadow-sm">
           <CardHeader>
-            <CardTitle className="text-lg font-black text-slate-900">Rischi e opportunita immediate</CardTitle>
-            <CardDescription>Questa sezione evidenzia cosa puo bloccare o accelerare il loop nel breve.</CardDescription>
+            <CardTitle className="text-lg font-black text-slate-900">Rischi e opportunità immediate</CardTitle>
+            <CardDescription>Questa sezione evidenzia cosa può bloccare o accelerare il loop nel breve.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
             {analytics.knowledgeGaps.length > 0 ? (
@@ -345,7 +345,7 @@ export default function ProjectAnalytics({ projectId, availableBots }: ProjectAn
               ))
             ) : (
               <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
-                Non emergono gap critici: puoi usare Tips ed Execute per spingere la distribuzione.
+                Non emergono gap critici: puoi usare Tips ed Esecuzione per spingere la distribuzione.
               </div>
             )}
 
@@ -460,7 +460,7 @@ export default function ProjectAnalytics({ projectId, availableBots }: ProjectAn
           <CardContent className="p-5">
             <p className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-500">Lead</p>
             <p className="mt-2 text-3xl font-black text-slate-900">{analytics.leadsCaptured}</p>
-            <p className="mt-1 text-xs text-slate-500">opportunita tracciate</p>
+            <p className="mt-1 text-xs text-slate-500">opportunità tracciate</p>
           </CardContent>
         </Card>
       </section>

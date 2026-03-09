@@ -95,7 +95,7 @@ export function getTipOperationalState(
       key: 'ready_to_route',
       label: 'Pronto da instradare',
       className: 'border-blue-200 bg-blue-50 text-blue-700',
-      description: 'La logica e chiara e il routing puo essere configurato o attivato.',
+      description: 'La logica è chiara e il routing può essere configurato o attivato.',
     };
   }
 

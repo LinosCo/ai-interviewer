@@ -19,6 +19,9 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Local/agent worktrees and scratch areas are not part of the main app source.
+    ".claude/**",
+    ".worktrees/**",
   ]),
 ]);
 

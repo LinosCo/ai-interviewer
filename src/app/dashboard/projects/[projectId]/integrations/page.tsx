@@ -439,8 +439,8 @@ export default function IntegrationsPage() {
         projectId={projectId}
         projectName={currentProjectName}
         activeSection={activeSection}
-        eyebrow={activeTab === 'routing' ? 'Execute' : 'Connections'}
-        title={activeTab === 'routing' ? 'Routing e messa in azione' : 'Connections e setup esterno'}
+        eyebrow={activeTab === 'routing' ? 'Esecuzione' : 'Connessioni'}
+        title={activeTab === 'routing' ? 'Routing e messa in azione' : 'Connessioni e setup esterno'}
         description={
           activeTab === 'routing'
             ? 'Configura dove devono andare i tip, con quali policy e quali blocchi correggere prima di eseguire.'
@@ -450,7 +450,7 @@ export default function IntegrationsPage() {
           { label: 'Connessioni attive', value: String(activeCount), tone: activeCount > 0 ? 'success' : 'warning' },
           { label: 'Routing AI', value: hasBusinessTier ? 'Disponibile' : 'Upgrade richiesto', tone: hasBusinessTier ? 'accent' : 'warning' },
           { label: 'Progetto', value: currentOrgName || 'Workspace', tone: 'default' },
-          { label: 'Tab attiva', value: activeTab === 'routing' ? 'Execute' : 'Connections', tone: 'accent' },
+          { label: 'Tab attiva', value: activeTab === 'routing' ? 'Esecuzione' : 'Connessioni', tone: 'accent' },
         ]}
       >
         <div className="mt-8 flex min-h-[70vh] flex-col overflow-hidden rounded-[2rem] border border-slate-200 bg-white shadow-sm">

@@ -53,7 +53,7 @@ export function ProjectTipEditor({
           className="min-h-24 rounded-xl border border-slate-300 px-3 py-2 text-sm"
           value={draft.reasoning}
           onChange={(event) => onChange({ ...draft, reasoning: event.target.value })}
-          placeholder="Perche questo tip esiste"
+          placeholder="Perché questo tip esiste"
         />
         <textarea
           className="min-h-24 rounded-xl border border-slate-300 px-3 py-2 text-sm"

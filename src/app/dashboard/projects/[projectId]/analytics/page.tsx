@@ -35,7 +35,7 @@ export default async function AnalyticsPage(props: { params: Promise<{ projectId
                 projectId={params.projectId}
                 projectName={project.name}
                 activeSection="measure"
-                eyebrow="Measure"
+                eyebrow="Misura"
                 title="Misura impatto e priorita"
                 description="Leggi i risultati del progetto in chiave decisionale: cosa sta cambiando, dove si sta creando attrito e quale mossa conviene fare adesso."
                 metrics={[

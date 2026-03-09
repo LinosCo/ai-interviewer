@@ -29,7 +29,7 @@ export function ProjectTipDetailPanel({
       <div className="grid gap-4 lg:grid-cols-[1.2fr_0.8fr]">
         <div className="space-y-3">
           <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-            <p className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-500">Perche questo tip esiste</p>
+            <p className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-500">Perché questo tip esiste</p>
             <p className="mt-2 text-sm leading-6 text-slate-700">{detail.explainability?.whyThisTip || detail.reasoning || detail.summary || 'Nessun reasoning registrato.'}</p>
             {detail.explainability?.projectInputsUsed?.length ? (
               <p className="mt-2 text-xs text-slate-500">

@@ -30,6 +30,12 @@ interface ProjectAccessManagerProps {
 }
 
 const DEFAULT_ROLE: Member['role'] = 'MEMBER';
+const ROLE_LABELS: Record<Member['role'], string> = {
+  OWNER: 'Proprietario',
+  ADMIN: 'Amministratore',
+  MEMBER: 'Membro',
+  VIEWER: 'Lettore',
+};
 
 export function ProjectAccessManager({ projectId, variant = 'full' }: ProjectAccessManagerProps) {
   const [data, setData] = useState<AccessData | null>(null);
@@ -145,16 +151,18 @@ export function ProjectAccessManager({ projectId, variant = 'full' }: ProjectAcc
 
   const content = (
     <div className="space-y-6">
-      <div className="grid gap-3 sm:grid-cols-3">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
         <div className="rounded-xl border border-slate-200 bg-white p-3">
           <p className="text-[11px] font-bold uppercase tracking-wide text-slate-500">Membri</p>
           <p className="text-xl font-black text-slate-900">{data?.members.length ?? 0}</p>
         </div>
         <div className="rounded-xl border border-slate-200 bg-white p-3">
           <p className="text-[11px] font-bold uppercase tracking-wide text-slate-500">Il tuo ruolo</p>
-          <p className="text-xl font-black text-slate-900">{data?.currentUserRole || '-'}</p>
+          <p className="text-xl font-black text-slate-900">
+            {data?.currentUserRole ? ROLE_LABELS[data.currentUserRole] : '-'}
+          </p>
         </div>
-        <div className="rounded-xl border border-slate-200 bg-white p-3">
+        <div className="rounded-xl border border-slate-200 bg-white p-3 sm:col-span-2 lg:col-span-1">
           <p className="text-[11px] font-bold uppercase tracking-wide text-slate-500">Governance</p>
           <p className="text-sm font-semibold text-slate-900">{canManageMembers ? 'Puoi gestire membri' : 'Accesso in sola lettura'}</p>
         </div>
@@ -179,9 +187,9 @@ export function ProjectAccessManager({ projectId, variant = 'full' }: ProjectAcc
               onChange={(event) => setInviteRole(event.target.value as Member['role'])}
               className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm"
             >
-              <option value="ADMIN">Admin</option>
-              <option value="MEMBER">Member</option>
-              <option value="VIEWER">Viewer</option>
+              <option value="ADMIN">Amministratore</option>
+              <option value="MEMBER">Membro</option>
+              <option value="VIEWER">Lettore</option>
             </select>
             <Button
               onClick={handleInvite}
@@ -197,7 +205,7 @@ export function ProjectAccessManager({ projectId, variant = 'full' }: ProjectAcc
       {!canManageMembers && (
         <div className="flex gap-2 rounded-xl border border-slate-200 bg-slate-50 p-3 text-xs text-slate-600">
           <Shield className="h-4 w-4 shrink-0 text-slate-400" />
-          Solo OWNER e ADMIN possono invitare o rimuovere membri.
+          Solo Proprietario e Amministratore possono invitare o rimuovere membri.
         </div>
       )}
 
@@ -210,36 +218,38 @@ export function ProjectAccessManager({ projectId, variant = 'full' }: ProjectAcc
         ) : (
           <div className="space-y-2">
             {data?.members.map((member) => (
-              <div key={member.id} className="flex items-center justify-between rounded-xl border border-slate-100 bg-white p-3">
-                <div className="flex items-center gap-3">
-                  <div className="flex h-8 w-8 items-center justify-center rounded-full bg-slate-100 text-xs font-bold uppercase text-slate-700">
-                    {(member.name?.[0] || member.email[0]).toUpperCase()}
+              <div key={member.id} className="rounded-xl border border-slate-100 bg-white p-3">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                  <div className="flex min-w-0 items-center gap-3">
+                    <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-slate-100 text-xs font-bold uppercase text-slate-700">
+                      {(member.name?.[0] || member.email[0]).toUpperCase()}
+                    </div>
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-semibold text-slate-900">{member.name || member.email}</p>
+                      <p className="truncate text-xs text-slate-500">{member.email}</p>
+                    </div>
                   </div>
-                  <div>
-                    <p className="text-sm font-semibold text-slate-900">{member.name || member.email}</p>
-                    <p className="text-xs text-slate-500">{member.email}</p>
+                  <div className="flex w-full flex-wrap items-center justify-end gap-2 sm:w-auto sm:flex-nowrap">
+                    <Badge variant="outline" className="text-[10px] font-bold uppercase tracking-wide">
+                      {ROLE_LABELS[member.role]}
+                    </Badge>
+                    {member.role === 'OWNER' && <Crown className="h-4 w-4 text-amber-500" />}
+                    {canManageMembers && member.role !== 'OWNER' && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleRemove(member.userId)}
+                        disabled={removingId === member.userId}
+                        className="text-slate-500 hover:bg-red-50 hover:text-red-600"
+                      >
+                        {removingId === member.userId ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <UserMinus className="h-4 w-4" />
+                        )}
+                      </Button>
+                    )}
                   </div>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Badge variant="outline" className="text-[10px] font-bold uppercase tracking-wide">
-                    {member.role}
-                  </Badge>
-                  {member.role === 'OWNER' && <Crown className="h-4 w-4 text-amber-500" />}
-                  {canManageMembers && member.role !== 'OWNER' && (
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => handleRemove(member.userId)}
-                      disabled={removingId === member.userId}
-                      className="text-slate-500 hover:bg-red-50 hover:text-red-600"
-                    >
-                      {removingId === member.userId ? (
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                      ) : (
-                        <UserMinus className="h-4 w-4" />
-                      )}
-                    </Button>
-                  )}
                 </div>
               </div>
             ))}

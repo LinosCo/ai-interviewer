@@ -7,7 +7,7 @@ const tips = [
   {
     icon: TrendingUp,
     category: 'Supporto Strategico',
-    title: 'Opportunita di upselling in clienti ad alta intenzione',
+    title: 'Opportunità di upselling in clienti ad alta intenzione',
     description:
       "Il Copilot rileva richieste ricorrenti su servizi premium e propone il playbook: offerta, timing, segmento e messaggio.",
   },
@@ -27,10 +27,10 @@ const tips = [
   },
   {
     icon: Heart,
-    category: 'Visibilita',
+    category: 'Visibilità',
     title: 'Brand citato poco nelle risposte AI',
     description:
-      'Il monitoraggio brand evidenzia competitor piu presenti. Il Copilot suggerisce contenuti e FAQ per recuperare copertura.',
+      'Il monitoraggio brand evidenzia competitor più presenti. Il Copilot suggerisce contenuti e FAQ per recuperare copertura.',
   },
 ];
 

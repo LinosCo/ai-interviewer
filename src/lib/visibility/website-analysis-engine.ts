@@ -242,7 +242,7 @@ export class WebsiteAnalysisEngine {
             `- Un esempio concreto di applicazione nel contesto del brand.`,
             `- Una CTA finale con passo successivo misurabile.`,
             ``,
-            `## Perche ora`,
+            `## Perché ora`,
             `Questo intervento e prioritario per migliorare copertura prompt AI, comprensione utente e conversione delle visite.`,
             ``,
             `## Pagina target`,

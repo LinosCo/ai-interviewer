@@ -92,7 +92,7 @@ function buildCopilotPromptVariants(prompt: string, suggestedFollowUp: string): 
     ) {
         return [
             suggestedFollowUp,
-            'Quale tip canonico dovrei rivedere per primo e perche?',
+            'Quale tip canonico dovrei rivedere per primo e perché?',
             'Suggerisci 2 azioni collegate da eseguire intorno al tip principale.',
         ].filter(Boolean).slice(0, 3);
     }

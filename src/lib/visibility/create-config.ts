@@ -11,6 +11,7 @@ type CreateVisibilityConfigInput = {
     category: string;
     description?: string;
     websiteUrl?: string | null;
+    sitemapUrl?: string | null;
     additionalUrls?: unknown;
     language?: string;
     territory?: string;
@@ -106,6 +107,7 @@ export async function createVisibilityConfigWithGuard(
                 category: input.category,
                 description: input.description || '',
                 websiteUrl: input.websiteUrl || null,
+                sitemapUrl: input.sitemapUrl || null,
                 additionalUrls: toNullableJsonInput(input.additionalUrls),
                 language: input.language || 'it',
                 territory: input.territory || 'IT',

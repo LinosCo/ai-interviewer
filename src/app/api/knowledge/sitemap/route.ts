@@ -2,8 +2,8 @@ import { auth } from '@/auth';
 import { prisma } from '@/lib/prisma';
 import { scrapeUrl } from '@/lib/scraping';
 import { NextResponse } from 'next/server';
-import Sitemapper from 'sitemapper';
 import { indexKnowledgeSource } from '@/lib/kb/semantic-search';
+import { parseProvidedSitemap } from '@/lib/visibility/site-crawler-engine';
 
 
 function getMainLanguageUrls(urls: string[]): string[] {
@@ -21,7 +21,7 @@ function getMainLanguageUrls(urls: string[]): string[] {
             } else {
                 buckets.root.push(url);
             }
-        } catch (e) {
+        } catch {
             buckets.root.push(url);
         }
     }
@@ -76,9 +76,9 @@ export async function POST(req: Request) {
             return new Response('Unauthorized', { status: 404 });
         }
 
-        // Fetch Sitemap
-        const sitemap = new Sitemapper();
-        const { sites } = await sitemap.fetch(url);
+        // Fetch Sitemap via the same parser used by Brand Monitor so nested
+        // sitemap indexes are handled consistently.
+        const { urls: sites } = await parseProvidedSitemap(url);
 
         if (!sites || sites.length === 0) {
             return NextResponse.json({ error: 'Nessun URL trovato nella sitemap' }, { status: 400 });

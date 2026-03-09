@@ -31,7 +31,7 @@ export async function POST(request: Request) {
         }
 
         const body = await request.json();
-        const { brandName, brandAliases, category, description, language, territory, prompts, competitors, organizationId, websiteUrl, additionalUrls } = body;
+        const { brandName, brandAliases, category, description, language, territory, prompts, competitors, organizationId, websiteUrl, sitemapUrl, additionalUrls } = body;
 
         // Determine organizationId: use provided if admin, or fallback to selected org cookie
         let finalOrganizationId = organizationId;
@@ -140,6 +140,7 @@ export async function POST(request: Request) {
             category,
             description,
             websiteUrl,
+            sitemapUrl,
             additionalUrls,
             language,
             territory,
@@ -369,7 +370,7 @@ export async function PATCH(request: Request) {
         }
 
         const body = await request.json();
-        const { id, brandName, brandAliases, category, description, language, territory, isActive, prompts, competitors, projectId, websiteUrl, additionalUrls } = body;
+        const { id, brandName, brandAliases, category, description, language, territory, isActive, prompts, competitors, projectId, websiteUrl, sitemapUrl, additionalUrls } = body;
 
         if (!id) {
             return NextResponse.json({ error: 'Configuration id is required' }, { status: 400 });
@@ -452,6 +453,7 @@ export async function PATCH(request: Request) {
                     ...(category && { category }),
                     ...(description !== undefined && { description }),
                     ...(websiteUrl !== undefined && { websiteUrl }),
+                    ...(sitemapUrl !== undefined && { sitemapUrl }),
                     ...(additionalUrls !== undefined && { additionalUrls }),
                     ...(language && { language }),
                     ...(territory && { territory }),

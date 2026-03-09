@@ -1,4 +1,5 @@
 import * as cheerio from 'cheerio';
+import { parseProvidedSitemap, parseSitemap } from '@/lib/visibility/site-crawler-engine';
 
 export interface ScrapedContent {
     title: string;
@@ -105,11 +106,92 @@ function extractPageText($: cheerio.CheerioAPI): string {
     return sanitizeExtractedText(root.text());
 }
 
+function buildFallbackContent($: cheerio.CheerioAPI, description: string): string {
+    const parts: string[] = [];
+    const h1 = sanitizeExtractedText($('h1').first().text(), 400);
+    const h2 = sanitizeExtractedText($('h2').first().text(), 300);
+    const ogTitle = sanitizeExtractedText($('meta[property="og:title"]').attr('content') || '', 300);
+    const twitterTitle = sanitizeExtractedText($('meta[name="twitter:title"]').attr('content') || '', 300);
+    const bodyText = sanitizeExtractedText($('body').text(), 2500);
+
+    if (description) parts.push(description);
+    if (h1) parts.push(h1);
+    if (h2) parts.push(h2);
+    if (ogTitle) parts.push(ogTitle);
+    if (twitterTitle) parts.push(twitterTitle);
+    if (bodyText) parts.push(bodyText);
+
+    return sanitizeExtractedText(parts.join('\n\n'), 6000);
+}
+
+function normalizeComparableUrl(rawUrl: string): string | null {
+    try {
+        const parsed = new URL(rawUrl);
+        if (!['http:', 'https:'].includes(parsed.protocol)) return null;
+        parsed.hash = '';
+        parsed.search = '';
+        let normalized = parsed.toString();
+        if (parsed.pathname !== '/' && normalized.endsWith('/')) {
+            normalized = normalized.slice(0, -1);
+        }
+        return normalized;
+    } catch {
+        return null;
+    }
+}
+
+function isLikelyScrapablePageUrl(rawUrl: string): boolean {
+    try {
+        const parsed = new URL(rawUrl);
+        if (!['http:', 'https:'].includes(parsed.protocol)) return false;
+        const pathname = parsed.pathname.toLowerCase();
+
+        if (pathname.endsWith('.xml') || pathname.endsWith('.xml.gz')) return false;
+        if (pathname.includes('sitemap')) return false;
+
+        return !/\.(pdf|doc|docx|xls|xlsx|zip|rar|png|jpg|jpeg|gif|svg|webp|mp4|mp3|avi|mov)$/i.test(pathname);
+    } catch {
+        return false;
+    }
+}
+
+function isLikelySitemapInput(rawUrl: string): boolean {
+    const lower = rawUrl.toLowerCase();
+    try {
+        const parsed = new URL(rawUrl);
+        const pathname = parsed.pathname.toLowerCase();
+        if (pathname.endsWith('.xml') || pathname.endsWith('.xml.gz')) {
+            return pathname.includes('sitemap') || pathname.endsWith('sitemap.xml');
+        }
+        return pathname.includes('sitemap_index');
+    } catch {
+        return (
+            lower.includes('sitemap') &&
+            (lower.endsWith('.xml') || lower.endsWith('.xml.gz') || lower.includes('sitemap_index'))
+        );
+    }
+}
+
 export async function scrapeUrl(url: string): Promise<ScrapedContent> {
     try {
+        if (isLikelySitemapInput(url)) {
+            const sitemap = await parseProvidedSitemap(url);
+            if (sitemap.urls.length > 0) {
+                const listedUrls = sitemap.urls.slice(0, 200).join('\n');
+                return {
+                    title: 'Sitemap',
+                    content: `Sitemap URL: ${sitemap.sitemapUrl || url}\n\nDiscovered URLs (${sitemap.urls.length}):\n${listedUrls}`,
+                    description: `Parsed sitemap with ${sitemap.urls.length} URLs`,
+                    url
+                };
+            }
+            throw new Error('Sitemap provided but no URLs were discovered');
+        }
+
         const response = await fetch(url, {
             headers: {
-                'User-Agent': 'BusinessTunerBot/1.0 (AI Assistant; +https://businesstuner.ai)'
+                'User-Agent': 'Mozilla/5.0 (compatible; BrandAuditBot/1.0)',
+                'Accept-Language': 'it-IT,it;q=0.9,en;q=0.8'
             }
         });
 
@@ -125,10 +207,21 @@ export async function scrapeUrl(url: string): Promise<ScrapedContent> {
             || $('meta[property="og:description"]').attr('content')
             || '';
         const description = sanitizeExtractedText(rawDescription, 600);
-        const content = extractPageText($);
+        let content = extractPageText($);
 
-        if (content.length < 50) {
-            throw new Error("Content too short or couldn't extract meaningful text");
+        if (content.length < 120) {
+            const fallback = buildFallbackContent($, description);
+            if (fallback.length > content.length) {
+                content = fallback;
+            }
+        }
+
+        if (content.length < 30 && description.length < 30) {
+            const minimal = sanitizeExtractedText(
+                `${title}\n${description}\nPagina analizzata con contenuto testuale limitato.`,
+                500
+            );
+            content = minimal || title || url;
         }
 
         return {
@@ -200,21 +293,15 @@ function extractInternalLinks(html: string, baseUrl: string): string[] {
 
                 // Only include same-domain links
                 if (absoluteUrl.hostname !== baseHost) return;
+                if (!['http:', 'https:'].includes(absoluteUrl.protocol)) return;
 
                 // Skip anchors, javascript, mailto, tel links
                 if (href.startsWith('#') || href.startsWith('javascript:') ||
                     href.startsWith('mailto:') || href.startsWith('tel:')) return;
 
-                // Skip file downloads
-                if (/\.(pdf|doc|docx|xls|xlsx|zip|rar|png|jpg|jpeg|gif|svg|webp)$/i.test(absoluteUrl.pathname)) return;
-
-                // Normalize URL (remove trailing slash, hash, query params)
-                absoluteUrl.hash = '';
-                absoluteUrl.search = '';
-                let normalizedUrl = absoluteUrl.toString();
-                if (normalizedUrl.endsWith('/') && normalizedUrl.length > 1) {
-                    normalizedUrl = normalizedUrl.slice(0, -1);
-                }
+                const normalizedUrl = normalizeComparableUrl(absoluteUrl.toString());
+                if (!normalizedUrl) return;
+                if (!isLikelyScrapablePageUrl(normalizedUrl)) return;
 
                 links.add(normalizedUrl);
             } catch {
@@ -285,14 +372,38 @@ export interface AdditionalUrl {
 export async function scrapeWebsiteWithSubpages(
     url: string,
     maxSubpages: number = 8,
-    additionalUrls: AdditionalUrl[] = []
+    additionalUrls: AdditionalUrl[] = [],
+    explicitSitemapUrl?: string
 ): Promise<MultiPageScrapedContent> {
     console.log(`[scraping] Starting multi-page scrape for ${url}`);
+    if (explicitSitemapUrl) {
+        console.log(`[scraping] Using explicit sitemap URL: ${explicitSitemapUrl}`);
+    }
+
+    let homepageUrl = url;
+    if (explicitSitemapUrl && isLikelySitemapInput(explicitSitemapUrl)) {
+        try {
+            const parsed = new URL(explicitSitemapUrl);
+            homepageUrl = `${parsed.protocol}//${parsed.host}`;
+            console.log(`[scraping] Explicit sitemap URL provided. Using ${homepageUrl} as homepage base.`);
+        } catch {
+            // keep original URL if parsing fails
+        }
+    } else if (isLikelySitemapInput(url)) {
+        try {
+            const parsed = new URL(url);
+            homepageUrl = `${parsed.protocol}//${parsed.host}`;
+            console.log(`[scraping] Sitemap URL provided. Using ${homepageUrl} as homepage base.`);
+        } catch {
+            // keep original URL if parsing fails
+        }
+    }
 
     // 1. Scrape homepage first
-    const response = await fetch(url, {
+    const response = await fetch(homepageUrl, {
         headers: {
-            'User-Agent': 'BusinessTunerBot/1.0 (AI Assistant; +https://businesstuner.ai)'
+            'User-Agent': 'Mozilla/5.0 (compatible; BrandAuditBot/1.0)',
+            'Accept-Language': 'it-IT,it;q=0.9,en;q=0.8'
         }
     });
 
@@ -301,12 +412,14 @@ export async function scrapeWebsiteWithSubpages(
     }
 
     const homepageHtml = await response.text();
-    const homepage = await scrapeUrl(url);
+    const homepage = await scrapeUrl(homepageUrl);
     console.log(`[scraping] Homepage scraped: ${homepage.title}`);
 
     // 2. Scrape additional URLs first (user-specified, high priority)
     const subpages: ScrapedPage[] = [];
-    const scrapedUrls = new Set<string>([url]); // Track already scraped URLs
+    const scrapedUrls = new Set<string>(); // Track already scraped URLs
+    const normalizedHomepageUrl = normalizeComparableUrl(homepageUrl);
+    if (normalizedHomepageUrl) scrapedUrls.add(normalizedHomepageUrl);
 
     if (additionalUrls.length > 0) {
         console.log(`[scraping] Scraping ${additionalUrls.length} additional user-specified URLs...`);
@@ -325,24 +438,74 @@ export async function scrapeWebsiteWithSubpages(
                     pageType: 'custom',
                     customLabel: additionalUrl.label
                 });
-                scrapedUrls.add(additionalUrl.url);
+                const normalizedAdditional = normalizeComparableUrl(additionalUrl.url);
+                if (normalizedAdditional) scrapedUrls.add(normalizedAdditional);
             } catch (error) {
                 console.warn(`[scraping] Failed to scrape additional URL ${additionalUrl.url}:`, error);
             }
         }
     }
 
-    // 3. Extract and prioritize internal links (fill remaining slots)
+    // 3. Discover pages from sitemap (preferred) + homepage links fallback
     const remainingSlots = maxSubpages - subpages.length;
 
     if (remainingSlots > 0) {
-        const allLinks = extractInternalLinks(homepageHtml, url);
-        // Filter out already scraped URLs
-        const newLinks = allLinks.filter(link => !scrapedUrls.has(link));
-        console.log(`[scraping] Found ${newLinks.length} new internal links`);
+        let sitemapLinks: string[] = [];
+        let sitemapSource: string | null = null;
 
-        const prioritizedLinks = prioritizeLinks(newLinks, remainingSlots);
-        console.log(`[scraping] Prioritized ${prioritizedLinks.length} links to scrape`);
+        try {
+            const sitemapResult = explicitSitemapUrl
+                ? await parseProvidedSitemap(explicitSitemapUrl)
+                : isLikelySitemapInput(url)
+                    ? await parseProvidedSitemap(url)
+                : await parseSitemap(url);
+
+            sitemapSource = sitemapResult.sitemapUrl;
+            sitemapLinks = sitemapResult.urls
+                .map(normalizeComparableUrl)
+                .filter((link): link is string => !!link)
+                .filter((link) => !scrapedUrls.has(link))
+                .filter((link) => isLikelyScrapablePageUrl(link));
+
+            if (sitemapLinks.length > 0) {
+                console.log(
+                    `[scraping] Sitemap discovered ${sitemapLinks.length} candidate pages` +
+                    (sitemapSource ? ` (${sitemapSource})` : '')
+                );
+            } else if (sitemapSource) {
+                console.log(`[scraping] Sitemap found (${sitemapSource}) but no additional page URLs to scrape`);
+            } else {
+                console.log('[scraping] No sitemap discovered, fallback to homepage links');
+            }
+        } catch (error) {
+            console.warn('[scraping] Sitemap discovery failed, fallback to homepage links:', error);
+        }
+
+        const homepageLinks = extractInternalLinks(homepageHtml, homepageUrl)
+            .map(normalizeComparableUrl)
+            .filter((link): link is string => !!link)
+            .filter((link) => !scrapedUrls.has(link))
+            .filter((link) => isLikelyScrapablePageUrl(link));
+
+        console.log(`[scraping] Found ${homepageLinks.length} internal links from homepage`);
+
+        let prioritizedLinks: string[] = [];
+        if (sitemapLinks.length > 0) {
+            const sitemapPrioritized = prioritizeLinks(sitemapLinks, remainingSlots);
+            const sitemapRemainder = sitemapLinks.filter(link => !sitemapPrioritized.includes(link));
+            const homepagePrioritized = prioritizeLinks(homepageLinks, remainingSlots);
+
+            prioritizedLinks = Array.from(new Set([
+                ...sitemapPrioritized,
+                ...sitemapRemainder,
+                ...homepagePrioritized
+            ])).slice(0, remainingSlots);
+
+            console.log(`[scraping] Prioritized ${prioritizedLinks.length} links (sitemap-first)`);
+        } else {
+            prioritizedLinks = prioritizeLinks(homepageLinks, remainingSlots);
+            console.log(`[scraping] Prioritized ${prioritizedLinks.length} links from homepage`);
+        }
 
         // 4. Scrape auto-discovered subpages in parallel with rate limiting
         const scrapePromises = prioritizedLinks.map(async (link, index) => {

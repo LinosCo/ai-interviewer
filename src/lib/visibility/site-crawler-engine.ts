@@ -114,6 +114,40 @@ function extractSitemapLocs(xml: string): string[] {
     return urls;
 }
 
+function extractSitemapEntries(xml: string): { pageUrls: string[]; sitemapUrls: string[] } {
+    const pageUrls = new Set<string>();
+    const sitemapUrls = new Set<string>();
+
+    try {
+        const $ = cheerio.load(xml, { xmlMode: true });
+
+        $('urlset > url > loc').each((_, el) => {
+            const normalized = normalizeXmlLoc($(el).text() || '');
+            if (normalized) pageUrls.add(normalized);
+        });
+
+        $('sitemapindex > sitemap > loc').each((_, el) => {
+            const normalized = normalizeXmlLoc($(el).text() || '');
+            if (normalized) sitemapUrls.add(normalized);
+        });
+    } catch {
+        // Fallback handled below.
+    }
+
+    if (pageUrls.size === 0 && sitemapUrls.size === 0) {
+        const locs = extractSitemapLocs(xml);
+        for (const loc of locs) {
+            if (isLikelySitemapUrl(loc)) sitemapUrls.add(loc);
+            else pageUrls.add(loc);
+        }
+    }
+
+    return {
+        pageUrls: Array.from(pageUrls),
+        sitemapUrls: Array.from(sitemapUrls),
+    };
+}
+
 function isLikelySitemapUrl(url: string): boolean {
     try {
         const parsed = new URL(url);
@@ -158,16 +192,10 @@ async function collectUrlsFromSitemap(params: {
     const xml = await fetchRaw(sitemapUrl);
     if (!xml) return [];
 
-    const locs = extractSitemapLocs(xml);
-    if (locs.length === 0) return [];
-
-    const pageUrls: string[] = [];
-    const subSitemaps: string[] = [];
-
-    for (const loc of locs) {
-        if (isLikelySitemapUrl(loc)) subSitemaps.push(loc);
-        else pageUrls.push(loc);
-    }
+    const entries = extractSitemapEntries(xml);
+    const pageUrls = entries.pageUrls;
+    const subSitemaps = entries.sitemapUrls;
+    if (pageUrls.length === 0 && subSitemaps.length === 0) return [];
 
     if (pageUrls.length >= MAX_SITEMAP_URLS || subSitemaps.length === 0) {
         return Array.from(new Set(pageUrls)).slice(0, MAX_SITEMAP_URLS);
@@ -188,29 +216,67 @@ async function collectUrlsFromSitemap(params: {
 }
 
 /**
- * Discover page URLs by parsing sitemap.xml (and optionally sitemap_index.xml).
+ * Discover page URLs by parsing common sitemap endpoints and robots.txt entries.
+ * Supports nested sitemap indexes (e.g. RankMath/Yoast: page-sitemap.xml, post-sitemap.xml).
  * Returns up to MAX_SITEMAP_URLS URLs. Falls back to an empty array if no
  * sitemap is found — callers should then fall back to just the base URL.
  */
 export async function parseSitemap(baseUrl: string): Promise<{ urls: string[]; sitemapUrl: string | null }> {
-    const normalized = baseUrl.replace(/\/$/, '');
-    const candidates = [
-        `${normalized}/sitemap.xml`,
-        `${normalized}/sitemap_index.xml`,
-        `${normalized}/sitemap/`,
-    ];
+    const trimmed = baseUrl.trim();
+    if (!trimmed) return { urls: [], sitemapUrl: null };
 
-    for (const candidate of candidates) {
-        const urls = await collectUrlsFromSitemap({ sitemapUrl: candidate });
-        if (urls.length > 0) {
-            return { urls, sitemapUrl: candidate };
-        }
+    if (isLikelySitemapUrl(trimmed)) {
+        return parseProvidedSitemap(trimmed);
     }
 
-    return { urls: [], sitemapUrl: null };
+    let originBase: string | null = null;
+    try {
+        const parsed = new URL(trimmed);
+        originBase = `${parsed.protocol}//${parsed.host}`;
+    } catch {
+        // Keep null; below we fallback to raw input candidates.
+    }
+
+    const candidates = new Set<string>();
+
+    if (originBase) {
+        candidates.add(`${originBase}/sitemap.xml`);
+        candidates.add(`${originBase}/sitemap_index.xml`);
+        candidates.add(`${originBase}/wp-sitemap.xml`);
+        candidates.add(`${originBase}/page-sitemap.xml`);
+        candidates.add(`${originBase}/post-sitemap.xml`);
+        candidates.add(`${originBase}/sitemap/`);
+
+        const robotsSitemaps = await discoverSitemapsFromRobots(originBase);
+        for (const sitemap of robotsSitemaps) candidates.add(sitemap);
+    } else {
+        const normalized = trimmed.replace(/\/$/, '');
+        candidates.add(`${normalized}/sitemap.xml`);
+        candidates.add(`${normalized}/sitemap_index.xml`);
+        candidates.add(`${normalized}/wp-sitemap.xml`);
+        candidates.add(`${normalized}/page-sitemap.xml`);
+        candidates.add(`${normalized}/post-sitemap.xml`);
+        candidates.add(`${normalized}/sitemap/`);
+    }
+
+    const discovered: string[] = [];
+    let firstSuccessfulSitemap: string | null = null;
+    const visited = new Set<string>();
+
+    for (const candidate of candidates) {
+        if (discovered.length >= MAX_SITEMAP_URLS) break;
+        const urls = await collectUrlsFromSitemap({ sitemapUrl: candidate, visited });
+        if (urls.length > 0 && !firstSuccessfulSitemap) firstSuccessfulSitemap = candidate;
+        discovered.push(...urls);
+    }
+
+    return {
+        urls: Array.from(new Set(discovered)).slice(0, MAX_SITEMAP_URLS),
+        sitemapUrl: firstSuccessfulSitemap
+    };
 }
 
-async function parseProvidedSitemap(sitemapUrl: string): Promise<{ urls: string[]; sitemapUrl: string | null }> {
+export async function parseProvidedSitemap(sitemapUrl: string): Promise<{ urls: string[]; sitemapUrl: string | null }> {
     let originBase: string | null = null;
     try {
         const parsed = new URL(sitemapUrl);
@@ -226,6 +292,7 @@ async function parseProvidedSitemap(sitemapUrl: string): Promise<{ urls: string[
         for (const url of robotsSitemaps) candidates.add(url);
         candidates.add(`${originBase}/sitemap.xml`);
         candidates.add(`${originBase}/sitemap_index.xml`);
+        candidates.add(`${originBase}/wp-sitemap.xml`);
     }
 
     const discovered: string[] = [];

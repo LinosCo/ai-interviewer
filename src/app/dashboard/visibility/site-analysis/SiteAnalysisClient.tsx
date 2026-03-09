@@ -233,6 +233,7 @@ interface Props {
     configId: string;
     brandName: string;
     websiteUrl: string;
+    initialSitemapUrl?: string;
     initialAdditionalUrls?: AdditionalUrl[];
     initialReport: BrandReport | null;
     initialIsRunning: boolean;
@@ -242,6 +243,7 @@ export function SiteAnalysisClient({
     configId,
     brandName,
     websiteUrl,
+    initialSitemapUrl = '',
     initialAdditionalUrls = [],
     initialReport,
     initialIsRunning,
@@ -254,7 +256,7 @@ export function SiteAnalysisClient({
     const [pageSearch, setPageSearch] = useState('');
     const [setupDone, setSetupDone] = useState<boolean>(!!initialReport || initialIsRunning);
     const [analysisWebsiteUrl, setAnalysisWebsiteUrl] = useState(websiteUrl);
-    const [analysisSitemapUrl, setAnalysisSitemapUrl] = useState('');
+    const [analysisSitemapUrl, setAnalysisSitemapUrl] = useState(initialSitemapUrl);
     const [analysisUrlsText, setAnalysisUrlsText] = useState(
         initialAdditionalUrls.map((item) => item.url).join('\n')
     );

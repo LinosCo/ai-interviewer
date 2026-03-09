@@ -776,13 +776,22 @@ export class WebsiteAnalysisEngine {
             const additionalUrls: AdditionalUrl[] = Array.isArray(analysis.visibilityConfig.additionalUrls)
                 ? (analysis.visibilityConfig.additionalUrls as unknown as AdditionalUrl[])
                 : [];
+            const sitemapUrl = analysis.visibilityConfig.sitemapUrl || undefined;
 
             // 5. Scrape website content (including subpages and additional URLs)
             console.log(`[website-analysis] Scraping ${analysis.websiteUrl} with subpages...`);
+            if (sitemapUrl) {
+                console.log(`[website-analysis] Using saved sitemap URL: ${sitemapUrl}`);
+            }
             if (additionalUrls.length > 0) {
                 console.log(`[website-analysis] Including ${additionalUrls.length} additional user-specified URLs`);
             }
-            const scrapedContent = await scrapeWebsiteWithSubpages(analysis.websiteUrl, 8, additionalUrls);
+            const scrapedContent = await scrapeWebsiteWithSubpages(
+                analysis.websiteUrl,
+                8,
+                additionalUrls,
+                sitemapUrl
+            );
             console.log(`[website-analysis] Scraped ${scrapedContent.pagesScraped} pages, ${scrapedContent.totalContent.length} chars total`);
 
             // 6. Analyze with LLM

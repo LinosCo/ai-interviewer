@@ -3,6 +3,7 @@ import { prisma } from '@/lib/prisma';
 import { streamText } from 'ai';
 import { createAnthropic } from '@ai-sdk/anthropic';
 import { createOpenAI } from '@ai-sdk/openai';
+import { createGoogleGenerativeAI } from '@ai-sdk/google';
 import { NextResponse } from 'next/server';
 import { buildCopilotSystemPrompt } from '@/lib/copilot/system-prompt';
 import { canAccessProjectData } from '@/lib/copilot/permissions';
@@ -50,7 +51,11 @@ function isConnectionError(error: unknown): boolean {
 
 function isAnthropicModelNotFound(error: unknown): boolean {
     const message = (error instanceof Error ? error.message : String(error || '')).toLowerCase();
-    return message.includes('not_found_error') || message.includes('model:');
+    return (
+        message.includes('not_found_error') ||
+        (message.includes('model:') && message.includes('not found')) ||
+        (message.includes('model') && message.includes('does not exist'))
+    );
 }
 
 function isAnthropicBillingError(error: unknown): boolean {
@@ -68,6 +73,26 @@ function shouldFallbackFromAnthropic(error: unknown): boolean {
         isConnectionError(error) ||
         isAnthropicModelNotFound(error) ||
         isAnthropicBillingError(error)
+    );
+}
+
+function isOpenAIModelNotFound(error: unknown): boolean {
+    const message = (error instanceof Error ? error.message : String(error || '')).toLowerCase();
+    return (
+        message.includes('model_not_found') ||
+        message.includes('does not exist') ||
+        message.includes('unknown model') ||
+        message.includes('not found')
+    );
+}
+
+function isGeminiModelNotFound(error: unknown): boolean {
+    const message = (error instanceof Error ? error.message : String(error || '')).toLowerCase();
+    return (
+        message.includes('not_found') ||
+        message.includes('model not found') ||
+        message.includes('unknown model') ||
+        message.includes('models/')
     );
 }
 
@@ -310,14 +335,15 @@ export async function POST(req: Request) {
         const kbResults = await searchPlatformKB(message, 'all');
         const kbContext = kbResults.slice(0, 2).map(r => `[${r.title}]: ${r.content}`).join('\n\n');
 
-        // 6. Get API key (Anthropic for Claude 4.5 Opus)
+        // 6. Get API keys
         const anthropicApiKey = await getConfigValue('anthropicApiKey') || '';
         const openaiApiKey = await getConfigValue('openaiApiKey') || '';
+        const geminiApiKey = await getConfigValue('geminiApiKey') || '';
 
-        if (!anthropicApiKey && !openaiApiKey) {
+        if (!anthropicApiKey && !openaiApiKey && !geminiApiKey) {
             return NextResponse.json({
                 error: 'API key not configured',
-                message: 'Nessuna chiave API LLM configurata (Anthropic/OpenAI). Contatta l\'amministratore.'
+                message: 'Nessuna chiave API LLM configurata (Anthropic/OpenAI/Gemini). Contatta l\'amministratore.'
             }, { status: 500 });
         }
 
@@ -434,26 +460,47 @@ export async function POST(req: Request) {
 
         const SYSTEM_SUFFIX = "\n\nCRITICAL: Never respond with placeholder messages like 'I'm searching' as a final answer. Always complete tool calls and give a full markdown answer. Optionally end with a natural Italian follow-up question on a new line prefixed with 'FOLLOW_UP: '.";
 
-        const buildLLM = (provider: 'anthropic' | 'openai', model: string) =>
+        const buildLLM = (provider: 'anthropic' | 'openai' | 'gemini', model: string) =>
             provider === 'anthropic'
                 ? createAnthropic({ apiKey: anthropicApiKey })(model)
-                : createOpenAI({ apiKey: openaiApiKey })(model);
+                : provider === 'openai'
+                    ? createOpenAI({ apiKey: openaiApiKey })(model)
+                    : createGoogleGenerativeAI({ apiKey: geminiApiKey })(model);
 
-        // Sonnet 4.6 is the preferred strategic copilot model.
-        const anthropicModelCandidates = [
+        // Prefer highest-capability configured models, then graceful degradation.
+        const anthropicModelCandidates = Array.from(new Set([
+            'claude-sonnet-4-5-20250929',
             (process.env.ANTHROPIC_MODEL || '').trim(),
-            'claude-4.6-sonnet',
-            'claude-sonnet-4-6',
+            'claude-sonnet-4-5',
+            'claude-3-7-sonnet-latest',
             'claude-3-5-sonnet-20241022',
-        ].filter(Boolean);
+            'claude-3-7-sonnet-20250219',
+            'claude-3-5-sonnet-latest',
+        ].filter(Boolean)));
 
-        let modelUsed = anthropicModelCandidates[0] || 'claude-4.6-sonnet';
+        const openAIModelCandidates = Array.from(new Set([
+            (process.env.OPENAI_MODEL || '').trim(),
+            'gpt-5.2',
+            'gpt-5',
+            'gpt-5-mini',
+            'gpt-4.1',
+            'gpt-4o',
+        ].filter(Boolean)));
+
+        const geminiModelCandidates = Array.from(new Set([
+            (process.env.GEMINI_MODEL || '').trim(),
+            'gemini-3.0-flash-latest',
+            'gemini-1.5-pro-latest',
+            'gemini-2.0-flash',
+        ].filter(Boolean)));
+
+        let modelUsed = anthropicModelCandidates[0] || 'claude-sonnet-4-5-20250929';
 
         // Metadata captured in onFinish — shared across attempts
         let capturedUsage: any = null;
         let capturedToolsUsed: string[] = [];
 
-        const attemptStream = async (provider: 'anthropic' | 'openai', model: string) => {
+        const attemptStream = async (provider: 'anthropic' | 'openai' | 'gemini', model: string) => {
             modelUsed = model;
             return streamText({
                 model: buildLLM(provider, model) as any,
@@ -490,14 +537,56 @@ export async function POST(req: Request) {
                 }
                 if (lastError) throw lastError;
             } else {
-                modelUsed = 'gpt-4o';
-                streamResult = await attemptStream('openai', 'gpt-4o');
+                const openAIHeadCandidates = openAIModelCandidates.filter((model) => model === 'gpt-5.2' || model === 'gpt-5');
+                const openAITailCandidates = openAIModelCandidates.filter((model) => model !== 'gpt-5.2' && model !== 'gpt-5');
+                const mixedCandidates: Array<{ provider: 'openai' | 'gemini'; model: string }> = [
+                    ...(openaiApiKey ? openAIHeadCandidates.map((model) => ({ provider: 'openai' as const, model })) : []),
+                    ...(geminiApiKey ? geminiModelCandidates.map((model) => ({ provider: 'gemini' as const, model })) : []),
+                    ...(openaiApiKey ? openAITailCandidates.map((model) => ({ provider: 'openai' as const, model })) : []),
+                ];
+                let mixedLastError: unknown = null;
+                for (const candidate of mixedCandidates) {
+                    try {
+                        streamResult = await attemptStream(candidate.provider, candidate.model);
+                        mixedLastError = null;
+                        break;
+                    } catch (error) {
+                        mixedLastError = error;
+                        const retryable =
+                            isConnectionError(error) ||
+                            (candidate.provider === 'openai' && isOpenAIModelNotFound(error)) ||
+                            (candidate.provider === 'gemini' && isGeminiModelNotFound(error));
+                        if (!retryable) throw error;
+                    }
+                }
+                if (mixedLastError) throw mixedLastError;
             }
         } catch (error) {
-            if (shouldFallbackFromAnthropic(error) && openaiApiKey) {
-                console.warn('[Copilot] Fallback to OpenAI due to Anthropic provider failure');
-                modelUsed = 'gpt-4o';
-                streamResult = await attemptStream('openai', 'gpt-4o');
+            if (shouldFallbackFromAnthropic(error) && (openaiApiKey || geminiApiKey)) {
+                console.warn('[Copilot] Fallback from Anthropic to OpenAI/Gemini due to provider failure');
+                const openAIHeadCandidates = openAIModelCandidates.filter((model) => model === 'gpt-5.2' || model === 'gpt-5');
+                const openAITailCandidates = openAIModelCandidates.filter((model) => model !== 'gpt-5.2' && model !== 'gpt-5');
+                const mixedCandidates: Array<{ provider: 'openai' | 'gemini'; model: string }> = [
+                    ...(openaiApiKey ? openAIHeadCandidates.map((model) => ({ provider: 'openai' as const, model })) : []),
+                    ...(geminiApiKey ? geminiModelCandidates.map((model) => ({ provider: 'gemini' as const, model })) : []),
+                    ...(openaiApiKey ? openAITailCandidates.map((model) => ({ provider: 'openai' as const, model })) : []),
+                ];
+                let mixedLastError: unknown = null;
+                for (const candidate of mixedCandidates) {
+                    try {
+                        streamResult = await attemptStream(candidate.provider, candidate.model);
+                        mixedLastError = null;
+                        break;
+                    } catch (providerError) {
+                        mixedLastError = providerError;
+                        const retryable =
+                            isConnectionError(providerError) ||
+                            (candidate.provider === 'openai' && isOpenAIModelNotFound(providerError)) ||
+                            (candidate.provider === 'gemini' && isGeminiModelNotFound(providerError));
+                        if (!retryable) throw providerError;
+                    }
+                }
+                if (mixedLastError) throw mixedLastError;
             } else {
                 throw error;
             }

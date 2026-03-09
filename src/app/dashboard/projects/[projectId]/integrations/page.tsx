@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
-import { useParams, useRouter } from 'next/navigation';
+import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { AnimatePresence } from 'framer-motion';
 import { ConnectionsTab } from '@/components/integrations/ConnectionsTab';
 import { AiRoutingTab } from '@/components/integrations/AiRoutingTab';
@@ -105,6 +105,15 @@ interface OrganizationsResponse {
   organizations?: Organization[];
 }
 
+type IntegrationsTab = 'connections' | 'routing' | 'settings';
+
+function parseTab(value: string | null): IntegrationsTab {
+  if (value === 'routing' || value === 'settings' || value === 'connections') {
+    return value;
+  }
+  return 'connections';
+}
+
 async function readJsonSafely<T>(response: Response): Promise<T | null> {
   const contentType = response.headers.get('content-type') || '';
   if (!contentType.includes('application/json')) return null;
@@ -118,6 +127,7 @@ async function readJsonSafely<T>(response: Response): Promise<T | null> {
 export default function IntegrationsPage() {
   const params = useParams();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const projectId = params.projectId as string;
 
   const [loading, setLoading] = useState(true);
@@ -131,7 +141,7 @@ export default function IntegrationsPage() {
   const [currentOrgName, setCurrentOrgName] = useState<string>('');
   const [userPlan, setUserPlan] = useState<UserPlan>('FREE');
   const [notification, setNotification] = useState<{ type: 'error' | 'success'; message: string } | null>(null);
-  const [activeTab, setActiveTab] = useState<'connections' | 'routing' | 'settings'>('connections');
+  const [activeTab, setActiveTab] = useState<IntegrationsTab>(() => parseTab(searchParams.get('tab')));
 
   const showNotification = useCallback((type: 'error' | 'success', message: string) => {
     setNotification({ type, message });
@@ -232,6 +242,11 @@ export default function IntegrationsPage() {
   useEffect(() => {
     fetchData();
   }, [fetchData]);
+
+  useEffect(() => {
+    const nextTab = parseTab(searchParams.get('tab'));
+    setActiveTab((prev) => (prev === nextTab ? prev : nextTab));
+  }, [searchParams]);
 
   // Handlers
   const handleTestMCP = async (id: string) => {
@@ -445,6 +460,9 @@ export default function IntegrationsPage() {
             </p>
             <p className="text-xs text-blue-800/90 mt-1">
               Usa il Copilot (icona con scintille in basso a destra) per impostare connessioni, testarle e preparare AI Tips instradabili.
+            </p>
+            <p className="text-[11px] text-blue-900/90 mt-2 font-semibold">
+              Sequenza consigliata: 1) collega una connessione 2) testa lo stato 3) attiva una regola in AI Routing.
             </p>
           </div>
           {!hasBusinessTier && (

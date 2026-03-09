@@ -6,6 +6,7 @@ import { DashboardProviders } from '@/components/dashboard/DashboardProviders';
 import { StrategyCopilot } from '@/components/copilot/StrategyCopilot';
 import { CreditsAlertBanner } from '@/components/dashboard/CreditsAlertBanner';
 import { CreditsExhaustedModal } from '@/components/dashboard/CreditsExhaustedModal';
+import { GuidanceLayer } from '@/components/guidance/GuidanceLayer';
 import { PLANS, PlanType } from '@/config/plans';
 import { cookies } from 'next/headers';
 import { getOrCreateDefaultOrganization } from '@/lib/organizations';
@@ -166,6 +167,8 @@ export default async function DashboardLayout({
                 </div>
 
                 <CreditsExhaustedModal />
+
+                <GuidanceLayer />
 
                 {/* Strategy Copilot - AI Assistant */}
                 <StrategyCopilot

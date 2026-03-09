@@ -23,6 +23,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { ProjectUserManagementDialog } from './user-management-dialog';
 import { PLANS, subscriptionTierToPlanType, PlanType } from '@/config/plans';
 import { assertProjectAccess } from '@/lib/domain/workspace';
+import { ProjectActivationChecklist } from '@/components/guidance/ProjectActivationChecklist';
 
 export default async function ProjectCockpitPage({ params }: { params: Promise<{ projectId: string }> }) {
     const session = await auth();
@@ -403,6 +404,8 @@ export default async function ProjectCockpitPage({ params }: { params: Promise<{
                             </div>
                         </CardContent>
                     </Card>
+
+                    <ProjectActivationChecklist projectId={projectId} />
 
                     <Card className="border-slate-200">
                         <CardHeader>

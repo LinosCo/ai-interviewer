@@ -22,7 +22,6 @@ import {
     Search,
     Lightbulb,
     Save,
-    Folder,
     Target,
     Code,
     FileText,
@@ -37,6 +36,16 @@ import { useOrganization } from '@/contexts/OrganizationContext';
 import { updateInsightStatus } from './actions';
 import { CONTENT_KIND_LABELS, type ContentKind } from '@/lib/cms/content-kinds';
 import { ROUTING_TIP_CATEGORY_LABELS } from '@/lib/cms/tip-routing-taxonomy';
+import type { ProjectTipDetailSnapshot, ProjectTipSnapshot } from '@/lib/projects/project-intelligence-types';
+import { ProjectWorkspaceShell } from '@/components/projects/ProjectWorkspaceShell';
+import { ProjectTipCard } from '@/components/projects/ProjectTipCard';
+import { ProjectTipDetailPanel } from '@/components/projects/ProjectTipDetailPanel';
+import { ProjectTipEditor, type ProjectTipEditDraft } from '@/components/projects/ProjectTipEditor';
+import {
+    buildTipRoutingPayload,
+    getTipOperationalState,
+    parseTipRoutingDraft,
+} from '@/components/projects/project-tip-ui';
 
 interface Action {
     type: string;
@@ -83,53 +92,8 @@ interface Insight {
     isVirtual?: boolean;
 }
 
-interface CanonicalTip {
-    id: string;
-    originType: string;
-    title: string;
-    summary?: string | null;
-    status: string;
-    priority?: number | null;
-    category?: string | null;
-    contentKind?: string | null;
-    starred: boolean;
-    reasoning?: string | null;
-    strategicAlignment?: string | null;
-    methodologySummary?: string | null;
-    draftStatus?: string | null;
-    routingStatus?: string | null;
-    publishStatus?: string | null;
-    evidenceCount?: number;
-    routeCount?: number;
-    executionCount?: number;
-}
-
-interface CanonicalTipDetail extends CanonicalTip {
-    evidence: Array<{
-        id: string;
-        sourceType: string;
-        sourceLabel?: string | null;
-        detail: string;
-    }>;
-    routes: Array<{
-        id: string;
-        destinationType: string;
-        status: string;
-    }>;
-    executions: Array<{
-        id: string;
-        status: string;
-        startedAt: string;
-    }>;
-    explainability?: {
-        whyThisTip: string;
-        projectInputsUsed: string[];
-        strategyContext: string | null;
-        methodologyContext: string | null;
-        automationRecommendation: string | null;
-    } | null;
-    reviewerNotes?: string | null;
-}
+type CanonicalTip = ProjectTipSnapshot;
+type CanonicalTipDetail = ProjectTipDetailSnapshot;
 
 interface TipHistoryItem {
     contentKind: string;
@@ -144,6 +108,15 @@ interface TipHistoryItem {
 interface RoutingConnectionState {
     hasConnection: boolean;
     loading: boolean;
+}
+
+type InsightWorkspaceView = 'listen' | 'tips' | 'strategy';
+
+function parseWorkspaceView(value: string | null): InsightWorkspaceView {
+    if (value === 'tips' || value === 'strategy' || value === 'listen') {
+        return value;
+    }
+    return 'tips';
 }
 
 // Helper: determine if action can be auto-applied (only if explicitly flagged)
@@ -202,20 +175,14 @@ export default function InsightHubPage() {
     const [canonicalTipDetails, setCanonicalTipDetails] = useState<Record<string, CanonicalTipDetail>>({});
     const [expandedCanonicalTipId, setExpandedCanonicalTipId] = useState<string | null>(null);
     const [editingCanonicalTipId, setEditingCanonicalTipId] = useState<string | null>(null);
-    const [canonicalEditDraft, setCanonicalEditDraft] = useState<{
-        title: string;
-        summary: string;
-        reasoning: string;
-        strategicAlignment: string;
-        status: string;
-        starred: boolean;
-    }>({
+    const [canonicalEditDraft, setCanonicalEditDraft] = useState<ProjectTipEditDraft>({
         title: '',
         summary: '',
         reasoning: '',
         strategicAlignment: '',
         status: 'NEW',
-        starred: false
+        starred: false,
+        routing: parseTipRoutingDraft(null),
     });
     const [savingCanonicalTipId, setSavingCanonicalTipId] = useState<string | null>(null);
     const [reviewerNotesDraftByTip, setReviewerNotesDraftByTip] = useState<Record<string, string>>({});
@@ -241,6 +208,7 @@ export default function InsightHubPage() {
 
     // If arriving from a project cockpit link (?projectId=...), force-select that project
     const cockpitProjectId = searchParams.get('projectId');
+    const workspaceView = parseWorkspaceView(searchParams.get('view'));
     useEffect(() => {
         if (!cockpitProjectId || !projects.length) return;
         const match = projects.find((p) => p.id === cockpitProjectId);
@@ -744,34 +712,6 @@ export default function InsightHubPage() {
             : 'active';
     };
 
-    const getCanonicalAutomationState = (tip: CanonicalTip, detail?: CanonicalTipDetail | null) => {
-        const hasFailed = Boolean(
-            detail?.executions.some((execution) => execution.status === 'FAILED')
-            || detail?.routes.some((route) => route.status === 'FAILED')
-        );
-        if (hasFailed) return { key: 'failed', label: 'Failed', className: 'bg-red-50 text-red-700 border-red-200' };
-
-        const hasCompletedExecution = Boolean(detail?.executions.some((execution) => execution.status === 'SUCCEEDED'));
-        if (hasCompletedExecution || tip.status === 'COMPLETED') {
-            return { key: 'completed', label: 'Completed', className: 'bg-emerald-50 text-emerald-700 border-emerald-200' };
-        }
-
-        if (tip.status === 'AUTOMATED') {
-            return { key: 'automated', label: 'Automated', className: 'bg-indigo-50 text-indigo-700 border-indigo-200' };
-        }
-
-        const hasDispatched = Boolean(detail?.routes.some((route) => route.status === 'DISPATCHED'));
-        if (hasDispatched || tip.status === 'ROUTED') {
-            return { key: 'awaiting_approval', label: 'Awaiting approval', className: 'bg-amber-50 text-amber-700 border-amber-200' };
-        }
-
-        if ((tip.routeCount ?? 0) > 0 || tip.routingStatus === 'PLANNED') {
-            return { key: 'ready_to_route', label: 'Ready to route', className: 'bg-blue-50 text-blue-700 border-blue-200' };
-        }
-
-        return { key: 'manual_only', label: 'Manual only', className: 'bg-slate-100 text-slate-700 border-slate-200' };
-    };
-
     const openCanonicalEdit = async (tip: CanonicalTip) => {
         setEditingCanonicalTipId(tip.id);
         setCanonicalEditDraft({
@@ -780,7 +720,8 @@ export default function InsightHubPage() {
             reasoning: tip.reasoning || '',
             strategicAlignment: tip.strategicAlignment || '',
             status: tip.status || 'NEW',
-            starred: Boolean(tip.starred)
+            starred: Boolean(tip.starred),
+            routing: parseTipRoutingDraft(tip.suggestedRouting),
         });
         await loadCanonicalTipDetail(tip.id);
     };
@@ -789,10 +730,22 @@ export default function InsightHubPage() {
         if (!projectId) return;
         setSavingCanonicalTipId(tipId);
         try {
+            const sourceTip = canonicalTipDetails[tipId] || canonicalTips.find((tip) => tip.id === tipId);
             const res = await fetch(`/api/projects/${projectId}/tips/${tipId}`, {
                 method: 'PATCH',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(canonicalEditDraft)
+                body: JSON.stringify({
+                    title: canonicalEditDraft.title,
+                    summary: canonicalEditDraft.summary,
+                    reasoning: canonicalEditDraft.reasoning,
+                    strategicAlignment: canonicalEditDraft.strategicAlignment,
+                    status: canonicalEditDraft.status,
+                    starred: canonicalEditDraft.starred,
+                    suggestedRouting: buildTipRoutingPayload(
+                        canonicalEditDraft.routing,
+                        sourceTip?.suggestedRouting ?? null,
+                    ),
+                })
             });
             if (!res.ok) {
                 showToast('Errore durante il salvataggio del tip', 'error');
@@ -960,9 +913,59 @@ export default function InsightHubPage() {
         && !selectedProjectRoutingState.loading
         && !selectedProjectRoutingState.hasConnection
     );
+    const handleUseCopilotPrompt = useCallback((prompt: string) => {
+        if (typeof window === 'undefined') return;
+        window.dispatchEvent(new CustomEvent('bt-copilot-prompt', { detail: { prompt } }));
+    }, []);
+
+    const workspaceTitle = workspaceView === 'listen'
+        ? 'Ascolta i segnali del progetto'
+        : workspaceView === 'strategy'
+            ? 'Leggi il contesto strategico'
+            : 'Rivedi e attiva i tip canonici';
+    const workspaceDescription = workspaceView === 'listen'
+        ? 'Questa vista serve a capire da quali fonti arrivano i segnali, quanto sono coerenti e quali pattern meritano di diventare tip operativi.'
+        : workspaceView === 'strategy'
+            ? 'Qui leggi priorita, metodo e sintesi strategica prima di decidere quali tip spingere in esecuzione.'
+            : 'Questa vista e il centro operativo dei tip: reasoning, related actions, routing e prossima mossa convivono nello stesso flusso.';
+    const activeSection = workspaceView === 'strategy' ? 'strategy' : workspaceView === 'listen' ? 'listen' : 'tips';
 
     return (
-        <div className="space-y-8 p-6 max-w-7xl mx-auto">
+        <div className="max-w-7xl mx-auto p-6">
+            <ProjectWorkspaceShell
+                projectId={projectId}
+                projectName={selectedProject && !isAllProjectsSelected ? selectedProject.name : null}
+                activeSection={activeSection}
+                eyebrow={workspaceView === 'tips' ? 'Tips' : workspaceView === 'listen' ? 'Listen' : 'Strategy'}
+                title={workspaceTitle}
+                description={workspaceDescription}
+                metrics={[
+                    { label: 'Tip canonici', value: String(canonicalTips.length), tone: canonicalTips.length > 0 ? 'success' : 'default' },
+                    { label: 'Segnali attivi', value: String(insights.filter((insight) => normalizeInsightStatus(insight.status) === 'active').length), tone: 'accent' },
+                    { label: 'Routing', value: showRoutingConnectionInvite ? 'Da attivare' : projectId ? 'Disponibile' : 'Seleziona progetto', tone: showRoutingConnectionInvite ? 'warning' : 'success' },
+                    { label: 'Focus', value: workspaceView === 'listen' ? 'Fonti' : workspaceView === 'strategy' ? 'Priorita' : 'Azione', tone: 'accent' },
+                ]}
+                action={
+                    <div className="flex items-center gap-2">
+                        <Button
+                            onClick={handleExportCsv}
+                            variant="outline"
+                            className="rounded-full px-6"
+                        >
+                            <Download className="mr-2 h-4 w-4" />
+                            Export CSV
+                        </Button>
+                        <Button
+                            onClick={handleSync}
+                            disabled={syncing}
+                            className="bg-amber-600 hover:bg-amber-700 text-white rounded-full px-8 shadow-lg shadow-amber-200 transition-all hover:scale-105 active:scale-95"
+                        >
+                            {syncing ? <RefreshCw className="mr-2 h-4 w-4 animate-spin" /> : <Sparkles className="mr-2 h-4 w-4" />}
+                            {syncing ? 'Analisi in corso...' : 'Aggiorna Analisi'}
+                        </Button>
+                    </div>
+                }
+            >
             {cockpitProjectId && selectedProject && !isAllProjectsSelected && (
                 <div className="flex items-center gap-2 text-xs text-slate-500">
                     <button
@@ -972,43 +975,9 @@ export default function InsightHubPage() {
                         ← {selectedProject.name}
                     </button>
                     <span>/</span>
-                    <span className="text-slate-700 font-medium">AI Tips</span>
+                    <span className="text-slate-700 font-medium">{workspaceView === 'listen' ? 'Listen' : workspaceView === 'strategy' ? 'Strategy' : 'Tips'}</span>
                 </div>
             )}
-            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-                <div>
-                    <h2 className="text-3xl font-extrabold tracking-tight bg-gradient-to-r from-amber-600 to-orange-600 bg-clip-text text-transparent">
-                        AI Tips
-                    </h2>
-                    <p className="text-muted-foreground font-medium flex items-center gap-2">
-                        Analisi cross-channel di interviste, chatbot e visibilità online.
-                        {selectedProject && !isAllProjectsSelected && (
-                            <Badge variant="outline" className="ml-2 gap-1 font-medium">
-                                <Folder className="w-3 h-3" />
-                                {selectedProject.name}
-                            </Badge>
-                        )}
-                    </p>
-                </div>
-                <div className="flex items-center gap-2">
-                    <Button
-                        onClick={handleExportCsv}
-                        variant="outline"
-                        className="rounded-full px-6"
-                    >
-                        <Download className="mr-2 h-4 w-4" />
-                        Export CSV
-                    </Button>
-                    <Button
-                        onClick={handleSync}
-                        disabled={syncing}
-                        className="bg-amber-600 hover:bg-amber-700 text-white rounded-full px-8 shadow-lg shadow-amber-200 transition-all hover:scale-105 active:scale-95"
-                    >
-                        {syncing ? <RefreshCw className="mr-2 h-4 w-4 animate-spin" /> : <Sparkles className="mr-2 h-4 w-4" />}
-                        {syncing ? 'Analisi in corso...' : 'Aggiorna Analisi'}
-                    </Button>
-                </div>
-            </div>
 
             <Card className="border-blue-100 bg-blue-50/50">
                 <CardContent className="py-4 flex flex-col md:flex-row md:items-center md:justify-between gap-3">
@@ -1605,151 +1574,51 @@ export default function InsightHubPage() {
                                     const detail = canonicalTipDetails[tip.id];
                                     const isExpanded = expandedCanonicalTipId === tip.id;
                                     const isEditing = editingCanonicalTipId === tip.id;
-                                    const automationState = getCanonicalAutomationState(tip, detail);
+                                    const operationalState = getTipOperationalState(tip, detail);
                                     return (
-                                        <Card key={tip.id} className="overflow-hidden border-slate-200 hover:border-amber-200 transition-all group hover:shadow-xl hover:shadow-slate-200/50">
-                                            <CardHeader className="pb-4">
-                                                <div className="flex justify-between items-start gap-4">
-                                                    <div>
-                                                        <CardTitle className="text-xl font-extrabold text-slate-900 leading-tight">
-                                                            {tip.title}
-                                                        </CardTitle>
-                                                        <CardDescription className="mt-2 flex flex-wrap items-center gap-2">
-                                                            <Badge variant="outline" className="text-[10px] uppercase">{tip.originType}</Badge>
-                                                            <Badge variant="outline" className="text-[10px] uppercase">{tip.status}</Badge>
-                                                            <Badge variant="outline" className={`text-[10px] uppercase ${automationState.className}`}>{automationState.label}</Badge>
-                                                            {tip.contentKind && <Badge variant="outline" className="text-[10px] uppercase">{tip.contentKind}</Badge>}
-                                                            <span className="text-xs text-slate-500">Evidenze: {tip.evidenceCount ?? 0}</span>
-                                                            <span className="text-xs text-slate-500">Route: {tip.routeCount ?? 0}</span>
-                                                        </CardDescription>
-                                                    </div>
-                                                    <div className="flex items-center gap-2">
-                                                        <Button
-                                                            variant="outline"
-                                                            size="sm"
-                                                            className="h-8 px-3 rounded-full text-xs"
-                                                            onClick={async () => {
-                                                                const next = isExpanded ? null : tip.id;
-                                                                setExpandedCanonicalTipId(next);
-                                                                if (next) await loadCanonicalTipDetail(next);
-                                                            }}
-                                                        >
-                                                            {isExpanded ? 'Nascondi' : 'Dettagli'}
-                                                        </Button>
-                                                        <Button
-                                                            variant="outline"
-                                                            size="sm"
-                                                            className="h-8 px-3 rounded-full text-xs"
-                                                            onClick={() => openCanonicalEdit(tip)}
-                                                        >
-                                                            Modifica
-                                                        </Button>
-                                                        <Button
-                                                            variant="outline"
-                                                            size="sm"
-                                                            className="h-8 px-3 rounded-full text-xs"
-                                                            onClick={() => duplicateCanonicalTip(tip.id)}
-                                                        >
-                                                            Duplica
-                                                        </Button>
-                                                    </div>
-                                                </div>
-                                            </CardHeader>
-                                            {(isExpanded || isEditing) && (
-                                                <CardContent className="pt-0 space-y-4">
+                                        <ProjectTipCard
+                                            key={tip.id}
+                                            tip={tip}
+                                            operationalState={operationalState}
+                                            isExpanded={isExpanded}
+                                            onToggleDetails={async () => {
+                                                const next = isExpanded ? null : tip.id;
+                                                setExpandedCanonicalTipId(next);
+                                                if (next) await loadCanonicalTipDetail(next);
+                                            }}
+                                            onEdit={() => openCanonicalEdit(tip)}
+                                            onDuplicate={() => duplicateCanonicalTip(tip.id)}
+                                        >
+                                            {(isExpanded || isEditing) ? (
+                                                <div className="space-y-4">
                                                     {isEditing ? (
-                                                        <div className="grid gap-3 rounded-xl border border-slate-200 p-4 bg-slate-50">
-                                                            <input className="h-9 rounded border border-slate-300 px-3 text-sm" value={canonicalEditDraft.title} onChange={(e) => setCanonicalEditDraft((prev) => ({ ...prev, title: e.target.value }))} />
-                                                            <textarea className="min-h-20 rounded border border-slate-300 px-3 py-2 text-sm" value={canonicalEditDraft.summary} onChange={(e) => setCanonicalEditDraft((prev) => ({ ...prev, summary: e.target.value }))} placeholder="Summary" />
-                                                            <textarea className="min-h-20 rounded border border-slate-300 px-3 py-2 text-sm" value={canonicalEditDraft.reasoning} onChange={(e) => setCanonicalEditDraft((prev) => ({ ...prev, reasoning: e.target.value }))} placeholder="Reasoning" />
-                                                            <textarea className="min-h-20 rounded border border-slate-300 px-3 py-2 text-sm" value={canonicalEditDraft.strategicAlignment} onChange={(e) => setCanonicalEditDraft((prev) => ({ ...prev, strategicAlignment: e.target.value }))} placeholder="Strategic alignment" />
-                                                            <div className="flex items-center gap-3">
-                                                                <select className="h-9 rounded border border-slate-300 px-3 text-sm" value={canonicalEditDraft.status} onChange={(e) => setCanonicalEditDraft((prev) => ({ ...prev, status: e.target.value }))}>
-                                                                    {['NEW', 'REVIEWED', 'APPROVED', 'DRAFTED', 'ROUTED', 'AUTOMATED', 'COMPLETED', 'ARCHIVED'].map((status) => (
-                                                                        <option key={status} value={status}>{status}</option>
-                                                                    ))}
-                                                                </select>
-                                                                <label className="flex items-center gap-2 text-xs text-slate-700">
-                                                                    <input type="checkbox" checked={canonicalEditDraft.starred} onChange={(e) => setCanonicalEditDraft((prev) => ({ ...prev, starred: e.target.checked }))} />
-                                                                    Prioritario
-                                                                </label>
-                                                            </div>
-                                                            <div className="flex items-center gap-2">
-                                                                <Button size="sm" className="h-8 px-3 rounded-full text-xs" onClick={() => saveCanonicalTipEdit(tip.id)} disabled={savingCanonicalTipId === tip.id}>
-                                                                    {savingCanonicalTipId === tip.id ? 'Salvataggio...' : 'Salva'}
-                                                                </Button>
-                                                                <Button variant="outline" size="sm" className="h-8 px-3 rounded-full text-xs" onClick={() => setEditingCanonicalTipId(null)}>
-                                                                    Annulla
-                                                                </Button>
-                                                            </div>
-                                                        </div>
+                                                        <ProjectTipEditor
+                                                            projectId={projectId as string}
+                                                            draft={canonicalEditDraft}
+                                                            onChange={setCanonicalEditDraft}
+                                                            onCancel={() => setEditingCanonicalTipId(null)}
+                                                            onSave={() => saveCanonicalTipEdit(tip.id)}
+                                                            saving={savingCanonicalTipId === tip.id}
+                                                            hasRoutingConnection={Boolean(selectedProjectRoutingState?.hasConnection)}
+                                                            hasRoutingPremium={hasRoutingPremium}
+                                                        />
                                                     ) : null}
 
-                                                    {isExpanded && detail && (
-                                                        <div className="space-y-3 rounded-xl border border-slate-200 p-4 bg-white">
-                                                            <p className="text-sm text-slate-700"><span className="font-semibold">Summary:</span> {detail.summary || '—'}</p>
-                                                            <p className="text-sm text-slate-700"><span className="font-semibold">Reasoning:</span> {detail.reasoning || '—'}</p>
-                                                            <p className="text-sm text-slate-700"><span className="font-semibold">Strategic alignment:</span> {detail.strategicAlignment || '—'}</p>
-                                                            <p className="text-sm text-slate-700"><span className="font-semibold">Methodology summary:</span> {detail.methodologySummary || '—'}</p>
-                                                            <div>
-                                                                <p className="text-xs font-semibold text-slate-600 mb-1">Evidence</p>
-                                                                {detail.evidence.length ? detail.evidence.map((ev) => (
-                                                                    <div key={ev.id} className="text-xs text-slate-600 bg-slate-100 rounded px-2 py-1 mb-1">{ev.sourceType}: {ev.detail}</div>
-                                                                )) : <p className="text-xs text-slate-500">Nessuna evidenza</p>}
-                                                            </div>
-                                                            <div>
-                                                                <p className="text-xs font-semibold text-slate-600 mb-1">Routes</p>
-                                                                {detail.routes.length ? detail.routes.map((route) => (
-                                                                    <div key={route.id} className="text-xs text-slate-600 bg-slate-100 rounded px-2 py-1 mb-1">{route.destinationType} · {route.status}</div>
-                                                                )) : <p className="text-xs text-slate-500">Nessuna route</p>}
-                                                            </div>
-                                                            <div>
-                                                                <p className="text-xs font-semibold text-slate-600 mb-1">Execution history</p>
-                                                                {detail.executions.length ? detail.executions.map((execution) => (
-                                                                    <div key={execution.id} className="text-xs text-slate-600 bg-slate-100 rounded px-2 py-1 mb-1">{execution.status} · {new Date(execution.startedAt).toLocaleString('it-IT')}</div>
-                                                                )) : <p className="text-xs text-slate-500">Nessuna esecuzione</p>}
-                                                            </div>
-                                                            {detail.explainability && (
-                                                                <div className="rounded-lg border border-indigo-100 bg-indigo-50/50 p-3 space-y-1.5">
-                                                                    <p className="text-xs font-semibold text-indigo-700">Perché questo tip</p>
-                                                                    <p className="text-xs text-slate-700">{detail.explainability.whyThisTip}</p>
-                                                                    {detail.explainability.projectInputsUsed.length > 0 && (
-                                                                        <p className="text-xs text-slate-500">Input usati: {detail.explainability.projectInputsUsed.join(', ')}</p>
-                                                                    )}
-                                                                    {detail.explainability.strategyContext && (
-                                                                        <p className="text-xs text-slate-600"><span className="font-medium">Strategia:</span> {detail.explainability.strategyContext}</p>
-                                                                    )}
-                                                                    {detail.explainability.methodologyContext && (
-                                                                        <p className="text-xs text-slate-600"><span className="font-medium">Metodologia:</span> {detail.explainability.methodologyContext}</p>
-                                                                    )}
-                                                                    {detail.explainability.automationRecommendation && (
-                                                                        <p className="text-xs text-slate-600"><span className="font-medium">Automazione:</span> {detail.explainability.automationRecommendation}</p>
-                                                                    )}
-                                                                </div>
-                                                            )}
-                                                            <div>
-                                                                <p className="text-xs font-semibold text-slate-600 mb-1">Note revisore</p>
-                                                                <textarea
-                                                                    className="w-full min-h-16 rounded border border-slate-200 px-2 py-1.5 text-xs text-slate-700 resize-none focus:outline-none focus:ring-1 focus:ring-indigo-300"
-                                                                    placeholder="Aggiungi note interne..."
-                                                                    value={reviewerNotesDraftByTip[tip.id] ?? (detail.reviewerNotes || '')}
-                                                                    onChange={(e) => setReviewerNotesDraftByTip((prev) => ({ ...prev, [tip.id]: e.target.value }))}
-                                                                />
-                                                                {reviewerNotesDraftByTip[tip.id] !== undefined && reviewerNotesDraftByTip[tip.id] !== (detail.reviewerNotes || '') && (
-                                                                    <button
-                                                                        className="mt-1 text-xs text-indigo-600 hover:text-indigo-800 font-medium disabled:opacity-50"
-                                                                        onClick={() => saveReviewerNotes(tip.id)}
-                                                                        disabled={savingReviewerNotesTipId === tip.id}
-                                                                    >
-                                                                        {savingReviewerNotesTipId === tip.id ? 'Salvataggio...' : 'Salva note'}
-                                                                    </button>
-                                                                )}
-                                                            </div>
-                                                        </div>
-                                                    )}
-                                                </CardContent>
-                                            )}
-                                        </Card>
+                                                    {isExpanded && detail ? (
+                                                        <ProjectTipDetailPanel
+                                                            detail={detail}
+                                                            reviewerNotesDraft={reviewerNotesDraftByTip[tip.id] ?? (detail.reviewerNotes || '')}
+                                                            onReviewerNotesChange={(value) =>
+                                                                setReviewerNotesDraftByTip((prev) => ({ ...prev, [tip.id]: value }))
+                                                            }
+                                                            onSaveReviewerNotes={() => saveReviewerNotes(tip.id)}
+                                                            savingReviewerNotes={savingReviewerNotesTipId === tip.id}
+                                                            onUsePrompt={handleUseCopilotPrompt}
+                                                        />
+                                                    ) : null}
+                                                </div>
+                                            ) : null}
+                                        </ProjectTipCard>
                                     );
                                 })}
                             </div>
@@ -1781,7 +1650,7 @@ export default function InsightHubPage() {
                                     </div>
                                     <h3 className="text-xl font-bold text-slate-900">Suggerimenti in arrivo</h3>
                                     <p className="text-sm text-slate-500 max-w-sm mt-2">
-                                        Nessun tip per i filtri selezionati oppure analisi ancora in corso. Clicca su "Aggiorna Analisi" per rigenerare i suggerimenti.
+                                        Nessun tip per i filtri selezionati oppure analisi ancora in corso. Clicca su &quot;Aggiorna Analisi&quot; per rigenerare i suggerimenti.
                                     </p>
                                 </CardContent>
                             </Card>
@@ -2098,6 +1967,7 @@ export default function InsightHubPage() {
                     );
                 })()}
             </div>
+            </ProjectWorkspaceShell>
         </div>
     );
 }

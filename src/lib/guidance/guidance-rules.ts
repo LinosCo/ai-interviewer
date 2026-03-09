@@ -72,8 +72,8 @@ export const GUIDANCE_STEPS: readonly GuidanceStepDefinition[] = [
   {
     id: 'project_without_tools',
     title: 'Attiva il primo tool del progetto',
-    description: 'Questo progetto non ha ancora strumenti attivi. Parti da una prima intervista per generare segnali utili.',
-    whyItMatters: 'Senza un tool attivo il loop operativo resta fermo e non produce tips.',
+    description: 'Questo progetto non ha ancora strumenti attivi. Parti da una prima intervista o da un setup visibility per generare segnali utili.',
+    whyItMatters: 'Senza segnali reali le sezioni Listen, Tips ed Execute restano vuote.',
     actionLabel: 'Crea prima intervista',
     actionHref: (ctx) => projectScopedHref(ctx.projectId, '/dashboard/interviews/create'),
     isRelevant: (ctx) => isProjectCockpitPath(ctx.pathname) && Boolean(ctx.activation),
@@ -115,27 +115,27 @@ export const GUIDANCE_STEPS: readonly GuidanceStepDefinition[] = [
   },
   {
     id: 'first_integration_connection',
-    title: 'Collega una prima integrazione',
-    description: 'Connetti CMS, WordPress o n8n per trasformare i tips in esecuzioni operative.',
-    whyItMatters: 'Le integrazioni riducono il lavoro manuale tra tip e azione.',
-    actionLabel: 'Apri integrazioni',
-    actionHref: (ctx) => (ctx.projectId ? `/dashboard/projects/${ctx.projectId}/integrations` : '/dashboard/projects'),
+    title: 'Apri Connections e collega una destinazione',
+    description: 'Connetti CMS, WordPress, Google o n8n prima di portare i tip in esecuzione.',
+    whyItMatters: 'Senza Connections attive il routing resta solo teorico.',
+    actionLabel: 'Apri Connections',
+    actionHref: (ctx) => (ctx.projectId ? `/dashboard/projects/${ctx.projectId}/integrations?tab=connections` : '/dashboard/projects'),
     isRelevant: (ctx) => ctx.pathname.includes('/integrations') && Boolean(ctx.activation),
     isCompleted: (ctx) => Boolean(ctx.activation?.checklist.hasIntegration),
   },
   {
     id: 'first_tip_review_or_routing',
-    title: 'Valida il primo tip e prepara il routing',
-    description: 'Apri i tips canonici, rivedi la priorita e configura il routing dove serve.',
-    whyItMatters: 'Questo passaggio converte i segnali in decisioni e azioni tracciabili.',
-    actionLabel: 'Vai ai tips',
+    title: 'Rivedi il primo tip e portalo in Execute',
+    description: 'Apri Tips, valida priorita e related actions, poi passa in Execute per il routing.',
+    whyItMatters: 'Questo passaggio converte i segnali in una decisione pronta a muoversi nel loop operativo.',
+    actionLabel: 'Apri Tips',
     actionHref: (ctx) => {
-      if (!ctx.projectId) return '/dashboard/insights';
-      if (!ctx.activation?.checklist.hasTips) return `/dashboard/insights?projectId=${ctx.projectId}`;
+      if (!ctx.projectId) return '/dashboard/insights?view=tips';
+      if (!ctx.activation?.checklist.hasTips) return `/dashboard/insights?projectId=${ctx.projectId}&view=tips`;
       if (!ctx.activation.checklist.hasRoutingRule && ctx.activation.checklist.hasIntegration) {
         return `/dashboard/projects/${ctx.projectId}/integrations?tab=routing`;
       }
-      return `/dashboard/insights?projectId=${ctx.projectId}`;
+      return `/dashboard/insights?projectId=${ctx.projectId}&view=tips`;
     },
     isRelevant: (ctx) =>
       (ctx.pathname.startsWith('/dashboard/insights') || ctx.pathname.includes('/integrations')) && Boolean(ctx.activation),

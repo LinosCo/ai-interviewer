@@ -1,11 +1,12 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Sparkles, Send, X, Lightbulb, MessageSquare, AlertCircle, Loader2, RotateCcw } from 'lucide-react';
 import { useProject } from '@/contexts/ProjectContext';
 import { useOrganization } from '@/contexts/OrganizationContext';
 import ReactMarkdown from 'react-markdown';
+import { usePathname } from 'next/navigation';
 
 interface Message {
     id: string;
@@ -14,6 +15,7 @@ interface Message {
     timestamp: Date;
     toolsUsed?: string[];
     suggestedFollowUp?: string;
+    suggestedPromptVariants?: string[];
 }
 
 interface StrategyCopilotProps {
@@ -34,6 +36,36 @@ const QUICK_ACTIONS_PRO = [
     { label: 'Quali sono i temi emergenti?', icon: Lightbulb, category: 'data' },
     { label: 'Ci sono knowledge gaps?', icon: Lightbulb, category: 'data' },
 ];
+
+function buildSurfaceQuickActions(pathname: string, hasProjectAccess: boolean) {
+    const base = hasProjectAccess ? [...QUICK_ACTIONS, ...QUICK_ACTIONS_PRO] : QUICK_ACTIONS;
+
+    if (pathname.includes('/integrations')) {
+        return [
+            { label: 'Verifica le connections attive di questo progetto', icon: Lightbulb, category: 'connections' },
+            { label: 'Suggerisci la prima regola di routing da creare', icon: Sparkles, category: 'execute' },
+            ...base,
+        ];
+    }
+
+    if (pathname.includes('/analytics')) {
+        return [
+            { label: 'Qual e la metrica che richiede attenzione adesso?', icon: Lightbulb, category: 'measure' },
+            { label: 'Confronta trend e suggerisci la prossima mossa', icon: Sparkles, category: 'measure' },
+            ...base,
+        ];
+    }
+
+    if (pathname.includes('/insights')) {
+        return [
+            { label: 'Quale tip canonico dovrei rivedere per primo?', icon: Sparkles, category: 'tips' },
+            { label: 'Suggerisci 3 azioni collegate intorno al tip principale', icon: Lightbulb, category: 'tips' },
+            ...base,
+        ];
+    }
+
+    return base;
+}
 
 const BASE_LOADING_STAGES = [
     'Analizzo la richiesta...',
@@ -103,6 +135,7 @@ export function StrategyCopilot({ userTier }: StrategyCopilotProps) {
 
     const { selectedProject } = useProject();
     const { currentOrganization } = useOrganization();
+    const pathname = usePathname() || '';
     const hasProjectAccess = ['PRO', 'BUSINESS', 'ENTERPRISE', 'ADMIN', 'PARTNER'].includes(userTier.toUpperCase());
 
     const clearLoadingTimers = () => {
@@ -126,6 +159,21 @@ export function StrategyCopilot({ userTier }: StrategyCopilotProps) {
             clearLoadingTimers();
         };
     }, []);
+
+    useEffect(() => {
+        const handlePrompt = (event: Event) => {
+            const prompt = (event as CustomEvent<{ prompt?: string }>).detail?.prompt?.trim();
+            if (!prompt) return;
+            setIsOpen(true);
+            void sendMessage(prompt);
+        };
+
+        window.addEventListener('bt-copilot-prompt', handlePrompt as EventListener);
+        return () => {
+            window.removeEventListener('bt-copilot-prompt', handlePrompt as EventListener);
+        };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [isLoading, conversationId, selectedProject?.id]);
 
     // If the landing chatbot embed leaked into dashboard via client-side navigation,
     // remove only its root container to avoid runtime errors while scripts execute.
@@ -321,12 +369,15 @@ export function StrategyCopilot({ userTier }: StrategyCopilotProps) {
             const finalContent = accumulated.trim() || 'Risposta non disponibile. Riprova.';
             setMessages(prev => prev.map(m =>
                 m.id === assistantMsgId
-                    ? {
+                            ? {
                         ...m,
                         content: finalContent,
                         toolsUsed: metaJson.toolsUsed,
                         suggestedFollowUp: typeof metaJson.suggestedFollowUp === 'string' && metaJson.suggestedFollowUp
                             ? metaJson.suggestedFollowUp
+                            : undefined,
+                        suggestedPromptVariants: Array.isArray(metaJson.suggestedPromptVariants)
+                            ? metaJson.suggestedPromptVariants.filter((item: unknown): item is string => typeof item === 'string' && item.trim().length > 0)
                             : undefined
                     }
                     : m
@@ -366,9 +417,10 @@ export function StrategyCopilot({ userTier }: StrategyCopilotProps) {
         }
     };
 
-    const quickActions = hasProjectAccess
-        ? [...QUICK_ACTIONS, ...QUICK_ACTIONS_PRO]
-        : QUICK_ACTIONS;
+    const quickActions = useMemo(
+        () => buildSurfaceQuickActions(pathname, hasProjectAccess),
+        [pathname, hasProjectAccess]
+    );
 
     return (
         <>
@@ -483,15 +535,29 @@ export function StrategyCopilot({ userTier }: StrategyCopilotProps) {
                                             <p className="text-sm">{msg.content}</p>
                                         )}
                                     </div>
-                                    {msg.role === 'assistant' && msg.suggestedFollowUp && (
-                                        <button
-                                            onClick={() => sendMessage(msg.suggestedFollowUp!)}
-                                            disabled={isLoading}
-                                            className="mt-2 self-start text-xs bg-amber-50 border border-amber-200 hover:bg-amber-100 text-amber-700 px-3 py-1.5 rounded-full transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1.5"
-                                        >
-                                            <Sparkles className="w-3 h-3" />
-                                            {msg.suggestedFollowUp}
-                                        </button>
+                                    {msg.role === 'assistant' && (msg.suggestedFollowUp || msg.suggestedPromptVariants?.length) && (
+                                        <div className="mt-2 flex flex-wrap gap-2 self-start">
+                                            {msg.suggestedFollowUp ? (
+                                                <button
+                                                    onClick={() => sendMessage(msg.suggestedFollowUp!)}
+                                                    disabled={isLoading}
+                                                    className="text-xs bg-amber-50 border border-amber-200 hover:bg-amber-100 text-amber-700 px-3 py-1.5 rounded-full transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1.5"
+                                                >
+                                                    <Sparkles className="w-3 h-3" />
+                                                    {msg.suggestedFollowUp}
+                                                </button>
+                                            ) : null}
+                                            {msg.suggestedPromptVariants?.filter((variant) => variant !== msg.suggestedFollowUp).slice(0, 3).map((variant) => (
+                                                <button
+                                                    key={variant}
+                                                    onClick={() => sendMessage(variant)}
+                                                    disabled={isLoading}
+                                                    className="text-xs bg-white border border-stone-200 hover:border-amber-200 hover:bg-amber-50 text-stone-700 px-3 py-1.5 rounded-full transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                                                >
+                                                    {variant}
+                                                </button>
+                                            ))}
+                                        </div>
                                     )}
                                 </div>
                             ))}

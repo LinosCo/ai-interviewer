@@ -71,6 +71,43 @@ function parseAdditionalUrls(value: unknown): Array<{ url: string; label?: strin
         .filter((entry) => entry.url);
 }
 
+type StrategicTipAction = {
+    type: string;
+    target: string;
+    title: string;
+    body: string;
+    reasoning: string;
+    strategicAlignment?: string;
+    coordination?: string;
+    evidence?: Array<{
+        sourceType: string;
+        sourceRef: string;
+        detail: string;
+    }>;
+    contentKind?: string | null;
+};
+
+export function buildStrategicTipRoutingPayload(
+    canonicalTipId: string,
+    actions: StrategicTipAction[]
+): Array<{
+    id: string;
+    title: string;
+    content: string;
+    contentKind: string;
+    targetChannel: string;
+}> {
+    return actions
+        .filter((action) => typeof action.contentKind === 'string' && action.contentKind.length > 0)
+        .map((action) => ({
+            id: canonicalTipId,
+            title: action.title,
+            content: action.body,
+            contentKind: action.contentKind as string,
+            targetChannel: action.target,
+        }));
+}
+
 export function createPlatformHelpSearchTool() {
     return {
         description: 'Search the Business Tuner product help knowledge base by keyword and category.',
@@ -2330,14 +2367,14 @@ const strategicTipActionSchema = z.object({
 
 export function createStrategicTipCreationTool(context: ToolContext) {
     return {
-        description: 'Create a new canonical AI Tip (ProjectTip) and optionally dispatch it to routing rules and n8n automation.',
+        description: 'Create a new canonical AI Tip (ProjectTip) and optionally dispatch its routing-ready actions to routing rules and n8n automation.',
         inputSchema: z.object({
             projectId: z.string().optional().describe('Project ID. If omitted, uses selected project in Copilot context.'),
             topicName: z.string().min(5).max(180).describe('Strategic AI tip title shown in Insights.'),
             reasoning: z.string().min(10).max(4000).describe('Strategic rationale and evidence behind the tip.'),
             priorityScore: z.number().min(0).max(100).optional().default(70),
             actions: z.array(strategicTipActionSchema).min(1).max(6),
-            autoCreateContentDrafts: z.boolean().optional().default(true).describe('Acknowledge that the canonical tip itself constitutes the content record.'),
+            autoCreateContentDrafts: z.boolean().optional().default(false).describe('Deprecated compatibility flag. Phase 5 no longer creates CMS draft records from this tool.'),
             autoDispatchRouting: z.boolean().optional().default(false).describe('If true, run n8n dispatch and tip routing rules using the canonical tip actions.')
         }),
         execute: async ({
@@ -2396,37 +2433,27 @@ export function createStrategicTipCreationTool(context: ToolContext) {
                     ...buildInsightActionMetadata(action)
                 }));
 
-                let canonicalTipId: string | null = null;
-                try {
-                    const canonicalTip = await ProjectTipService.createCopilotTip({
-                        projectId: targetProjectId,
-                        organizationId: context.organizationId,
-                        title: topicName,
-                        summary: reasoning.slice(0, 280),
-                        priority: Number(priorityScore ?? 70),
-                        category: 'copilot_strategic',
-                        contentKind: 'STRATEGIC_RECOMMENDATION',
-                        executionClass: 'COPILOT',
-                        reasoning,
-                        strategicAlignment: reasoning,
-                        actions: enrichedActions as any,
-                        evidence: enrichedActions.flatMap((action) => action.evidence ?? []) as any,
-                        createdBy: context.userId,
-                    });
-                    canonicalTipId = canonicalTip.id;
-                } catch (error) {
-                    console.warn('[project-tip-canonical-write] copilot canonical tip creation failed', { targetProjectId, error });
-                }
+                const canonicalTip = await ProjectTipService.createCopilotTip({
+                    projectId: targetProjectId,
+                    organizationId: context.organizationId,
+                    title: topicName,
+                    summary: reasoning.slice(0, 280),
+                    priority: Number(priorityScore ?? 70),
+                    category: 'copilot_strategic',
+                    contentKind: 'STRATEGIC_RECOMMENDATION',
+                    executionClass: 'COPILOT',
+                    reasoning,
+                    strategicAlignment: reasoning,
+                    actions: enrichedActions as any,
+                    evidence: enrichedActions.flatMap((action) => action.evidence ?? []) as any,
+                    createdBy: context.userId,
+                });
+                const canonicalTipId = canonicalTip.id;
 
                 const routing = { dispatchedToN8N: false, routedRules: 0, routingFailures: 0 };
-                if (autoDispatchRouting && canonicalTipId) {
-                    const tipsPayload = enrichedActions.map((action) => ({
-                        id: canonicalTipId!,
-                        title: action.title,
-                        content: action.body,
-                        contentKind: String(action.type),
-                        targetChannel: action.target,
-                    }));
+                const tipsPayload = buildStrategicTipRoutingPayload(canonicalTipId, enrichedActions);
+
+                if (autoDispatchRouting && tipsPayload.length > 0) {
 
                     try {
                         await N8NDispatcher.dispatchTips(targetProjectId, tipsPayload);
@@ -2455,7 +2482,10 @@ export function createStrategicTipCreationTool(context: ToolContext) {
                         actionsCount: enrichedActions.length,
                     },
                     automations: {
-                        contentDraftsCreated: canonicalTipId && autoCreateContentDrafts ? 1 : 0,
+                        contentDraftsCreated: 0,
+                        draftGenerationSupported: false,
+                        routableActionsCount: tipsPayload.length,
+                        ignoredAutoCreateContentDrafts: Boolean(autoCreateContentDrafts),
                         ...routing
                     }
                 };

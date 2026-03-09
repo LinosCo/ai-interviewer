@@ -1,6 +1,6 @@
 import { auth } from '@/auth';
 import { prisma } from '@/lib/prisma';
-import { generateText, streamText } from 'ai';
+import { streamText } from 'ai';
 import { createAnthropic } from '@ai-sdk/anthropic';
 import { createOpenAI } from '@ai-sdk/openai';
 import { NextResponse } from 'next/server';
@@ -15,6 +15,7 @@ import { TokenTrackingService } from '@/services/tokenTrackingService';
 import { checkCreditsForAction } from '@/lib/guards/resourceGuard';
 import { cookies } from 'next/headers';
 import { getDefaultStrategicMarketingKnowledge, getStrategicMarketingKnowledgeByOrg } from '@/lib/marketing/strategic-kb';
+import { buildRelatedCopilotPromptSuggestions } from '@/lib/projects/project-tip-related-suggestions';
 import {
     createPlatformHelpSearchTool,
     createProjectTranscriptsTool,
@@ -63,6 +64,54 @@ function isPlaceholderCopilotResponse(text: string): boolean {
         'verifico adesso',
         'un momento mentre controllo'
     ].some((snippet) => normalized.includes(snippet));
+}
+
+function buildCopilotPromptVariants(prompt: string, suggestedFollowUp: string): string[] {
+    const normalized = prompt.toLowerCase();
+
+    if (
+        normalized.includes('connession') ||
+        normalized.includes('routing') ||
+        normalized.includes('n8n') ||
+        normalized.includes('wordpress') ||
+        normalized.includes('woocommerce') ||
+        normalized.includes('cms')
+    ) {
+        return [
+            suggestedFollowUp,
+            'Verifica quali connections sono gia attive e quali mancano per questo progetto.',
+            'Suggerisci la prima regola di routing coerente con i tip piu pronti.',
+        ].filter(Boolean).slice(0, 3);
+    }
+
+    if (
+        normalized.includes('tema') ||
+        normalized.includes('segnal') ||
+        normalized.includes('insight') ||
+        normalized.includes('tip')
+    ) {
+        return [
+            suggestedFollowUp,
+            'Quale tip canonico dovrei rivedere per primo e perche?',
+            'Suggerisci 2 azioni collegate da eseguire intorno al tip principale.',
+        ].filter(Boolean).slice(0, 3);
+    }
+
+    if (
+        normalized.includes('analytics') ||
+        normalized.includes('risultat') ||
+        normalized.includes('metric') ||
+        normalized.includes('trend')
+    ) {
+        return [
+            suggestedFollowUp,
+            'Quale metrica merita attenzione immediata e quale azione suggerisce?',
+            'Confronta i segnali piu forti e dimmi dove intervenire prima.',
+        ].filter(Boolean).slice(0, 3);
+    }
+
+    const related = buildRelatedCopilotPromptSuggestions(prompt);
+    return [...new Set([suggestedFollowUp, ...related].filter(Boolean))].slice(0, 3);
 }
 
 export async function POST(req: Request) {
@@ -420,6 +469,7 @@ export async function POST(req: Request) {
                 if (followUpMatch) {
                     suggestedFollowUp = followUpMatch[1].trim();
                 }
+                const suggestedPromptVariants = buildCopilotPromptVariants(message, suggestedFollowUp);
 
                 // KB fallback for placeholder responses
                 let usedKnowledgeBase = false;
@@ -494,6 +544,7 @@ export async function POST(req: Request) {
                     hasProjectAccess,
                     usedKnowledgeBase,
                     suggestedFollowUp,
+                    suggestedPromptVariants,
                     toolsUsed: capturedToolsUsed
                 });
                 await writer.write(enc.encode('\x01' + meta));

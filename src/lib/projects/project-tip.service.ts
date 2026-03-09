@@ -17,6 +17,10 @@ import {
 import { assertProjectAccess } from '@/lib/domain/workspace';
 import { prisma } from '@/lib/prisma';
 import { ProjectTipGroundingService } from '@/lib/projects/project-tip-grounding.service';
+import {
+  mergeSuggestedRoutingWithDerivedSuggestions,
+  readDerivedTipSuggestions,
+} from '@/lib/projects/project-tip-related-suggestions';
 import type {
   ProjectTipDetailSnapshot,
   ProjectTipExecutionSnapshot,
@@ -51,6 +55,8 @@ function mapTipSnapshot(
   tip: ProjectTip,
   counts?: { evidenceCount: number; routeCount: number; executionCount: number }
 ): ProjectTipSnapshot {
+  const derivedSuggestions = readDerivedTipSuggestions(tip.suggestedRouting);
+
   return {
     id: tip.id,
     organizationId: tip.organizationId,
@@ -78,6 +84,9 @@ function mapTipSnapshot(
     sourceSnapshot: tip.sourceSnapshot ?? null,
     recommendedActions: tip.recommendedActions ?? null,
     suggestedRouting: tip.suggestedRouting ?? null,
+    derivedSuggestions,
+    relatedActionSuggestions: derivedSuggestions?.relatedActionSuggestions ?? [],
+    relatedPromptSuggestions: derivedSuggestions?.relatedPromptSuggestions ?? [],
     reviewerNotes: (tip as ProjectTip & { reviewerNotes?: string | null }).reviewerNotes ?? null,
     createdBy: tip.createdBy ?? null,
     lastEditedBy: tip.lastEditedBy ?? null,
@@ -87,6 +96,19 @@ function mapTipSnapshot(
     createdAt: tip.createdAt.toISOString(),
     updatedAt: tip.updatedAt.toISOString(),
   };
+}
+
+function buildStoredSuggestedRouting(context: {
+  title: string;
+  summary?: string | null;
+  contentKind?: string | null;
+  category?: string | null;
+  executionClass?: string | null;
+  recommendedActions?: unknown;
+  suggestedRouting?: unknown;
+  sourceSnapshot?: unknown;
+}): Prisma.InputJsonValue {
+  return mergeSuggestedRoutingWithDerivedSuggestions(context) as Prisma.InputJsonValue;
 }
 
 function buildExplainability(
@@ -227,7 +249,7 @@ async function materializeGrounding(payload: ProjectTipGroundingPayload): Promis
 
   const existing = await prisma.projectTip.findUnique({
     where: { originFingerprint },
-    select: { id: true },
+    select: { id: true, suggestedRouting: true },
   });
 
   const tip = existing
@@ -251,6 +273,16 @@ async function materializeGrounding(payload: ProjectTipGroundingPayload): Promis
           methodologyRefs: toNullableJson(payload.methodologyRefsSummary as unknown as Prisma.InputJsonValue),
           sourceSnapshot: toNullableJson(payload.tip.sourceSnapshot),
           recommendedActions: toNullableJson(payload.tip.recommendedActions),
+          suggestedRouting: toNullableJson(
+            buildStoredSuggestedRouting({
+              title: payload.tip.title,
+              summary: payload.tip.summary,
+              category: payload.tip.category,
+              recommendedActions: payload.tip.recommendedActions,
+              suggestedRouting: existing?.suggestedRouting ?? null,
+              sourceSnapshot: payload.tip.sourceSnapshot,
+            })
+          ),
         },
       })
     : await prisma.projectTip.create({
@@ -272,6 +304,15 @@ async function materializeGrounding(payload: ProjectTipGroundingPayload): Promis
           methodologyRefs: toNullableJson(payload.methodologyRefsSummary as unknown as Prisma.InputJsonValue),
           sourceSnapshot: toNullableJson(payload.tip.sourceSnapshot),
           recommendedActions: toNullableJson(payload.tip.recommendedActions),
+          suggestedRouting: toNullableJson(
+            buildStoredSuggestedRouting({
+              title: payload.tip.title,
+              summary: payload.tip.summary,
+              category: payload.tip.category,
+              recommendedActions: payload.tip.recommendedActions,
+              sourceSnapshot: payload.tip.sourceSnapshot,
+            })
+          ),
         },
       });
 
@@ -465,7 +506,18 @@ export class ProjectTipService {
         reasoning: input.reasoning ?? null,
         strategicAlignment: input.strategicAlignment ?? null,
         recommendedActions: toNullableJson((input.recommendedActions as Prisma.InputJsonValue) ?? null),
-        suggestedRouting: toNullableJson((input.suggestedRouting as Prisma.InputJsonValue) ?? null),
+        suggestedRouting: toNullableJson(
+          buildStoredSuggestedRouting({
+            title: input.title,
+            summary: input.summary ?? null,
+            contentKind: input.contentKind ?? null,
+            category: input.category ?? null,
+            executionClass: input.executionClass ?? null,
+            recommendedActions: input.recommendedActions ?? null,
+            suggestedRouting: input.suggestedRouting ?? null,
+            sourceSnapshot: input.sourceSnapshot ?? null,
+          })
+        ),
         sourceSnapshot: toNullableJson((input.sourceSnapshot as Prisma.InputJsonValue) ?? null),
         createdBy: input.createdBy ?? null,
         lastEditedBy: input.createdBy ?? null,
@@ -522,7 +574,18 @@ export class ProjectTipService {
         methodologyRefs: toNullableJson(payload.methodologyRefsSummary as unknown as Prisma.InputJsonValue),
         sourceSnapshot: toNullableJson(payload.tip.sourceSnapshot as Prisma.InputJsonValue),
         recommendedActions: toNullableJson(payload.tip.recommendedActions as Prisma.InputJsonValue),
-        suggestedRouting: toNullableJson((input.suggestedRouting as Prisma.InputJsonValue) ?? null),
+        suggestedRouting: toNullableJson(
+          buildStoredSuggestedRouting({
+            title: payload.tip.title,
+            summary: payload.tip.summary ?? null,
+            contentKind: input.contentKind ?? null,
+            category: input.category ?? payload.tip.category ?? null,
+            executionClass: input.executionClass ?? null,
+            recommendedActions: payload.tip.recommendedActions,
+            suggestedRouting: input.suggestedRouting ?? null,
+            sourceSnapshot: payload.tip.sourceSnapshot,
+          })
+        ),
         createdBy: input.createdBy ?? null,
         lastEditedBy: input.createdBy ?? null,
       },
@@ -551,7 +614,17 @@ export class ProjectTipService {
 
     const existing = await prisma.projectTip.findFirst({
       where: { id: input.tipId, projectId: input.projectId },
-      select: { id: true },
+      select: {
+        id: true,
+        title: true,
+        summary: true,
+        category: true,
+        contentKind: true,
+        executionClass: true,
+        recommendedActions: true,
+        suggestedRouting: true,
+        sourceSnapshot: true,
+      },
     });
     if (!existing) {
       throw new Error('Tip not found');
@@ -578,9 +651,18 @@ export class ProjectTipService {
         ...(input.recommendedActions !== undefined
           ? { recommendedActions: toNullableJson(input.recommendedActions as Prisma.InputJsonValue) }
           : {}),
-        ...(input.suggestedRouting !== undefined
-          ? { suggestedRouting: toNullableJson(input.suggestedRouting as Prisma.InputJsonValue) }
-          : {}),
+        suggestedRouting: toNullableJson(
+          buildStoredSuggestedRouting({
+            title: input.title ?? existing.title,
+            summary: input.summary !== undefined ? input.summary : existing.summary,
+            contentKind: input.contentKind !== undefined ? input.contentKind : existing.contentKind,
+            category: input.category !== undefined ? input.category : existing.category,
+            executionClass: input.executionClass !== undefined ? input.executionClass : existing.executionClass,
+            recommendedActions: input.recommendedActions !== undefined ? input.recommendedActions : existing.recommendedActions,
+            suggestedRouting: input.suggestedRouting !== undefined ? input.suggestedRouting : existing.suggestedRouting,
+            sourceSnapshot: existing.sourceSnapshot,
+          })
+        ),
         ...(input.reviewerNotes !== undefined ? { reviewerNotes: input.reviewerNotes } : {}),
         ...(input.lastEditedBy !== undefined ? { lastEditedBy: input.lastEditedBy } : {}),
       },
@@ -643,7 +725,18 @@ export class ProjectTipService {
         methodologyRefs: toNullableJson(source.methodologyRefs),
         sourceSnapshot: toNullableJson(source.sourceSnapshot),
         recommendedActions: toNullableJson(source.recommendedActions),
-        suggestedRouting: toNullableJson(source.suggestedRouting),
+        suggestedRouting: toNullableJson(
+          buildStoredSuggestedRouting({
+            title: `${source.title} (Copy)`,
+            summary: source.summary,
+            contentKind: source.contentKind,
+            category: source.category,
+            executionClass: source.executionClass,
+            recommendedActions: source.recommendedActions,
+            suggestedRouting: source.suggestedRouting,
+            sourceSnapshot: source.sourceSnapshot,
+          })
+        ),
         createdBy: input.createdBy ?? null,
         lastEditedBy: input.createdBy ?? null,
       },

@@ -14,6 +14,10 @@ import {
   TipRouteStatus,
   TipRoutingStatus,
 } from '@prisma/client';
+import type {
+  DerivedTipSuggestions,
+  RelatedActionSuggestion,
+} from '@/lib/projects/project-tip-related-suggestions';
 
 export type ProjectStrategySnapshot = {
   projectId: string;
@@ -83,6 +87,9 @@ export type ProjectTipSnapshot = {
   sourceSnapshot: Prisma.JsonValue | null;
   recommendedActions: Prisma.JsonValue | null;
   suggestedRouting: Prisma.JsonValue | null;
+  derivedSuggestions: DerivedTipSuggestions | null;
+  relatedActionSuggestions: RelatedActionSuggestion[];
+  relatedPromptSuggestions: string[];
   reviewerNotes: string | null;
   createdBy: string | null;
   lastEditedBy: string | null;

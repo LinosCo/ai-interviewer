@@ -5,6 +5,7 @@ import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { AnimatePresence } from 'framer-motion';
 import { ConnectionsTab } from '@/components/integrations/ConnectionsTab';
 import { AiRoutingTab } from '@/components/integrations/AiRoutingTab';
+import { ProjectWorkspaceShell } from '@/components/projects/ProjectWorkspaceShell';
 
 interface MCPConnection {
   id: string;
@@ -147,6 +148,13 @@ export default function IntegrationsPage() {
     setNotification({ type, message });
     setTimeout(() => setNotification(null), 4000);
   }, []);
+
+  const handleTabChange = useCallback((tab: IntegrationsTab) => {
+    setActiveTab(tab);
+    const nextParams = new URLSearchParams(searchParams.toString());
+    nextParams.set('tab', tab);
+    router.replace(`/dashboard/projects/${projectId}/integrations?${nextParams.toString()}`, { scroll: false });
+  }, [projectId, router, searchParams]);
 
   // Fetch all integrations data
   const fetchData = useCallback(async () => {
@@ -409,6 +417,7 @@ export default function IntegrationsPage() {
     { id: 'settings' as const, label: 'Impostazioni' },
   ] as const;
   const hasBusinessTier = ['BUSINESS', 'PARTNER', 'ENTERPRISE', 'ADMIN'].includes(userPlan);
+  const currentProjectName = projects.find((project) => project.id === projectId)?.name || 'Progetto';
 
   // Compute number of active connections for the tab badge
   const activeCount = [
@@ -422,11 +431,30 @@ export default function IntegrationsPage() {
     ...(cmsConnection?.status === 'ACTIVE' ? [cmsConnection] : []),
     ...(n8nConnection?.status === 'ACTIVE' ? [n8nConnection] : []),
   ].length;
+  const activeSection = activeTab === 'routing' ? 'execute' : 'connections';
 
   return (
-    <div className="flex flex-col h-[calc(100vh-80px)] overflow-hidden">
-      {/* Page header + tab bar */}
-      <div className="px-8 pt-8 pb-0 flex-shrink-0">
+    <div className="max-w-7xl mx-auto p-6">
+      <ProjectWorkspaceShell
+        projectId={projectId}
+        projectName={currentProjectName}
+        activeSection={activeSection}
+        eyebrow={activeTab === 'routing' ? 'Execute' : 'Connections'}
+        title={activeTab === 'routing' ? 'Routing e messa in azione' : 'Connections e setup esterno'}
+        description={
+          activeTab === 'routing'
+            ? 'Configura dove devono andare i tip, con quali policy e quali blocchi correggere prima di eseguire.'
+            : 'Collega i sistemi esterni del progetto e verifica se le destinazioni sono davvero pronte per entrare nel loop operativo.'
+        }
+        metrics={[
+          { label: 'Connessioni attive', value: String(activeCount), tone: activeCount > 0 ? 'success' : 'warning' },
+          { label: 'Routing AI', value: hasBusinessTier ? 'Disponibile' : 'Upgrade richiesto', tone: hasBusinessTier ? 'accent' : 'warning' },
+          { label: 'Progetto', value: currentOrgName || 'Workspace', tone: 'default' },
+          { label: 'Tab attiva', value: activeTab === 'routing' ? 'Execute' : 'Connections', tone: 'accent' },
+        ]}
+      >
+        <div className="mt-8 flex min-h-[70vh] flex-col overflow-hidden rounded-[2rem] border border-slate-200 bg-white shadow-sm">
+          <div className="px-8 pt-8 pb-0 flex-shrink-0">
         {/* Inline notification */}
         {notification && (
           <div
@@ -481,7 +509,7 @@ export default function IntegrationsPage() {
           {TABS.map(tab => (
             <button
               key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
+              onClick={() => handleTabChange(tab.id)}
               className={`
                 relative px-4 py-3 text-sm font-semibold transition-colors
                 ${activeTab === tab.id
@@ -504,10 +532,10 @@ export default function IntegrationsPage() {
             </button>
           ))}
         </div>
-      </div>
+          </div>
 
       {/* Tab content area */}
-      <div className="flex-1 overflow-y-auto px-8">
+          <div className="flex-1 overflow-y-auto px-8">
         <AnimatePresence mode="wait">
           {activeTab === 'connections' && (
             <ConnectionsTab
@@ -571,7 +599,9 @@ export default function IntegrationsPage() {
             </div>
           )}
         </AnimatePresence>
-      </div>
+          </div>
+        </div>
+      </ProjectWorkspaceShell>
     </div>
   );
 }

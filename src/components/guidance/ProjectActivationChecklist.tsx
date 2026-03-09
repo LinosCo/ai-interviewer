@@ -67,31 +67,31 @@ export function ProjectActivationChecklist({ projectId }: ProjectActivationCheck
     return [
       {
         id: 'tools',
-        label: 'Attiva il primo tool',
+        label: 'Attiva il primo tool di ascolto',
         done: hasTools,
         href: `/dashboard/interviews/create?projectId=${projectId}`,
         cta: 'Crea intervista',
       },
       {
         id: 'integration',
-        label: 'Collega una integrazione',
+        label: 'Apri Connections e collega una destinazione',
         done: hasIntegration,
-        href: `/dashboard/projects/${projectId}/integrations`,
-        cta: 'Apri integrazioni',
+        href: `/dashboard/projects/${projectId}/integrations?tab=connections`,
+        cta: 'Apri Connections',
       },
       {
         id: 'tips',
         label: 'Valida il primo tip canonico',
         done: hasTips,
-        href: `/dashboard/insights?projectId=${projectId}`,
-        cta: 'Vai ai tips',
+        href: `/dashboard/insights?projectId=${projectId}&view=tips`,
+        cta: 'Apri Tips',
       },
       {
         id: 'routing',
-        label: 'Configura una regola di routing',
+        label: 'Passa in Execute e configura il routing',
         done: hasRouting,
         href: `/dashboard/projects/${projectId}/integrations?tab=routing`,
-        cta: 'Apri routing',
+        cta: 'Apri Execute',
       },
     ];
   }, [projectId, snapshot]);
@@ -106,7 +106,7 @@ export function ProjectActivationChecklist({ projectId }: ProjectActivationCheck
           Attivazione progetto
         </CardTitle>
         <p className="text-xs text-slate-600">
-          Avanza nel loop operativo completando i passaggi essenziali.
+          Completa le basi del loop operativo prima di chiedere automazioni o reporting avanzato.
         </p>
       </CardHeader>
 

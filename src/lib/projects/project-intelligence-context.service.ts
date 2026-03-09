@@ -2,6 +2,7 @@ import { Role } from '@prisma/client';
 
 import { assertProjectAccess, hasRequiredRole } from '@/lib/domain/workspace';
 import { prisma } from '@/lib/prisma';
+import { readDerivedTipSuggestions } from '@/lib/projects/project-tip-related-suggestions';
 import type {
   CrossProjectReference,
   DataSourceBindingSnapshot,
@@ -103,7 +104,10 @@ export class ProjectIntelligenceContextService {
       metadata: binding.metadata ?? null,
     }));
 
-    const tips: ProjectTipSnapshot[] = project.projectTips.map((tip) => ({
+    const tips: ProjectTipSnapshot[] = project.projectTips.map((tip) => {
+      const derivedSuggestions = readDerivedTipSuggestions(tip.suggestedRouting);
+
+      return {
       id: tip.id,
       organizationId: tip.organizationId,
       projectId: tip.projectId,
@@ -130,11 +134,16 @@ export class ProjectIntelligenceContextService {
       sourceSnapshot: tip.sourceSnapshot ?? null,
       recommendedActions: tip.recommendedActions ?? null,
       suggestedRouting: tip.suggestedRouting ?? null,
+      derivedSuggestions,
+      relatedActionSuggestions: derivedSuggestions?.relatedActionSuggestions ?? [],
+      relatedPromptSuggestions: derivedSuggestions?.relatedPromptSuggestions ?? [],
+      reviewerNotes: (tip as typeof tip & { reviewerNotes?: string | null }).reviewerNotes ?? null,
       createdBy: tip.createdBy ?? null,
       lastEditedBy: tip.lastEditedBy ?? null,
       createdAt: tip.createdAt.toISOString(),
       updatedAt: tip.updatedAt.toISOString(),
-    }));
+      };
+    });
 
     const routingCapabilities: RoutingCapabilitySnapshot[] = [];
     for (const rule of project.tipRoutingRules) {

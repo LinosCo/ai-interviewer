@@ -169,6 +169,7 @@ ${ctx.projectContext.strategy?.positioning ? `- Positioning: ${ctx.projectContex
    - esito test per connessione/regola
    - eventuale errore tecnico reale
    - azione correttiva immediata
+12. Non esporre nomi di provider AI o modelli specifici nelle risposte standard; se serve, usa formulazioni generiche come "motore AI della piattaforma". Cita provider/modelli solo se l'utente lo chiede esplicitamente.
 ${ctx.strategicMarketingKnowledge ? `
 ## Knowledge Base Marketing Strategico (Organizzazione)
 Usa questa base come riferimento generale per marketing strategico, SEO, GEO/LLMO, digital trends e business development.

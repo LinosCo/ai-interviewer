@@ -180,10 +180,10 @@ Risolvere i gap migliora l'esperienza utente e riduce il carico sul supporto.`,
         title: 'Cos\'e il Brand Monitor (Visibility Tracker)',
         content: `Il Brand Monitor (ex Visibility Tracker) monitora come il tuo brand appare nelle risposte degli AI e nei risultati di ricerca Google.
 
-**Monitoraggio Multi-LLM:**
-- OpenAI (GPT-4o-mini)
-- Anthropic (Claude 3.5 Haiku)
-- Google Gemini (Gemini 2.0 Flash)
+**Monitoraggio AI:**
+- Analisi della visibilita del brand sulle principali piattaforme AI
+- Confronto tra risposte e posizione del brand nei prompt monitorati
+- Tracciamento continuo dell'evoluzione nel tempo
 
 **SERP Monitoring:**
 - Traccia le menzioni su Google Search
@@ -221,7 +221,7 @@ Questo ti aiuta a capire quanto sei "visibile" nel nuovo mondo delle ricerche AI
 5. Avvia la prima scansione
 
 **Come funziona la scansione:**
-- Interroga simultaneamente OpenAI, Anthropic e Gemini
+- Interroga automaticamente le piattaforme AI configurate
 - Analizza le risposte per trovare menzioni del brand
 - Calcola posizione e sentiment
 - Genera uno score di visibilita (0-100)
@@ -428,8 +428,8 @@ Per ogni topic block:
 - 31-60: Visibilita media, presente ma non dominante
 - 61-100: Alta visibilita, brand ben posizionato
 
-**2. Risultati per LLM**
-Per ogni provider (OpenAI, Anthropic, Gemini):
+**2. Risultati per piattaforma AI**
+Per ogni piattaforma monitorata:
 - Brand menzionato: Si/No
 - Posizione: dove appare nella lista (1 = primo)
 - Competitor positions: dove appaiono i concorrenti
@@ -548,7 +548,7 @@ Per ogni provider (OpenAI, Anthropic, Gemini):
     {
         id: 'cop-1',
         title: 'Strategy Copilot',
-        content: `Lo Strategy Copilot e un assistente AI avanzato alimentato da Claude 4.5 Opus che ti aiuta a:
+        content: `Lo Strategy Copilot e un assistente AI avanzato che ti aiuta a:
 
 **Per tutti gli utenti:**
 - Rispondere a domande su come usare Business Tuner

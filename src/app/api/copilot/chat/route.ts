@@ -71,50 +71,6 @@ function shouldFallbackFromAnthropic(error: unknown): boolean {
     );
 }
 
-function isPlaceholderCopilotResponse(text: string): boolean {
-    const normalized = String(text || '').toLowerCase().trim();
-    if (!normalized) return true;
-
-    return [
-        'lasciami cercare',
-        'cerco subito',
-        'scusa per il ritardo',
-        'verifico adesso',
-        'un momento mentre controllo'
-    ].some((snippet) => normalized.includes(snippet));
-}
-
-function shouldUseKnowledgeBaseFallback(
-    prompt: string,
-    modelText: string,
-    hasProjectAccess: boolean
-): boolean {
-    if (!isPlaceholderCopilotResponse(modelText)) return false;
-
-    const normalizedPrompt = String(prompt || '').toLowerCase();
-    const asksForStrategicWriting = [
-        'strategia',
-        'visione',
-        'vision',
-        'mission',
-        'posizionamento',
-        'proposta di valore',
-        'scrivimi',
-        'scrivere',
-        'testo',
-        'descrittivo',
-        'descrizione',
-        'pitch',
-        'manifesto',
-    ].some((snippet) => normalizedPrompt.includes(snippet));
-
-    if (hasProjectAccess && asksForStrategicWriting) {
-        return false;
-    }
-
-    return true;
-}
-
 function isLowSignalUserMessage(text: string): boolean {
     const normalized = String(text || '').toLowerCase().trim();
     if (!normalized) return true;

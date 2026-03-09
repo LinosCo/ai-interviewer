@@ -195,6 +195,23 @@ function getWwwFallbackUrl(rawUrl: string): string | null {
     }
 }
 
+function stripWww(hostname: string): string {
+    return hostname.replace(/^www\./i, '').toLowerCase();
+}
+
+function alignUrlToCanonicalHost(rawUrl: string, canonicalHost: string): string {
+    try {
+        const parsed = new URL(rawUrl);
+        if (stripWww(parsed.hostname) === stripWww(canonicalHost)) {
+            parsed.hostname = canonicalHost;
+            return parsed.toString();
+        }
+        return rawUrl;
+    } catch {
+        return rawUrl;
+    }
+}
+
 async function fetchWithDnsFallback(
     url: string,
     options: RequestInit
@@ -279,10 +296,10 @@ export async function scrapeUrl(url: string): Promise<ScrapedContent> {
             const dnsError = new Error(`Failed to scrape URL: DNS lookup failed for ${dnsHost}`) as Error & { code?: string; hostname?: string };
             dnsError.code = 'ENOTFOUND';
             dnsError.hostname = dnsHost;
-            console.error(`Scraping error for ${url}:`, error);
+            console.warn(`[scraping] DNS lookup failed for ${dnsHost} (${url})`);
             throw dnsError;
         }
-        console.error(`Scraping error for ${url}:`, error);
+        console.warn(`Scraping error for ${url}:`, error);
         throw new Error(`Failed to scrape URL: ${message}`);
     }
 }
@@ -449,21 +466,28 @@ export async function scrapeWebsiteWithSubpages(
         }
     }
 
-    // 1. Scrape homepage first
-    const response = await fetch(homepageUrl, {
+    // 1. Scrape homepage first (with DNS fallback + canonical host resolution)
+    const { response: homepageResponse, resolvedUrl: resolvedHomepageUrl } = await fetchWithDnsFallback(homepageUrl, {
         headers: {
             'User-Agent': 'Mozilla/5.0 (compatible; BrandAuditBot/1.0)',
             'Accept-Language': 'it-IT,it;q=0.9,en;q=0.8'
         }
     });
 
-    if (!response.ok) {
-        throw new Error(`Failed to fetch URL: ${response.status} ${response.statusText}`);
+    if (!homepageResponse.ok) {
+        throw new Error(`Failed to fetch URL: ${homepageResponse.status} ${homepageResponse.statusText}`);
     }
 
-    const homepageHtml = await response.text();
-    const homepage = await scrapeUrl(homepageUrl);
+    const homepageHtml = await homepageResponse.text();
+    const homepage = await scrapeUrl(resolvedHomepageUrl);
     console.log(`[scraping] Homepage scraped: ${homepage.title}`);
+
+    let canonicalHost = '';
+    try {
+        canonicalHost = new URL(homepage.url).hostname;
+    } catch {
+        canonicalHost = '';
+    }
 
     // 2. Scrape additional URLs first (user-specified, high priority)
     const subpages: ScrapedPage[] = [];
@@ -480,14 +504,18 @@ export async function scrapeWebsiteWithSubpages(
             // Stagger requests
             await new Promise(resolve => setTimeout(resolve, i * 200));
 
+            const normalizedAdditionalUrl = canonicalHost
+                ? alignUrlToCanonicalHost(additionalUrl.url, canonicalHost)
+                : additionalUrl.url;
+
             let additionalHost = '';
-            try { additionalHost = new URL(additionalUrl.url).hostname; } catch { /* ignore */ }
+            try { additionalHost = new URL(normalizedAdditionalUrl).hostname; } catch { /* ignore */ }
             if (additionalHost && blockedHosts.has(additionalHost)) {
                 continue;
             }
 
             try {
-                const content = await scrapeUrl(additionalUrl.url);
+                const content = await scrapeUrl(normalizedAdditionalUrl);
                 console.log(`[scraping] Scraped custom page: ${additionalUrl.label} - ${content.title}`);
 
                 subpages.push({
@@ -495,7 +523,7 @@ export async function scrapeWebsiteWithSubpages(
                     pageType: 'custom',
                     customLabel: additionalUrl.label
                 });
-                const normalizedAdditional = normalizeComparableUrl(additionalUrl.url);
+                const normalizedAdditional = normalizeComparableUrl(normalizedAdditionalUrl);
                 if (normalizedAdditional) scrapedUrls.add(normalizedAdditional);
             } catch (error) {
                 const maybeDnsError = error as { code?: string };
@@ -574,14 +602,18 @@ export async function scrapeWebsiteWithSubpages(
             await new Promise(resolve => setTimeout(resolve, index * 200));
 
             try {
+                const normalizedLink = canonicalHost
+                    ? alignUrlToCanonicalHost(link, canonicalHost)
+                    : link;
+
                 let linkHost = '';
-                try { linkHost = new URL(link).hostname; } catch { /* ignore */ }
+                try { linkHost = new URL(normalizedLink).hostname; } catch { /* ignore */ }
                 if (linkHost && blockedHosts.has(linkHost)) {
                     return null;
                 }
 
-                const content = await scrapeUrl(link);
-                const pageType = getPageType(link);
+                const content = await scrapeUrl(normalizedLink);
+                const pageType = getPageType(normalizedLink);
 
                 console.log(`[scraping] Scraped subpage: ${pageType} - ${content.title}`);
 

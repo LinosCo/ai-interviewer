@@ -172,6 +172,48 @@ function isLikelySitemapInput(rawUrl: string): boolean {
     }
 }
 
+function extractDnsHostFromError(error: unknown): string | null {
+    const message = error instanceof Error ? error.message : String(error || '');
+    const match = message.match(/ENOTFOUND\s+([a-z0-9.-]+)/i) || message.match(/getaddrinfo\s+ENOTFOUND\s+([a-z0-9.-]+)/i);
+    return match?.[1] || null;
+}
+
+function isDnsResolutionError(error: unknown): boolean {
+    const message = error instanceof Error ? error.message : String(error || '');
+    return /ENOTFOUND|getaddrinfo/i.test(message);
+}
+
+function getWwwFallbackUrl(rawUrl: string): string | null {
+    try {
+        const parsed = new URL(rawUrl);
+        if (!['http:', 'https:'].includes(parsed.protocol)) return null;
+        if (parsed.hostname.startsWith('www.')) return null;
+        parsed.hostname = `www.${parsed.hostname}`;
+        return parsed.toString();
+    } catch {
+        return null;
+    }
+}
+
+async function fetchWithDnsFallback(
+    url: string,
+    options: RequestInit
+): Promise<{ response: Response; resolvedUrl: string }> {
+    try {
+        const response = await fetch(url, options);
+        return { response, resolvedUrl: url };
+    } catch (error) {
+        if (!isDnsResolutionError(error)) throw error;
+
+        const fallbackUrl = getWwwFallbackUrl(url);
+        if (!fallbackUrl) throw error;
+
+        console.warn(`[scraping] DNS resolution failed for ${url}. Retrying with ${fallbackUrl}`);
+        const response = await fetch(fallbackUrl, options);
+        return { response, resolvedUrl: fallbackUrl };
+    }
+}
+
 export async function scrapeUrl(url: string): Promise<ScrapedContent> {
     try {
         if (isLikelySitemapInput(url)) {
@@ -188,7 +230,7 @@ export async function scrapeUrl(url: string): Promise<ScrapedContent> {
             throw new Error('Sitemap provided but no URLs were discovered');
         }
 
-        const response = await fetch(url, {
+        const { response, resolvedUrl } = await fetchWithDnsFallback(url, {
             headers: {
                 'User-Agent': 'Mozilla/5.0 (compatible; BrandAuditBot/1.0)',
                 'Accept-Language': 'it-IT,it;q=0.9,en;q=0.8'
@@ -228,10 +270,18 @@ export async function scrapeUrl(url: string): Promise<ScrapedContent> {
             title,
             content,
             description,
-            url
+            url: resolvedUrl
         };
     } catch (error: unknown) {
         const message = error instanceof Error ? error.message : 'Unknown scraping error';
+        const dnsHost = extractDnsHostFromError(error);
+        if (dnsHost) {
+            const dnsError = new Error(`Failed to scrape URL: DNS lookup failed for ${dnsHost}`) as Error & { code?: string; hostname?: string };
+            dnsError.code = 'ENOTFOUND';
+            dnsError.hostname = dnsHost;
+            console.error(`Scraping error for ${url}:`, error);
+            throw dnsError;
+        }
         console.error(`Scraping error for ${url}:`, error);
         throw new Error(`Failed to scrape URL: ${message}`);
     }
@@ -420,6 +470,7 @@ export async function scrapeWebsiteWithSubpages(
     const scrapedUrls = new Set<string>(); // Track already scraped URLs
     const normalizedHomepageUrl = normalizeComparableUrl(homepageUrl);
     if (normalizedHomepageUrl) scrapedUrls.add(normalizedHomepageUrl);
+    const blockedHosts = new Set<string>();
 
     if (additionalUrls.length > 0) {
         console.log(`[scraping] Scraping ${additionalUrls.length} additional user-specified URLs...`);
@@ -428,6 +479,12 @@ export async function scrapeWebsiteWithSubpages(
             const additionalUrl = additionalUrls[i];
             // Stagger requests
             await new Promise(resolve => setTimeout(resolve, i * 200));
+
+            let additionalHost = '';
+            try { additionalHost = new URL(additionalUrl.url).hostname; } catch { /* ignore */ }
+            if (additionalHost && blockedHosts.has(additionalHost)) {
+                continue;
+            }
 
             try {
                 const content = await scrapeUrl(additionalUrl.url);
@@ -441,6 +498,10 @@ export async function scrapeWebsiteWithSubpages(
                 const normalizedAdditional = normalizeComparableUrl(additionalUrl.url);
                 if (normalizedAdditional) scrapedUrls.add(normalizedAdditional);
             } catch (error) {
+                const maybeDnsError = error as { code?: string };
+                if (maybeDnsError?.code === 'ENOTFOUND' && additionalHost) {
+                    blockedHosts.add(additionalHost);
+                }
                 console.warn(`[scraping] Failed to scrape additional URL ${additionalUrl.url}:`, error);
             }
         }
@@ -513,6 +574,12 @@ export async function scrapeWebsiteWithSubpages(
             await new Promise(resolve => setTimeout(resolve, index * 200));
 
             try {
+                let linkHost = '';
+                try { linkHost = new URL(link).hostname; } catch { /* ignore */ }
+                if (linkHost && blockedHosts.has(linkHost)) {
+                    return null;
+                }
+
                 const content = await scrapeUrl(link);
                 const pageType = getPageType(link);
 
@@ -523,6 +590,15 @@ export async function scrapeWebsiteWithSubpages(
                     pageType
                 } as ScrapedPage;
             } catch (error) {
+                const maybeDnsError = error as { code?: string };
+                try {
+                    const linkHost = new URL(link).hostname;
+                    if (maybeDnsError?.code === 'ENOTFOUND') {
+                        blockedHosts.add(linkHost);
+                    }
+                } catch {
+                    // ignore malformed link
+                }
                 console.warn(`[scraping] Failed to scrape ${link}:`, error);
                 return null;
             }

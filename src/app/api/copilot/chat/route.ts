@@ -573,12 +573,14 @@ export async function POST(req: Request) {
                     ? buildCopilotPromptVariants(promptContext, suggestedFollowUp, fullText)
                     : (suggestedFollowUp ? [suggestedFollowUp] : []);
 
-                // KB fallback for placeholder responses
+                // KB fallback only when the model produced no usable output at all.
+                // Avoid replacing valid answers with hardcoded KB excerpts.
                 let usedKnowledgeBase = false;
-                if (shouldUseKnowledgeBaseFallback(message, fullText, hasProjectAccess) && kbResults.length > 0) {
+                if (!fullText.trim() && kbResults.length > 0) {
                     const top = kbResults[0];
-                    const fallback = `Ho trovato questo nella documentazione di Business Tuner:\n\n**${top.title}**\n\n${top.content.slice(0, 1100)}\n\nSe vuoi, posso darti i passaggi operativi esatti sul tuo progetto.`;
+                    const fallback = `Posso aiutarti su questo tema. Dalla documentazione interna risulta utile iniziare da **${top.title}**.\n\nSe vuoi, ti guido passo-passo in modo operativo sul tuo progetto.`;
                     await writer.write(enc.encode('\x00' + fallback)); // replace signal
+                    fullText = fallback;
                     usedKnowledgeBase = true;
                 }
 

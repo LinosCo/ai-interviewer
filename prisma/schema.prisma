@@ -1667,6 +1667,7 @@ model PlatformKBEntry {
   content   String
   category  String
   keywords  String[]
+  embedding Unsupported("vector(1536)")?
   updatedAt DateTime @updatedAt
 
   @@index([category])

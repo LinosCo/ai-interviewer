@@ -53,6 +53,24 @@ function isAnthropicModelNotFound(error: unknown): boolean {
     return message.includes('not_found_error') || message.includes('model:');
 }
 
+function isAnthropicBillingError(error: unknown): boolean {
+    const message = (error instanceof Error ? error.message : String(error || '')).toLowerCase();
+    return (
+        message.includes('credit balance is too low') ||
+        message.includes('plans & billing') ||
+        message.includes('purchase credits') ||
+        message.includes('insufficient') && message.includes('credit')
+    );
+}
+
+function shouldFallbackFromAnthropic(error: unknown): boolean {
+    return (
+        isConnectionError(error) ||
+        isAnthropicModelNotFound(error) ||
+        isAnthropicBillingError(error)
+    );
+}
+
 function isPlaceholderCopilotResponse(text: string): boolean {
     const normalized = String(text || '').toLowerCase().trim();
     if (!normalized) return true;
@@ -64,6 +82,37 @@ function isPlaceholderCopilotResponse(text: string): boolean {
         'verifico adesso',
         'un momento mentre controllo'
     ].some((snippet) => normalized.includes(snippet));
+}
+
+function shouldUseKnowledgeBaseFallback(
+    prompt: string,
+    modelText: string,
+    hasProjectAccess: boolean
+): boolean {
+    if (!isPlaceholderCopilotResponse(modelText)) return false;
+
+    const normalizedPrompt = String(prompt || '').toLowerCase();
+    const asksForStrategicWriting = [
+        'strategia',
+        'visione',
+        'vision',
+        'mission',
+        'posizionamento',
+        'proposta di valore',
+        'scrivimi',
+        'scrivere',
+        'testo',
+        'descrittivo',
+        'descrizione',
+        'pitch',
+        'manifesto',
+    ].some((snippet) => normalizedPrompt.includes(snippet));
+
+    if (hasProjectAccess && asksForStrategicWriting) {
+        return false;
+    }
+
+    return true;
 }
 
 function buildCopilotPromptVariants(prompt: string, suggestedFollowUp: string): string[] {
@@ -312,7 +361,7 @@ export async function POST(req: Request) {
             { role: 'user' as const, content: message }
         ];
 
-        // 8. Generate response (Anthropic primary, OpenAI fallback on network failures)
+        // 8. Generate response (Anthropic primary, OpenAI fallback on recoverable provider failures)
 
         const toolContext = {
             userId: session.user.id,
@@ -430,7 +479,7 @@ export async function POST(req: Request) {
                         break;
                     } catch (error) {
                         lastError = error;
-                        if (!isAnthropicModelNotFound(error)) throw error;
+                        if (!shouldFallbackFromAnthropic(error)) throw error;
                     }
                 }
                 if (lastError) throw lastError;
@@ -439,8 +488,8 @@ export async function POST(req: Request) {
                 streamResult = await attemptStream('openai', 'gpt-4o');
             }
         } catch (error) {
-            if (isConnectionError(error) && openaiApiKey) {
-                console.warn('[Copilot] Fallback to OpenAI due to connection error');
+            if (shouldFallbackFromAnthropic(error) && openaiApiKey) {
+                console.warn('[Copilot] Fallback to OpenAI due to Anthropic provider failure');
                 modelUsed = 'gpt-4o';
                 streamResult = await attemptStream('openai', 'gpt-4o');
             } else {
@@ -473,7 +522,7 @@ export async function POST(req: Request) {
 
                 // KB fallback for placeholder responses
                 let usedKnowledgeBase = false;
-                if (isPlaceholderCopilotResponse(fullText) && kbResults.length > 0) {
+                if (shouldUseKnowledgeBaseFallback(message, fullText, hasProjectAccess) && kbResults.length > 0) {
                     const top = kbResults[0];
                     const fallback = `Ho trovato questo nella documentazione di Business Tuner:\n\n**${top.title}**\n\n${top.content.slice(0, 1100)}\n\nSe vuoi, posso darti i passaggi operativi esatti sul tuo progetto.`;
                     await writer.write(enc.encode('\x00' + fallback)); // replace signal

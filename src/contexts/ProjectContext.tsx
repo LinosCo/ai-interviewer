@@ -1,6 +1,7 @@
 'use client';
 
 import { createContext, useContext, useState, useEffect, ReactNode, useCallback } from 'react';
+import { usePathname, useSearchParams } from 'next/navigation';
 import { useOrganization } from './OrganizationContext';
 
 interface Project {
@@ -34,6 +35,8 @@ const SELECTED_PROJECT_KEY_PREFIX = 'bt_selected_project_id_';
 
 export function ProjectProvider({ children, initialData }: { children: ReactNode, initialData?: Project[] }) {
     const { currentOrganization, loading: orgLoading } = useOrganization();
+    const pathname = usePathname();
+    const searchParams = useSearchParams();
     const hasInitialProjects = Array.isArray(initialData) && initialData.length > 0;
     const currentOrganizationIsAdmin =
         currentOrganization?.role === 'OWNER' || currentOrganization?.role === 'ADMIN';
@@ -187,6 +190,37 @@ export function ProjectProvider({ children, initialData }: { children: ReactNode
         setInitializedOrgId(currentOrganization.id);
         fetchProjects();
     }, [currentOrganization?.id, initializedOrgId, fetchProjects, projects.length, hasInitialProjects]);
+
+    useEffect(() => {
+        if (!currentOrganization || projects.length === 0) {
+            return;
+        }
+
+        const routeProjectMatch = pathname?.match(/^\/dashboard\/projects\/([^/]+)/);
+        const routeProjectId = routeProjectMatch?.[1];
+        const queryProjectId = searchParams.get('projectId');
+        const explicitProjectId = routeProjectId || queryProjectId;
+
+        if (!explicitProjectId) {
+            return;
+        }
+
+        const storageKey = `${SELECTED_PROJECT_KEY_PREFIX}${currentOrganization.id}`;
+
+        if (explicitProjectId === ALL_PROJECTS_OPTION.id) {
+            if (selectedProject?.id !== ALL_PROJECTS_OPTION.id) {
+                setSelectedProjectState(ALL_PROJECTS_OPTION);
+                localStorage.setItem(storageKey, ALL_PROJECTS_OPTION.id);
+            }
+            return;
+        }
+
+        const matchedProject = projects.find((project) => project.id === explicitProjectId);
+        if (matchedProject && selectedProject?.id !== matchedProject.id) {
+            setSelectedProjectState(matchedProject);
+            localStorage.setItem(storageKey, matchedProject.id);
+        }
+    }, [currentOrganization, pathname, projects, searchParams, selectedProject?.id]);
 
     const setSelectedProject = (project: Project | null) => {
         setSelectedProjectState(project);

@@ -2,6 +2,7 @@ import { PrismaClient } from '@prisma/client';
 
 const globalForPrisma = globalThis as unknown as { prisma?: PrismaClient };
 let visibilitySchemaCompatibilityPromise: Promise<void> | null = null;
+let projectTipSchemaCompatibilityPromise: Promise<void> | null = null;
 
 async function ensureVisibilityConfigSchemaCompatibility(client: PrismaClient): Promise<void> {
   if (!visibilitySchemaCompatibilityPromise) {
@@ -23,6 +24,22 @@ async function ensureVisibilityConfigSchemaCompatibility(client: PrismaClient): 
   }
 
   await visibilitySchemaCompatibilityPromise;
+}
+
+async function ensureProjectTipSchemaCompatibility(client: PrismaClient): Promise<void> {
+  if (!projectTipSchemaCompatibilityPromise) {
+    projectTipSchemaCompatibilityPromise = (async () => {
+      try {
+        await client.$executeRawUnsafe(
+          'ALTER TABLE "ProjectTip" ADD COLUMN IF NOT EXISTS "reviewerNotes" TEXT',
+        );
+      } catch (error) {
+        console.warn('[prisma] ProjectTip compatibility patch skipped:', error);
+      }
+    })();
+  }
+
+  await projectTipSchemaCompatibilityPromise;
 }
 
 function createPrismaClient(): PrismaClient {
@@ -73,6 +90,12 @@ function createPrismaClient(): PrismaClient {
       visibilityConfig: {
         async $allOperations({ args, query }) {
           await ensureVisibilityConfigSchemaCompatibility(baseClient);
+          return query(args);
+        },
+      },
+      projectTip: {
+        async $allOperations({ args, query }) {
+          await ensureProjectTipSchemaCompatibility(baseClient);
           return query(args);
         },
       },

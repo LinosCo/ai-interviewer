@@ -49,6 +49,46 @@ export interface DailyAnalytics {
 }
 
 class GoogleServiceClass {
+  private normalizeGa4PropertyId(rawPropertyId: string): { value: string; error?: string } {
+    const trimmed = rawPropertyId.trim();
+    const withoutPrefix = trimmed.replace(/^properties\//i, '');
+
+    if (!withoutPrefix) {
+      return { value: '', error: 'GA4 property ID not configured' };
+    }
+
+    if (/^G-/i.test(withoutPrefix)) {
+      return {
+        value: '',
+        error: 'Property ID GA4 non valido: hai inserito un Measurement ID (G-...). Usa il Property ID numerico.',
+      };
+    }
+
+    if (!/^\d+$/.test(withoutPrefix)) {
+      return {
+        value: '',
+        error: 'Property ID GA4 non valido: usa solo il valore numerico (es. 123456789).',
+      };
+    }
+
+    return { value: withoutPrefix };
+  }
+
+  private formatGa4TestError(rawErrorMessage: string, propertyId: string, serviceAccountEmail: string): string {
+    const normalized = rawErrorMessage.toLowerCase();
+    const baseMessage = rawErrorMessage.trim();
+
+    if (normalized.includes('permission_denied') || normalized.includes('sufficient permissions')) {
+      return `PERMISSION_DENIED su Property ID ${propertyId}. Verifica che ${serviceAccountEmail} sia utente della proprietà GA4 (Viewer o superiore), che il Property ID sia numerico (non G-...) e che Analytics Data API sia attiva nel progetto Google Cloud del Service Account.`;
+    }
+
+    if (normalized.includes('not found')) {
+      return `Property ID ${propertyId} non trovato. Controlla di aver inserito il Property ID GA4 numerico corretto (non Measurement ID G-...).`;
+    }
+
+    return baseMessage || 'Unknown error';
+  }
+
   /**
    * Create GA4 client with Service Account credentials
    */
@@ -81,12 +121,24 @@ class GoogleServiceClass {
       return { success: false, error: 'GA4 not configured' };
     }
 
+    const normalizedProperty = this.normalizeGa4PropertyId(connection.ga4PropertyId);
+    if (normalizedProperty.error) {
+      await prisma.googleConnection.update({
+        where: { id: connectionId },
+        data: {
+          ga4Status: 'ERROR',
+          ga4LastError: normalizedProperty.error,
+        },
+      });
+      return { success: false, error: normalizedProperty.error };
+    }
+
     try {
       const client = this.createGA4Client(connection.serviceAccountJson);
 
       // Run a simple query to test the connection
-      const [response] = await client.runReport({
-        property: `properties/${connection.ga4PropertyId}`,
+      await client.runReport({
+        property: `properties/${normalizedProperty.value}`,
         dateRanges: [{ startDate: '7daysAgo', endDate: 'today' }],
         metrics: [{ name: 'sessions' }],
         limit: 1,
@@ -104,10 +156,11 @@ class GoogleServiceClass {
 
       return {
         success: true,
-        propertyName: `Property ${connection.ga4PropertyId}`,
+        propertyName: `Property ${normalizedProperty.value}`,
       };
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      const rawErrorMessage = error instanceof Error ? error.message : 'Unknown error';
+      const errorMessage = this.formatGa4TestError(rawErrorMessage, normalizedProperty.value, connection.serviceAccountEmail);
 
       await prisma.googleConnection.update({
         where: { id: connectionId },
@@ -230,8 +283,13 @@ class GoogleServiceClass {
       throw new Error('GA4 property ID not configured');
     }
 
+    const normalizedProperty = this.normalizeGa4PropertyId(connection.ga4PropertyId);
+    if (normalizedProperty.error) {
+      throw new Error(normalizedProperty.error);
+    }
+
     const client = this.createGA4Client(connection.serviceAccountJson);
-    const property = `properties/${connection.ga4PropertyId}`;
+    const property = `properties/${normalizedProperty.value}`;
 
     // Fetch main metrics
     const [metricsResponse] = await client.runReport({

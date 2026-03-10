@@ -53,6 +53,51 @@ import {
 
 export const maxDuration = 60;
 
+type CopilotLogLevel = 'info' | 'warn' | 'error';
+
+function buildLogTextPreview(value: unknown, maxChars = 180): string {
+    const text = String(value || '').replace(/\s+/g, ' ').trim();
+    if (text.length <= maxChars) return text;
+    return `${text.slice(0, Math.max(0, maxChars - 1)).trim()}…`;
+}
+
+function serializeErrorForLog(error: unknown): Record<string, unknown> {
+    if (error instanceof Error) {
+        return {
+            name: error.name,
+            message: error.message,
+            stack: error.stack?.split('\n').slice(0, 3).join('\n') || undefined
+        };
+    }
+
+    return { message: String(error || 'Unknown error') };
+}
+
+function logCopilotEvent(
+    requestId: string,
+    stage: string,
+    details: Record<string, unknown> = {},
+    level: CopilotLogLevel = 'info'
+): void {
+    const payload = {
+        requestId,
+        stage,
+        ...details
+    };
+
+    if (level === 'warn') {
+        console.warn('[Copilot]', payload);
+        return;
+    }
+
+    if (level === 'error') {
+        console.error('[Copilot]', payload);
+        return;
+    }
+
+    console.info('[Copilot]', payload);
+}
+
 function isConnectionError(error: unknown): boolean {
     const message = (error instanceof Error ? error.message : String(error || '')).toLowerCase();
     return (
@@ -314,6 +359,24 @@ function buildPromptContextFromConversation(
     return deduped.join(' | ');
 }
 
+function looksLikeContentPrompt(text: string): boolean {
+    const normalized = String(text || '').toLowerCase();
+    return [
+        'linkedin',
+        'email',
+        'newsletter',
+        'articolo',
+        'blog',
+        'faq',
+        'contenuto',
+        'carousel',
+        'post',
+        'landing',
+        'pagina',
+        'cta'
+    ].some((fragment) => normalized.includes(fragment));
+}
+
 function buildCopilotPromptVariants(prompt: string, suggestedFollowUp: string, assistantText: string): string[] {
     if (isLowSignalUserMessage(prompt) || isAssistantErrorLike(assistantText)) {
         return suggestedFollowUp ? [suggestedFollowUp] : [];
@@ -370,8 +433,20 @@ function buildCopilotPromptVariants(prompt: string, suggestedFollowUp: string, a
         ].filter(Boolean).slice(0, 3);
     }
 
-    const related = buildRelatedCopilotPromptSuggestions(prompt);
-    return [...new Set([suggestedFollowUp, ...related].filter(Boolean))].slice(0, 3);
+    if (isDocsIntent(normalized)) {
+        return [
+            suggestedFollowUp,
+            'Dimmi il passaggio esatto in cui ti blocchi e ti guido passo passo.',
+            'Verifica se questa funzione è inclusa nel tuo piano attuale.',
+        ].filter(Boolean).slice(0, 3);
+    }
+
+    if (looksLikeContentPrompt(normalized)) {
+        const related = buildRelatedCopilotPromptSuggestions(prompt);
+        return [...new Set([suggestedFollowUp, ...related].filter(Boolean))].slice(0, 3);
+    }
+
+    return [suggestedFollowUp].filter(Boolean).slice(0, 3);
 }
 
 function buildKnowledgeBaseContext(
@@ -462,6 +537,8 @@ function buildCopilotModelPlan(params: {
 }
 
 export async function POST(req: Request) {
+    const requestId = crypto.randomUUID();
+    const requestStartedAt = Date.now();
     try {
         const session = await auth();
         if (!session?.user?.id || !session?.user?.email) {
@@ -477,7 +554,14 @@ export async function POST(req: Request) {
         const normalizedProjectId = typeof projectId === 'string' && projectId.trim().length > 0
             ? projectId.trim()
             : null;
-        const intentProfile = detectCopilotIntent(message);
+        let intentProfile = detectCopilotIntent(message);
+        logCopilotEvent(requestId, 'request_received', {
+            userId: session.user.id,
+            incomingConversationId: incomingConversationId || null,
+            normalizedProjectId,
+            messagePreview: buildLogTextPreview(message),
+            initialIntent: intentProfile.primaryArea
+        });
 
         // 1. Get user with organization info
         const userWithMembership = await prisma.user.findUnique({
@@ -664,6 +748,15 @@ export async function POST(req: Request) {
             }
         }
 
+        if (!normalizedProjectId && (intentProfile.needsOperationalExecution || isConnectionsIntent(message))) {
+            logCopilotEvent(requestId, 'project_context_missing', {
+                tier,
+                hasProjectAccess,
+                intent: intentProfile.primaryArea,
+                messagePreview: buildLogTextPreview(message)
+            }, 'warn');
+        }
+
         // 5. Search platform KB only when it is likely to help.
         const kbResults = intentProfile.prefetchKb || !hasProjectAccess
             ? await searchPlatformKB(message, intentProfile.kbCategory)
@@ -724,6 +817,28 @@ export async function POST(req: Request) {
         }
         const conversationId = conversation.id;
 
+        const recentRelevantUserMessage = [...conversation.messages]
+            .reverse()
+            .find((messageItem) => (
+                messageItem.role === 'user' &&
+                !isLowSignalUserMessage(messageItem.content)
+            ));
+        const asksForProjectContext =
+            /progett/i.test(message) &&
+            (
+                /non vedi/i.test(message) ||
+                /quale progetto/i.test(message) ||
+                /che progetto/i.test(message)
+            );
+        if ((isLowSignalUserMessage(message) || asksForProjectContext) && recentRelevantUserMessage) {
+            intentProfile = detectCopilotIntent(recentRelevantUserMessage.content);
+            logCopilotEvent(requestId, 'intent_inherited_from_context', {
+                inheritedFromMessagePreview: buildLogTextPreview(recentRelevantUserMessage.content),
+                finalIntent: intentProfile.primaryArea,
+                triggerMessagePreview: buildLogTextPreview(message)
+            });
+        }
+
         const condensedHistory = buildCondensedConversationHistory(
             conversation.messages.map((messageItem) => ({
                 role: messageItem.role as 'user' | 'assistant',
@@ -731,6 +846,22 @@ export async function POST(req: Request) {
                 toolsUsed: messageItem.toolsUsed
             }))
         );
+        logCopilotEvent(requestId, 'context_resolved', {
+            organizationId: organization.id,
+            organizationName: organization.name,
+            tier,
+            hasProjectAccess,
+            normalizedProjectId,
+            projectName: projectContext?.projectName || null,
+            conversationId,
+            historyMessagesLoaded: conversation.messages.length,
+            condensedRecentMessages: condensedHistory.recentMessages.length,
+            hasCondensedSummary: Boolean(condensedHistory.summary),
+            kbCategory: intentProfile.kbCategory,
+            kbResultsCount: kbResults.length,
+            intent: intentProfile.primaryArea,
+            intentAreas: intentProfile.areas
+        });
         if (condensedHistory.summary) {
             systemPrompt += `\n\n## Stato conversazione in corso\n${condensedHistory.summary}`;
         }
@@ -823,6 +954,14 @@ export async function POST(req: Request) {
             geminiApiKey
         });
         let modelUsed = modelPlan[0]?.models[0] || 'gpt-4o-mini';
+        logCopilotEvent(requestId, 'execution_plan', {
+            selectedToolNames,
+            maxSteps: intentProfile.maxSteps,
+            modelPlan: modelPlan.map((candidateGroup) => ({
+                provider: candidateGroup.provider,
+                models: candidateGroup.models.slice(0, 4)
+            }))
+        });
 
         // Metadata captured in onFinish — shared across attempts
         let capturedUsage: any = null;
@@ -858,6 +997,10 @@ export async function POST(req: Request) {
                 try {
                     streamResult = await attemptStream(candidateGroup.provider, candidateModel);
                     lastProviderError = null;
+                    logCopilotEvent(requestId, 'provider_selected', {
+                        provider: candidateGroup.provider,
+                        model: candidateModel
+                    });
                     break providerLoop;
                 } catch (error) {
                     lastProviderError = error;
@@ -867,6 +1010,12 @@ export async function POST(req: Request) {
                         (candidateGroup.provider === 'openai' && isOpenAIModelNotFound(error)) ||
                         (candidateGroup.provider === 'gemini' && isGeminiModelNotFound(error));
 
+                    logCopilotEvent(requestId, 'provider_attempt_failed', {
+                        provider: candidateGroup.provider,
+                        model: candidateModel,
+                        retryable,
+                        error: serializeErrorForLog(error)
+                    }, retryable ? 'warn' : 'error');
                     if (!retryable) throw error;
                     if (candidateGroup.provider === 'anthropic' && isAnthropicBillingError(error)) {
                         break;
@@ -911,6 +1060,11 @@ export async function POST(req: Request) {
                     isConnectionsIntent(message) &&
                     isConnectionNonAnswer(fullText)
                 ) {
+                    logCopilotEvent(requestId, 'connection_non_answer_detected', {
+                        fullTextPreview: buildLogTextPreview(fullText),
+                        normalizedProjectId,
+                        hasSnapshot: Boolean(projectConnectionsSnapshot)
+                    }, 'warn');
                     let fallbackResult: ConnectionStatusLike | null = null;
                     if (normalizedProjectId) {
                         const connectionTypes = isGoogleAnalyticsIntent(message)
@@ -929,6 +1083,14 @@ export async function POST(req: Request) {
                             'manageProjectConnections'
                         ]));
                     }
+
+                    logCopilotEvent(requestId, 'connection_fallback_result', {
+                        normalizedProjectId,
+                        fallbackOperation: isConnectionTestIntent(message) || isGoogleAnalyticsIntent(message)
+                            ? 'test'
+                            : 'status',
+                        fallbackResult
+                    });
 
                     const deterministic = buildConnectionsToolResponse(
                         fallbackResult,
@@ -979,6 +1141,14 @@ export async function POST(req: Request) {
                         fallback = `Ho trovato contenuti rilevanti nella documentazione: **${top.title}**.\n\nPosso riassumerli in modo operativo sul tuo caso in 3 passi.`;
                         usedKnowledgeBase = true;
                     }
+
+                    logCopilotEvent(requestId, 'empty_output_fallback', {
+                        normalizedProjectId,
+                        intent: intentProfile.primaryArea,
+                        isGoogleAnalyticsIntent: isGoogleAnalyticsIntent(message),
+                        usedKnowledgeBase,
+                        fallbackPreview: buildLogTextPreview(fallback)
+                    }, 'warn');
 
                     await writer.write(enc.encode('\x00' + fallback)); // replace signal
                     fullText = fallback;
@@ -1052,8 +1222,25 @@ export async function POST(req: Request) {
                     toolsUsed: capturedToolsUsed
                 });
                 await writer.write(enc.encode('\x01' + meta));
+                logCopilotEvent(requestId, 'completed', {
+                    conversationId,
+                    normalizedProjectId,
+                    modelUsed,
+                    toolsUsed: capturedToolsUsed,
+                    usage: capturedUsage || null,
+                    usedKnowledgeBase,
+                    suggestedFollowUp: suggestedFollowUp || null,
+                    suggestedPromptVariants,
+                    responseChars: fullText.length,
+                    responsePreview: buildLogTextPreview(fullText),
+                    durationMs: Date.now() - requestStartedAt
+                });
             } catch (err) {
-                console.error('[Copilot] Stream error:', err);
+                logCopilotEvent(requestId, 'stream_error', {
+                    normalizedProjectId,
+                    error: serializeErrorForLog(err),
+                    durationMs: Date.now() - requestStartedAt
+                }, 'error');
             } finally {
                 await writer.close();
             }
@@ -1069,7 +1256,10 @@ export async function POST(req: Request) {
         });
 
     } catch (error: any) {
-        console.error('[Copilot] Error:', error);
+        logCopilotEvent(requestId, 'fatal_error', {
+            error: serializeErrorForLog(error),
+            durationMs: Date.now() - requestStartedAt
+        }, 'error');
         return NextResponse.json(
             { error: 'Internal error', message: error.message },
             { status: 500 }

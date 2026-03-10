@@ -27,6 +27,13 @@ describe('copilot runtime helpers', () => {
     expect(tools).toContain('manageTipRouting');
   });
 
+  it('recognizes short GA phrasing as a Google Analytics connection intent', () => {
+    const profile = detectCopilotIntent('Puoi aiutarmi a connettere ga?');
+
+    expect(profile.primaryArea).toBe('connections');
+    expect(profile.needsOperationalExecution).toBe(true);
+  });
+
   it('condenses older history and preserves recent turns', () => {
     const history = buildCondensedConversationHistory([
       { role: 'user', content: 'Analizza le ultime conversazioni e trova i temi emergenti' },

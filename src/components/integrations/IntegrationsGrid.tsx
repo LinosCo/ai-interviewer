@@ -17,7 +17,7 @@ type ConnectionStatus = 'PENDING' | 'TESTING' | 'ACTIVE' | 'ERROR' | 'DISABLED';
 
 interface MCPConnection {
   id: string;
-  type: 'WORDPRESS' | 'WOOCOMMERCE';
+  type: 'WORDPRESS' | 'WOOCOMMERCE' | 'BREVO';
   name: string;
   status: ConnectionStatus;
   lastSyncAt?: string | null;
@@ -77,7 +77,7 @@ interface IntegrationsGridProps {
   userPlan: 'FREE' | 'STARTER' | 'PRO' | 'BUSINESS' | 'PARTNER';
   onTestMCP: (id: string) => Promise<void>;
   onDeleteMCP: (id: string) => Promise<void>;
-  onConfigureMCP: (type: 'WORDPRESS' | 'WOOCOMMERCE') => void;
+  onConfigureMCP: (type: 'WORDPRESS' | 'WOOCOMMERCE' | 'BREVO') => void;
   onTestGA4: (id: string) => Promise<void>;
   onTestGSC: (id: string) => Promise<void>;
   onConfigureGoogle: () => void;
@@ -140,6 +140,7 @@ export function IntegrationsGrid({
   // Find existing connections
   const wpConnection = mcpConnections.find(c => c.type === 'WORDPRESS');
   const wooConnection = mcpConnections.find(c => c.type === 'WOOCOMMERCE');
+  const brevoConnection = mcpConnections.find(c => c.type === 'BREVO');
 
   return (
     <div className="space-y-6">
@@ -295,6 +296,25 @@ export function IntegrationsGrid({
           onManageSharing={wooConnection ? () => setShareConnection({ id: wooConnection.id, name: wooConnection.name, type: 'MCP' }) : undefined}
           onTransferOrg={wooConnection ? () => setTransferOrgConnection({ id: wooConnection.id, name: wooConnection.name, type: 'MCP' }) : undefined}
           disabled={!wooConnection}
+          upgradeRequired={!canWrite}
+        />
+
+        {/* Brevo */}
+        <IntegrationCard
+          id={brevoConnection?.id || 'brevo'}
+          type="BREVO"
+          name="Brevo"
+          description="Email marketing e automation"
+          status={brevoConnection?.status || 'DISABLED'}
+          lastSyncAt={brevoConnection?.lastSyncAt}
+          lastError={brevoConnection?.lastError}
+          onTest={brevoConnection ? () => onTestMCP(brevoConnection.id) : undefined}
+          onConfigure={() => onConfigureMCP('BREVO')}
+          onDelete={brevoConnection ? () => onDeleteMCP(brevoConnection.id) : undefined}
+          onTransfer={brevoConnection ? () => setTransferItem({ id: brevoConnection.id, name: brevoConnection.name, type: 'MCP' }) : undefined}
+          onManageSharing={brevoConnection ? () => setShareConnection({ id: brevoConnection.id, name: brevoConnection.name, type: 'MCP' }) : undefined}
+          onTransferOrg={brevoConnection ? () => setTransferOrgConnection({ id: brevoConnection.id, name: brevoConnection.name, type: 'MCP' }) : undefined}
+          disabled={!brevoConnection}
           upgradeRequired={!canWrite}
         />
 

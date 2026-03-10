@@ -82,11 +82,14 @@ export function isLowSignalUserMessage(text: string): boolean {
 
 export function isGoogleAnalyticsIntent(text: string): boolean {
     const normalized = String(text || '').toLowerCase();
+    const mentionsGoogleAnalytics =
+        /\bga4\b/.test(normalized) ||
+        /\bga\b/.test(normalized) ||
+        /\bgsc\b/.test(normalized) ||
+        normalized.includes('google analytics') ||
+        normalized.includes('search console');
     return (
-        (normalized.includes('google analytics') ||
-            normalized.includes('ga4') ||
-            normalized.includes('search console') ||
-            normalized.includes('gsc')) &&
+        mentionsGoogleAnalytics &&
         hasAny(normalized, ['connet', 'integra', 'collega', 'setup', 'configura', 'verifica', 'test'])
     );
 }
@@ -114,7 +117,9 @@ export function isConnectionFlowContext(text: string): boolean {
     return (
         isConnectionsIntent(normalized) ||
         normalized.includes('google analytics') ||
-        normalized.includes('ga4') ||
+        /\bga4\b/.test(normalized) ||
+        /\bga\b/.test(normalized) ||
+        /\bgsc\b/.test(normalized) ||
         normalized.includes('search console')
     );
 }

@@ -95,6 +95,10 @@ function buildLoadingStages(prompt: string): string[] {
         normalized.includes('connession') ||
         normalized.includes('routing') ||
         normalized.includes('mcp') ||
+        normalized.includes('google analytics') ||
+        normalized.includes('ga4') ||
+        /\bga\b/.test(normalized) ||
+        /\bgsc\b/.test(normalized) ||
         normalized.includes('wordpress') ||
         normalized.includes('woocommerce') ||
         normalized.includes('n8n')
@@ -152,10 +156,15 @@ export function StrategyCopilot({ userTier }: StrategyCopilotProps) {
     const { currentOrganization } = useOrganization();
     const pathname = usePathname() || '';
     const hasProjectAccess = ['PRO', 'BUSINESS', 'ENTERPRISE', 'ADMIN', 'PARTNER'].includes(userTier.toUpperCase());
+    const routeProjectIdMatch = pathname.match(/^\/dashboard\/projects\/([^/]+)/);
+    const routeProjectId = routeProjectIdMatch?.[1] && routeProjectIdMatch[1] !== '__ALL__'
+        ? routeProjectIdMatch[1]
+        : null;
     const scopedProjectId = selectedProject?.id && selectedProject.id !== '__ALL__'
         ? selectedProject.id
         : null;
-    const conversationStorageKey = getCopilotConversationStorageKey(currentOrganization?.id, scopedProjectId);
+    const effectiveProjectId = scopedProjectId || routeProjectId;
+    const conversationStorageKey = getCopilotConversationStorageKey(currentOrganization?.id, effectiveProjectId);
 
     const clearLoadingTimers = () => {
         if (loadingStageTimerRef.current) {
@@ -268,7 +277,7 @@ export function StrategyCopilot({ userTier }: StrategyCopilotProps) {
             setConversationId(storedId);
             const params = new URLSearchParams({ conversationId: storedId });
             if (currentOrganization?.id) params.set('organizationId', currentOrganization.id);
-            if (scopedProjectId) params.set('projectId', scopedProjectId);
+            if (effectiveProjectId) params.set('projectId', effectiveProjectId);
 
             fetch(`/api/copilot/chat?${params.toString()}`)
                 .then(r => r.ok ? r.json() : null)
@@ -290,7 +299,7 @@ export function StrategyCopilot({ userTier }: StrategyCopilotProps) {
             showWelcome();
         }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [isOpen, messages.length, conversationStorageKey, currentOrganization?.id, scopedProjectId]);
+    }, [isOpen, messages.length, conversationStorageKey, currentOrganization?.id, effectiveProjectId]);
 
     const showWelcome = () => {
         const welcomeMsg = hasProjectAccess && selectedProject && selectedProject.id !== '__ALL__'
@@ -355,7 +364,7 @@ export function StrategyCopilot({ userTier }: StrategyCopilotProps) {
                 body: JSON.stringify({
                     message: trimmedContent,
                     conversationId: conversationId,
-                    projectId: scopedProjectId
+                    projectId: effectiveProjectId
                 })
             });
 

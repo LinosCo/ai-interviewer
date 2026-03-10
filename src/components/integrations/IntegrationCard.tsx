@@ -17,6 +17,7 @@ import {
   ShoppingCart,
   Rocket,
   GitBranch,
+  Mail,
   type LucideIcon,
 } from 'lucide-react';
 import { ConfirmDialog, useConfirmDialog } from '@/components/ui/confirm-dialog';
@@ -25,7 +26,7 @@ type ConnectionStatus = 'PENDING' | 'TESTING' | 'ACTIVE' | 'ERROR' | 'DISABLED';
 
 interface IntegrationCardProps {
   id: string;
-  type: 'WORDPRESS' | 'WOOCOMMERCE' | 'GOOGLE' | 'CMS_VOLER' | 'N8N';
+  type: 'WORDPRESS' | 'WOOCOMMERCE' | 'BREVO' | 'GOOGLE' | 'CMS_VOLER' | 'N8N';
   name: string;
   status: ConnectionStatus;
   description?: string;
@@ -93,6 +94,11 @@ const TYPE_CONFIG: Record<IntegrationCardProps['type'], {
   },
   WOOCOMMERCE: {
     icon: ShoppingCart,
+    iconClassName: 'text-stone-700',
+    containerClassName: 'bg-stone-100 border border-stone-200',
+  },
+  BREVO: {
+    icon: Mail,
     iconClassName: 'text-stone-700',
     containerClassName: 'bg-stone-100 border border-stone-200',
   },

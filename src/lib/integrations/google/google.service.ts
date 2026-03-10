@@ -48,7 +48,83 @@ export interface DailyAnalytics {
   gsc?: GSCMetrics;
 }
 
+type GoogleLogLevel = 'info' | 'warn' | 'error';
+
+function serializeGoogleError(error: unknown): Record<string, unknown> {
+  if (error instanceof Error) {
+    const asRecord = error as Error & {
+      code?: string | number;
+      status?: number;
+      response?: { status?: number; data?: unknown };
+      errors?: unknown;
+    };
+
+    return {
+      name: error.name,
+      message: error.message,
+      code: asRecord.code,
+      status: asRecord.status,
+      responseStatus: asRecord.response?.status,
+      responseData: asRecord.response?.data,
+      errors: asRecord.errors,
+    };
+  }
+
+  return { message: String(error || 'Unknown error') };
+}
+
+function logGoogleEvent(
+  stage: string,
+  details: Record<string, unknown>,
+  level: GoogleLogLevel = 'info'
+): void {
+  const payload = { stage, ...details };
+
+  if (level === 'warn') {
+    console.warn('[GoogleService]', payload);
+    return;
+  }
+
+  if (level === 'error') {
+    console.error('[GoogleService]', payload);
+    return;
+  }
+
+  console.info('[GoogleService]', payload);
+}
+
 class GoogleServiceClass {
+  private async writeIntegrationLog(params: {
+    googleConnectionId: string;
+    action: string;
+    arguments?: Record<string, unknown>;
+    result?: Record<string, unknown>;
+    success: boolean;
+    errorMessage?: string | null;
+    durationMs: number;
+  }): Promise<void> {
+    try {
+      await prisma.integrationLog.create({
+        data: {
+          googleConnectionId: params.googleConnectionId,
+          action: params.action,
+          arguments: params.arguments,
+          result: params.result,
+          success: params.success,
+          errorMessage: params.errorMessage || null,
+          creditsUsed: 0,
+          durationMs: params.durationMs,
+        },
+      });
+    } catch (logError) {
+      logGoogleEvent('integration_log_write_failed', {
+        googleConnectionId: params.googleConnectionId,
+        action: params.action,
+        error: serializeGoogleError(logError),
+      }, 'warn');
+    }
+  }
+
   private normalizeGa4PropertyId(rawPropertyId: string): { value: string; error?: string } {
     const trimmed = rawPropertyId.trim();
     const withoutPrefix = trimmed.replace(/^properties\//i, '');
@@ -113,15 +189,42 @@ class GoogleServiceClass {
    * Test GA4 connection
    */
   async testGA4(connectionId: string): Promise<TestConnectionResult> {
+    const startedAt = Date.now();
     const connection = await prisma.googleConnection.findUnique({
       where: { id: connectionId },
+      select: {
+        id: true,
+        projectId: true,
+        serviceAccountJson: true,
+        serviceAccountEmail: true,
+        ga4PropertyId: true,
+        project: {
+          select: {
+            id: true,
+            name: true,
+          },
+        },
+      },
     });
 
     if (!connection?.ga4PropertyId) {
+      logGoogleEvent('ga4_test_skipped', {
+        connectionId,
+        reason: 'GA4 not configured',
+      }, 'warn');
       return { success: false, error: 'GA4 not configured' };
     }
 
     const normalizedProperty = this.normalizeGa4PropertyId(connection.ga4PropertyId);
+    logGoogleEvent('ga4_test_start', {
+      connectionId,
+      projectId: connection.projectId,
+      projectName: connection.project?.name || null,
+      serviceAccountEmail: connection.serviceAccountEmail,
+      rawPropertyId: connection.ga4PropertyId,
+      normalizedPropertyId: normalizedProperty.value || null,
+      normalizationError: normalizedProperty.error || null,
+    });
     if (normalizedProperty.error) {
       await prisma.googleConnection.update({
         where: { id: connectionId },
@@ -129,6 +232,23 @@ class GoogleServiceClass {
           ga4Status: 'ERROR',
           ga4LastError: normalizedProperty.error,
         },
+      });
+      await this.writeIntegrationLog({
+        googleConnectionId: connectionId,
+        action: 'google.test_ga4',
+        arguments: {
+          projectId: connection.projectId,
+          projectName: connection.project?.name || null,
+          serviceAccountEmail: connection.serviceAccountEmail,
+          rawPropertyId: connection.ga4PropertyId,
+        },
+        result: {
+          normalizedPropertyId: normalizedProperty.value || null,
+          validationError: normalizedProperty.error,
+        },
+        success: false,
+        errorMessage: normalizedProperty.error,
+        durationMs: Date.now() - startedAt,
       });
       return { success: false, error: normalizedProperty.error };
     }
@@ -154,6 +274,29 @@ class GoogleServiceClass {
         },
       });
 
+      logGoogleEvent('ga4_test_success', {
+        connectionId,
+        projectId: connection.projectId,
+        projectName: connection.project?.name || null,
+        propertyId: normalizedProperty.value,
+        durationMs: Date.now() - startedAt,
+      });
+      await this.writeIntegrationLog({
+        googleConnectionId: connectionId,
+        action: 'google.test_ga4',
+        arguments: {
+          projectId: connection.projectId,
+          projectName: connection.project?.name || null,
+          serviceAccountEmail: connection.serviceAccountEmail,
+          propertyId: normalizedProperty.value,
+        },
+        result: {
+          propertyName: `Property ${normalizedProperty.value}`,
+        },
+        success: true,
+        durationMs: Date.now() - startedAt,
+      });
+
       return {
         success: true,
         propertyName: `Property ${normalizedProperty.value}`,
@@ -170,6 +313,34 @@ class GoogleServiceClass {
         },
       });
 
+      logGoogleEvent('ga4_test_failure', {
+        connectionId,
+        projectId: connection.projectId,
+        projectName: connection.project?.name || null,
+        serviceAccountEmail: connection.serviceAccountEmail,
+        propertyId: normalizedProperty.value,
+        formattedError: errorMessage,
+        rawError: serializeGoogleError(error),
+        durationMs: Date.now() - startedAt,
+      }, 'error');
+      await this.writeIntegrationLog({
+        googleConnectionId: connectionId,
+        action: 'google.test_ga4',
+        arguments: {
+          projectId: connection.projectId,
+          projectName: connection.project?.name || null,
+          serviceAccountEmail: connection.serviceAccountEmail,
+          propertyId: normalizedProperty.value,
+        },
+        result: {
+          rawError: serializeGoogleError(error),
+          formattedError: errorMessage,
+        },
+        success: false,
+        errorMessage,
+        durationMs: Date.now() - startedAt,
+      });
+
       return { success: false, error: errorMessage };
     }
   }
@@ -178,11 +349,29 @@ class GoogleServiceClass {
    * Test Search Console connection
    */
   async testGSC(connectionId: string): Promise<TestConnectionResult> {
+    const startedAt = Date.now();
     const connection = await prisma.googleConnection.findUnique({
       where: { id: connectionId },
+      select: {
+        id: true,
+        projectId: true,
+        serviceAccountJson: true,
+        serviceAccountEmail: true,
+        gscSiteUrl: true,
+        project: {
+          select: {
+            id: true,
+            name: true,
+          },
+        },
+      },
     });
 
     if (!connection?.gscSiteUrl) {
+      logGoogleEvent('gsc_test_skipped', {
+        connectionId,
+        reason: 'Search Console not configured',
+      }, 'warn');
       return { success: false, error: 'Search Console not configured' };
     }
 
@@ -193,6 +382,14 @@ class GoogleServiceClass {
       const yesterday = new Date();
       yesterday.setDate(yesterday.getDate() - 1);
       const dateStr = yesterday.toISOString().split('T')[0];
+      logGoogleEvent('gsc_test_start', {
+        connectionId,
+        projectId: connection.projectId,
+        projectName: connection.project?.name || null,
+        serviceAccountEmail: connection.serviceAccountEmail,
+        siteUrl: connection.gscSiteUrl,
+        queryDate: dateStr,
+      });
 
       await client.searchanalytics.query({
         siteUrl: connection.gscSiteUrl,
@@ -202,6 +399,30 @@ class GoogleServiceClass {
           dimensions: ['query'],
           rowLimit: 1,
         },
+      });
+
+      logGoogleEvent('gsc_test_success', {
+        connectionId,
+        projectId: connection.projectId,
+        projectName: connection.project?.name || null,
+        siteUrl: connection.gscSiteUrl,
+        durationMs: Date.now() - startedAt,
+      });
+      await this.writeIntegrationLog({
+        googleConnectionId: connectionId,
+        action: 'google.test_gsc',
+        arguments: {
+          projectId: connection.projectId,
+          projectName: connection.project?.name || null,
+          serviceAccountEmail: connection.serviceAccountEmail,
+          siteUrl: connection.gscSiteUrl,
+          queryDate: dateStr,
+        },
+        result: {
+          siteUrl: connection.gscSiteUrl,
+        },
+        success: true,
+        durationMs: Date.now() - startedAt,
       });
 
       // Update connection status
@@ -227,6 +448,32 @@ class GoogleServiceClass {
           gscStatus: 'ERROR',
           gscLastError: errorMessage,
         },
+      });
+
+      logGoogleEvent('gsc_test_failure', {
+        connectionId,
+        projectId: connection.projectId,
+        projectName: connection.project?.name || null,
+        serviceAccountEmail: connection.serviceAccountEmail,
+        siteUrl: connection.gscSiteUrl,
+        rawError: serializeGoogleError(error),
+        durationMs: Date.now() - startedAt,
+      }, 'error');
+      await this.writeIntegrationLog({
+        googleConnectionId: connectionId,
+        action: 'google.test_gsc',
+        arguments: {
+          projectId: connection.projectId,
+          projectName: connection.project?.name || null,
+          serviceAccountEmail: connection.serviceAccountEmail,
+          siteUrl: connection.gscSiteUrl,
+        },
+        result: {
+          rawError: serializeGoogleError(error),
+        },
+        success: false,
+        errorMessage,
+        durationMs: Date.now() - startedAt,
       });
 
       return { success: false, error: errorMessage };
@@ -256,7 +503,11 @@ class GoogleServiceClass {
       try {
         result.ga4 = await this.fetchGA4Metrics(connection, dateStr);
       } catch (error) {
-        console.error('GA4 fetch error:', error);
+        logGoogleEvent('ga4_fetch_failure', {
+          connectionId,
+          date: dateStr,
+          error: serializeGoogleError(error),
+        }, 'error');
       }
     }
 
@@ -265,7 +516,11 @@ class GoogleServiceClass {
       try {
         result.gsc = await this.fetchGSCMetrics(connection, dateStr);
       } catch (error) {
-        console.error('GSC fetch error:', error);
+        logGoogleEvent('gsc_fetch_failure', {
+          connectionId,
+          date: dateStr,
+          error: serializeGoogleError(error),
+        }, 'error');
       }
     }
 

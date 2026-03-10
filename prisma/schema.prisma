@@ -2170,6 +2170,7 @@ enum CMSSuggestionStatus {
 enum MCPConnectionType {
   WORDPRESS
   WOOCOMMERCE
+  BREVO
 }
 
 enum ConnectionStatus {

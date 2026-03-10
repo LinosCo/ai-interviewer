@@ -9,7 +9,7 @@ import { ProjectWorkspaceShell } from '@/components/projects/ProjectWorkspaceShe
 
 interface MCPConnection {
   id: string;
-  type: 'WORDPRESS' | 'WOOCOMMERCE';
+  type: 'WORDPRESS' | 'WOOCOMMERCE' | 'BREVO';
   name: string;
   status: 'PENDING' | 'TESTING' | 'ACTIVE' | 'ERROR' | 'DISABLED';
   lastSyncAt?: string | null;
@@ -275,7 +275,7 @@ export default function IntegrationsPage() {
     }
   };
 
-  const handleConfigureMCP = (type: 'WORDPRESS' | 'WOOCOMMERCE') => {
+  const handleConfigureMCP = (type: 'WORDPRESS' | 'WOOCOMMERCE' | 'BREVO') => {
     router.push(`/dashboard/projects/${projectId}/integrations/connect/${type.toLowerCase()}`);
   };
 

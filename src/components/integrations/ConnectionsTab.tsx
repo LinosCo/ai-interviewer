@@ -34,9 +34,9 @@ export function ConnectionsTab({ activeCount, ...gridProps }: ConnectionsTabProp
       title: 'Publishing Destinations',
       state: publishingReady ? 'Connesso' : 'Da completare',
       health: publishingReady ? 'Sano' : 'Nessuna destinazione attiva',
-      coverage: publishingReady ? 'Copertura: WordPress/WooCommerce/CMS disponibili' : 'Copertura: assente',
+      coverage: publishingReady ? 'Copertura: WordPress/WooCommerce/Brevo/CMS disponibili' : 'Copertura: assente',
       scope: 'Scope: dedicato al progetto',
-      nextAction: publishingReady ? 'Azione: verifica permessi di pubblicazione' : 'Azione: configura WordPress, WooCommerce o CMS voler.ai',
+      nextAction: publishingReady ? 'Azione: verifica permessi di pubblicazione' : 'Azione: configura WordPress, WooCommerce, Brevo o CMS voler.ai',
     },
     {
       title: 'Automation',

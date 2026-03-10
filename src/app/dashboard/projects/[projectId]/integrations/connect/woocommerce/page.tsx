@@ -16,7 +16,7 @@ interface ExistingConnection {
 
 interface MCPConnectionSummary {
     id: string;
-    type: 'WORDPRESS' | 'WOOCOMMERCE';
+    type: 'WORDPRESS' | 'WOOCOMMERCE' | 'BREVO';
     name: string;
     endpoint: string;
 }

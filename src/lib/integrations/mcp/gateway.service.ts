@@ -1,6 +1,6 @@
 /**
  * MCP Gateway Service
- * Orchestrates connections to WordPress and WooCommerce via MCP protocol
+ * Orchestrates MCP connections (WordPress, WooCommerce, Brevo)
  */
 
 import { prisma } from '@/lib/prisma';
@@ -8,6 +8,7 @@ import { decrypt } from '../encryption';
 import { calculateCredits } from '../credits';
 import { WordPressAdapter, type WordPressCredentials } from './wordpress.adapter';
 import { WooCommerceAdapter, type WooCommerceCredentials } from './woocommerce.adapter';
+import { BrevoAdapter, type BrevoCredentials } from './brevo.adapter';
 import { getMcpEndpointCandidates, normalizeMcpEndpoint } from './endpoint';
 import type { BaseMCPAdapter, MCPServerInfo, MCPTool, MCPCallResult } from './base.adapter';
 import type { MCPConnection, MCPConnectionType } from '@prisma/client';
@@ -40,7 +41,7 @@ class MCPGatewayServiceClass {
     const endpoint = normalizeMcpEndpoint(connection.type, endpointOverride || connection.endpoint);
     const credentials = JSON.parse(decrypt(connection.credentials));
 
-    switch (connection.type) {
+    switch (connection.type as string) {
       case 'WORDPRESS':
         return new WordPressAdapter(
           endpoint,
@@ -50,6 +51,11 @@ class MCPGatewayServiceClass {
         return new WooCommerceAdapter(
           endpoint,
           credentials as WooCommerceCredentials
+        );
+      case 'BREVO':
+        return new BrevoAdapter(
+          endpoint,
+          credentials as BrevoCredentials
         );
       default:
         throw new Error(`Unknown connection type: ${connection.type}`);

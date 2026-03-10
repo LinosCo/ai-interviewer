@@ -42,7 +42,7 @@ const CREDITS_MAP: Record<string, number> = {
  * Calculate credits for a given operation
  */
 export function calculateCredits(
-  connectionType: 'WORDPRESS' | 'WOOCOMMERCE' | 'GOOGLE_ANALYTICS' | 'GOOGLE_SEARCH_CONSOLE',
+  connectionType: 'WORDPRESS' | 'WOOCOMMERCE' | 'BREVO' | 'GOOGLE_ANALYTICS' | 'GOOGLE_SEARCH_CONSOLE',
   toolName: string
 ): number {
   // Build key based on connection type
@@ -74,7 +74,7 @@ export function calculateCredits(
  */
 export function hasEnoughCredits(
   availableCredits: number,
-  connectionType: 'WORDPRESS' | 'WOOCOMMERCE' | 'GOOGLE_ANALYTICS' | 'GOOGLE_SEARCH_CONSOLE',
+  connectionType: 'WORDPRESS' | 'WOOCOMMERCE' | 'BREVO' | 'GOOGLE_ANALYTICS' | 'GOOGLE_SEARCH_CONSOLE',
   toolName: string
 ): boolean {
   const needed = calculateCredits(connectionType, toolName);

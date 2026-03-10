@@ -63,6 +63,26 @@ function clampLimit(limit?: number): number {
     return Math.min(Math.max(1, Math.floor(limit)), 10);
 }
 
+function logManageConnectionsEvent(
+    stage: string,
+    details: Record<string, unknown>,
+    level: 'info' | 'warn' | 'error' = 'info'
+): void {
+    const payload = { stage, ...details };
+
+    if (level === 'warn') {
+        console.warn('[Copilot Tool][manageProjectConnections]', payload);
+        return;
+    }
+
+    if (level === 'error') {
+        console.error('[Copilot Tool][manageProjectConnections]', payload);
+        return;
+    }
+
+    console.info('[Copilot Tool][manageProjectConnections]', payload);
+}
+
 function parseAdditionalUrls(value: unknown): Array<{ url: string; label?: string }> {
     if (!Array.isArray(value)) return [];
     return value
@@ -856,8 +876,8 @@ export function createProjectConnectionsOpsTool(context: ToolContext) {
             projectId: z.string().optional(),
             connectionTypes: z.array(z.enum(['mcp', 'google', 'cms', 'n8n'])).optional(),
             connectionId: z.string().optional(),
-            mcpType: z.enum(['WORDPRESS', 'WOOCOMMERCE']).optional(),
-            type: z.enum(['WORDPRESS', 'WOOCOMMERCE']).optional().describe('Alias of mcpType'),
+            mcpType: z.enum(['WORDPRESS', 'WOOCOMMERCE', 'BREVO']).optional(),
+            type: z.enum(['WORDPRESS', 'WOOCOMMERCE', 'BREVO']).optional().describe('Alias of mcpType'),
             name: z.string().optional(),
             endpoint: z.string().optional(),
             credentials: z.any().optional(),
@@ -893,8 +913,8 @@ export function createProjectConnectionsOpsTool(context: ToolContext) {
             projectId?: string;
             connectionTypes?: Array<'mcp' | 'google' | 'cms' | 'n8n'>;
             connectionId?: string;
-            mcpType?: 'WORDPRESS' | 'WOOCOMMERCE';
-            type?: 'WORDPRESS' | 'WOOCOMMERCE';
+            mcpType?: 'WORDPRESS' | 'WOOCOMMERCE' | 'BREVO';
+            type?: 'WORDPRESS' | 'WOOCOMMERCE' | 'BREVO';
             name?: string;
             endpoint?: string;
             credentials?: unknown;
@@ -910,6 +930,20 @@ export function createProjectConnectionsOpsTool(context: ToolContext) {
             try {
                 const op = operation || 'status';
                 const targetProjectId = await resolveSingleProjectId(context, projectId);
+                logManageConnectionsEvent('request_received', {
+                    userId: context.userId,
+                    organizationId: context.organizationId,
+                    requestedProjectId: projectId || null,
+                    resolvedProjectId: targetProjectId,
+                    operation: op,
+                    connectionTypes: connectionTypes || null,
+                    connectionId: connectionId || null,
+                    hasServiceAccountJson: Boolean(serviceAccountJson),
+                    hasGa4PropertyId: Boolean(ga4PropertyId && String(ga4PropertyId).trim()),
+                    hasGscSiteUrl: Boolean(gscSiteUrl && String(gscSiteUrl).trim()),
+                    hasWebhookUrl: Boolean(webhookUrl && String(webhookUrl).trim()),
+                    testAfterSave: Boolean(testAfterSave)
+                });
                 if (!targetProjectId) {
                     return { error: 'No accessible project found for this request.' };
                 }
@@ -929,6 +963,12 @@ export function createProjectConnectionsOpsTool(context: ToolContext) {
                 if (!project) {
                     return { error: 'Project not found.' };
                 }
+                logManageConnectionsEvent('project_resolved', {
+                    operation: op,
+                    projectId: project.id,
+                    projectName: project.name,
+                    organizationId: project.organizationId
+                });
 
                 const shouldTestAfterSave = Boolean(testAfterSave);
 
@@ -1194,6 +1234,17 @@ export function createProjectConnectionsOpsTool(context: ToolContext) {
                         };
                     }
 
+                    logManageConnectionsEvent('google_connection_created', {
+                        operation: op,
+                        projectId: targetProjectId,
+                        connectionId: created.id,
+                        ga4Enabled: created.ga4Enabled,
+                        ga4PropertyId: created.ga4PropertyId || null,
+                        gscEnabled: created.gscEnabled,
+                        gscSiteUrl: created.gscSiteUrl || null,
+                        testResult
+                    });
+
                     return {
                         success: true,
                         operation: op,
@@ -1301,6 +1352,17 @@ export function createProjectConnectionsOpsTool(context: ToolContext) {
                                 : { success: false, skipped: true, reason: 'GSC non configurato' }
                         };
                     }
+
+                    logManageConnectionsEvent('google_connection_updated', {
+                        operation: op,
+                        projectId: targetProjectId,
+                        connectionId: updated.id,
+                        ga4Enabled: updated.ga4Enabled,
+                        ga4PropertyId: updated.ga4PropertyId || null,
+                        gscEnabled: updated.gscEnabled,
+                        gscSiteUrl: updated.gscSiteUrl || null,
+                        testResult
+                    });
 
                     return {
                         success: true,
@@ -1505,6 +1567,26 @@ export function createProjectConnectionsOpsTool(context: ToolContext) {
                 ]);
 
                 if (op === 'status') {
+                    logManageConnectionsEvent('status_completed', {
+                        projectId: targetProjectId,
+                        operation: op,
+                        googleConnection: googleConnection
+                            ? {
+                                id: googleConnection.id,
+                                ga4Enabled: googleConnection.ga4Enabled,
+                                ga4Status: googleConnection.ga4Status,
+                                ga4PropertyId: googleConnection.ga4PropertyId || null,
+                                ga4LastError: googleConnection.ga4LastError || null,
+                                gscEnabled: googleConnection.gscEnabled,
+                                gscStatus: googleConnection.gscStatus,
+                                gscSiteUrl: googleConnection.gscSiteUrl || null,
+                                gscLastError: googleConnection.gscLastError || null,
+                            }
+                            : null,
+                        mcpCount: mcpConnections.length,
+                        cmsCount: cmsConnections.length,
+                        hasN8n: Boolean(n8nConnection)
+                    });
                     return {
                         success: true,
                         operation: op,
@@ -1566,6 +1648,13 @@ export function createProjectConnectionsOpsTool(context: ToolContext) {
                     return { error: 'Connection not found for this project or filtered types.' };
                 }
 
+                logManageConnectionsEvent('test_completed', {
+                    projectId: targetProjectId,
+                    operation: op,
+                    tested: tests.length,
+                    tests
+                });
+
                 return {
                     success: true,
                     operation: op,
@@ -1574,7 +1663,11 @@ export function createProjectConnectionsOpsTool(context: ToolContext) {
                     tests
                 };
             } catch (error: any) {
-                console.error('[Copilot Tool] manageProjectConnections error:', error);
+                logManageConnectionsEvent('operation_failed', {
+                    userId: context.userId,
+                    organizationId: context.organizationId,
+                    error: error?.message || 'Unknown error'
+                }, 'error');
                 return { error: 'Failed to manage connections', details: error?.message || 'Unknown error' };
             }
         }

@@ -181,6 +181,21 @@ class GoogleServiceClass {
     return baseMessage || 'Unknown error';
   }
 
+  private async listAccessibleGscSites(client: ReturnType<typeof google.searchconsole>): Promise<string[]> {
+    try {
+      const response = await client.sites.list();
+      const entries = Array.isArray(response.data.siteEntry) ? response.data.siteEntry : [];
+      return entries
+        .map((entry: { siteUrl?: string | null }) => String(entry.siteUrl || '').trim())
+        .filter(Boolean);
+    } catch (error) {
+      logGoogleEvent('gsc_sites_list_failure', {
+        error: serializeGoogleError(error),
+      }, 'warn');
+      return [];
+    }
+  }
+
   /**
    * Create GA4 client with Service Account credentials
    */
@@ -426,6 +441,8 @@ class GoogleServiceClass {
       return { success: false, error: normalizedSite.error };
     }
 
+    let accessibleSites: string[] = [];
+
     try {
       const client = this.createGSCClient(connection.serviceAccountJson);
 
@@ -441,6 +458,54 @@ class GoogleServiceClass {
         siteUrl: normalizedSite.value,
         queryDate: dateStr,
       });
+
+      accessibleSites = await this.listAccessibleGscSites(client);
+      logGoogleEvent('gsc_test_accessible_sites', {
+        connectionId,
+        projectId: connection.projectId,
+        siteUrl: normalizedSite.value,
+        accessibleSitesCount: accessibleSites.length,
+        accessibleSitesSample: accessibleSites.slice(0, 10),
+      });
+
+      if (accessibleSites.length > 0 && !accessibleSites.includes(normalizedSite.value)) {
+        const targetHost = normalizedSite.value.startsWith('http')
+          ? new URL(normalizedSite.value).hostname.replace(/^www\./i, '').toLowerCase()
+          : null;
+        const domainCandidate = targetHost ? `sc-domain:${targetHost}` : null;
+        const hasDomainCandidate = domainCandidate ? accessibleSites.includes(domainCandidate) : false;
+        const visibleSites = accessibleSites.slice(0, 6).join(', ');
+        const mismatchError = hasDomainCandidate
+          ? `Il service account ${connection.serviceAccountEmail} non vede la proprietà '${normalizedSite.value}'. Usa '${domainCandidate}' oppure aggiungi il service account alla property URL-prefix esatta. Proprietà visibili: ${visibleSites}.`
+          : `Il service account ${connection.serviceAccountEmail} non vede la proprietà '${normalizedSite.value}'. Proprietà visibili: ${visibleSites}.`;
+
+        await prisma.googleConnection.update({
+          where: { id: connectionId },
+          data: {
+            gscStatus: 'ERROR',
+            gscLastError: mismatchError,
+          },
+        });
+
+        await this.writeIntegrationLog({
+          googleConnectionId: connectionId,
+          action: 'google.test_gsc',
+          arguments: {
+            projectId: connection.projectId,
+            projectName: connection.project?.name || null,
+            serviceAccountEmail: connection.serviceAccountEmail,
+            siteUrl: normalizedSite.value,
+          },
+          result: {
+            accessibleSites: accessibleSites.slice(0, 20),
+          },
+          success: false,
+          errorMessage: mismatchError,
+          durationMs: Date.now() - startedAt,
+        });
+
+        return { success: false, error: mismatchError };
+      }
 
       await client.searchanalytics.query({
         siteUrl: normalizedSite.value,
@@ -492,7 +557,10 @@ class GoogleServiceClass {
       };
     } catch (error) {
       const rawErrorMessage = error instanceof Error ? error.message : 'Unknown error';
-      const errorMessage = this.formatGscTestError(rawErrorMessage, normalizedSite.value, connection.serviceAccountEmail);
+      const baseError = this.formatGscTestError(rawErrorMessage, normalizedSite.value, connection.serviceAccountEmail);
+      const errorMessage = accessibleSites.length > 0
+        ? `${baseError} Proprietà visibili per questo service account: ${accessibleSites.slice(0, 6).join(', ')}.`
+        : baseError;
 
       await prisma.googleConnection.update({
         where: { id: connectionId },

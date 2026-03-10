@@ -7,6 +7,7 @@
 import { BetaAnalyticsDataClient } from '@google-analytics/data';
 import { google } from 'googleapis';
 import { prisma } from '@/lib/prisma';
+import { normalizeGscSiteUrl } from '@/lib/integrations/google/normalization';
 import { decrypt } from '../encryption';
 
 export interface GA4Metrics {
@@ -160,6 +161,21 @@ class GoogleServiceClass {
 
     if (normalized.includes('not found')) {
       return `Property ID ${propertyId} non trovato. Controlla di aver inserito il Property ID GA4 numerico corretto (non Measurement ID G-...).`;
+    }
+
+    return baseMessage || 'Unknown error';
+  }
+
+  private formatGscTestError(rawErrorMessage: string, siteUrl: string, serviceAccountEmail: string): string {
+    const normalized = rawErrorMessage.toLowerCase();
+    const baseMessage = rawErrorMessage.trim();
+
+    if (normalized.includes('permission_denied') || normalized.includes('sufficient permission')) {
+      return `PERMISSION_DENIED su site '${siteUrl}'. Verifica che ${serviceAccountEmail} sia utente della proprietà Search Console corretta e che il formato sia esatto: URL-prefix => https://dominio.tld/ (slash finale), Domain property => sc-domain:dominio.tld.`;
+    }
+
+    if (normalized.includes('not found')) {
+      return `Proprietà Search Console non trovata per '${siteUrl}'. Controlla formato e corrispondenza esatta della proprietà (URL-prefix con slash finale oppure sc-domain:dominio.tld).`;
     }
 
     return baseMessage || 'Unknown error';
@@ -375,6 +391,41 @@ class GoogleServiceClass {
       return { success: false, error: 'Search Console not configured' };
     }
 
+    const normalizedSite = normalizeGscSiteUrl(connection.gscSiteUrl);
+    logGoogleEvent('gsc_test_site_normalization', {
+      connectionId,
+      projectId: connection.projectId,
+      rawSiteUrl: connection.gscSiteUrl,
+      normalizedSiteUrl: normalizedSite.value || null,
+      normalizationError: normalizedSite.error || null,
+    });
+    if (normalizedSite.error) {
+      await prisma.googleConnection.update({
+        where: { id: connectionId },
+        data: {
+          gscStatus: 'ERROR',
+          gscLastError: normalizedSite.error,
+        },
+      });
+      await this.writeIntegrationLog({
+        googleConnectionId: connectionId,
+        action: 'google.test_gsc',
+        arguments: {
+          projectId: connection.projectId,
+          projectName: connection.project?.name || null,
+          serviceAccountEmail: connection.serviceAccountEmail,
+          siteUrl: connection.gscSiteUrl,
+        },
+        result: {
+          normalizedSiteUrl: normalizedSite.value || null,
+        },
+        success: false,
+        errorMessage: normalizedSite.error,
+        durationMs: Date.now() - startedAt,
+      });
+      return { success: false, error: normalizedSite.error };
+    }
+
     try {
       const client = this.createGSCClient(connection.serviceAccountJson);
 
@@ -387,12 +438,12 @@ class GoogleServiceClass {
         projectId: connection.projectId,
         projectName: connection.project?.name || null,
         serviceAccountEmail: connection.serviceAccountEmail,
-        siteUrl: connection.gscSiteUrl,
+        siteUrl: normalizedSite.value,
         queryDate: dateStr,
       });
 
       await client.searchanalytics.query({
-        siteUrl: connection.gscSiteUrl,
+        siteUrl: normalizedSite.value,
         requestBody: {
           startDate: dateStr,
           endDate: dateStr,
@@ -405,7 +456,7 @@ class GoogleServiceClass {
         connectionId,
         projectId: connection.projectId,
         projectName: connection.project?.name || null,
-        siteUrl: connection.gscSiteUrl,
+        siteUrl: normalizedSite.value,
         durationMs: Date.now() - startedAt,
       });
       await this.writeIntegrationLog({
@@ -415,11 +466,11 @@ class GoogleServiceClass {
           projectId: connection.projectId,
           projectName: connection.project?.name || null,
           serviceAccountEmail: connection.serviceAccountEmail,
-          siteUrl: connection.gscSiteUrl,
+          siteUrl: normalizedSite.value,
           queryDate: dateStr,
         },
         result: {
-          siteUrl: connection.gscSiteUrl,
+          siteUrl: normalizedSite.value,
         },
         success: true,
         durationMs: Date.now() - startedAt,
@@ -437,10 +488,11 @@ class GoogleServiceClass {
 
       return {
         success: true,
-        siteUrl: connection.gscSiteUrl,
+        siteUrl: normalizedSite.value,
       };
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      const rawErrorMessage = error instanceof Error ? error.message : 'Unknown error';
+      const errorMessage = this.formatGscTestError(rawErrorMessage, normalizedSite.value, connection.serviceAccountEmail);
 
       await prisma.googleConnection.update({
         where: { id: connectionId },
@@ -455,7 +507,8 @@ class GoogleServiceClass {
         projectId: connection.projectId,
         projectName: connection.project?.name || null,
         serviceAccountEmail: connection.serviceAccountEmail,
-        siteUrl: connection.gscSiteUrl,
+        siteUrl: normalizedSite.value,
+        formattedError: errorMessage,
         rawError: serializeGoogleError(error),
         durationMs: Date.now() - startedAt,
       }, 'error');
@@ -466,10 +519,11 @@ class GoogleServiceClass {
           projectId: connection.projectId,
           projectName: connection.project?.name || null,
           serviceAccountEmail: connection.serviceAccountEmail,
-          siteUrl: connection.gscSiteUrl,
+          siteUrl: normalizedSite.value,
         },
         result: {
           rawError: serializeGoogleError(error),
+          formattedError: errorMessage,
         },
         success: false,
         errorMessage,
@@ -599,10 +653,15 @@ class GoogleServiceClass {
       throw new Error('GSC site URL not configured');
     }
 
+    const normalizedSite = normalizeGscSiteUrl(connection.gscSiteUrl);
+    if (normalizedSite.error) {
+      throw new Error(normalizedSite.error);
+    }
+
     const client = this.createGSCClient(connection.serviceAccountJson);
 
     const response = await client.searchanalytics.query({
-      siteUrl: connection.gscSiteUrl,
+      siteUrl: normalizedSite.value,
       requestBody: {
         startDate: dateStr,
         endDate: dateStr,

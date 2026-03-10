@@ -276,11 +276,14 @@ export default function ConnectGooglePage() {
                             <Label htmlFor="gsc">URL Sito (GSC)</Label>
                             <Input
                                 id="gsc"
-                                placeholder="https://tuosito.it"
+                                placeholder="https://tuosito.it/"
                                 value={formData.gscSiteUrl}
                                 onChange={(e) => setFormData({ ...formData, gscSiteUrl: e.target.value })}
                                 required={formData.gscEnabled}
                             />
+                            <p className="text-xs text-gray-500">
+                                Formato: <strong>https://dominio.tld/</strong> per URL-prefix (slash finale) oppure <strong>sc-domain:dominio.tld</strong> per proprietà dominio.
+                            </p>
                         </div>
                     )}
                 </div>

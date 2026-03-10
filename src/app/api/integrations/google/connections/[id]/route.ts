@@ -10,6 +10,7 @@ import { NextResponse } from 'next/server';
 import { auth } from '@/auth';
 import { prisma } from '@/lib/prisma';
 import { encrypt } from '@/lib/integrations/encryption';
+import { normalizeGscSiteUrl } from '@/lib/integrations/google/normalization';
 import { WorkspaceError, assertProjectAccess } from '@/lib/domain/workspace';
 
 function toErrorResponse(error: unknown) {
@@ -105,9 +106,10 @@ export async function PUT(
     }
 
     if (ga4PropertyId !== undefined) {
-      if (ga4PropertyId) {
+      const normalizedGa4PropertyId = typeof ga4PropertyId === 'string' ? ga4PropertyId.trim() : '';
+      if (normalizedGa4PropertyId) {
         updateData.ga4Enabled = true;
-        updateData.ga4PropertyId = ga4PropertyId;
+        updateData.ga4PropertyId = normalizedGa4PropertyId;
         updateData.ga4Status = 'PENDING';
       } else {
         updateData.ga4Enabled = false;
@@ -117,9 +119,15 @@ export async function PUT(
     }
 
     if (gscSiteUrl !== undefined) {
-      if (gscSiteUrl) {
+      const rawGscSiteUrl = typeof gscSiteUrl === 'string' ? gscSiteUrl.trim() : '';
+      if (rawGscSiteUrl) {
+        const normalized = normalizeGscSiteUrl(rawGscSiteUrl);
+        if (normalized.error) {
+          return NextResponse.json({ error: normalized.error }, { status: 400 });
+        }
+
         updateData.gscEnabled = true;
-        updateData.gscSiteUrl = gscSiteUrl;
+        updateData.gscSiteUrl = normalized.value;
         updateData.gscStatus = 'PENDING';
       } else {
         updateData.gscEnabled = false;

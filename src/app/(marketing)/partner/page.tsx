@@ -17,8 +17,9 @@ import {
 } from 'lucide-react';
 import { PARTNER_PLAN } from '@/config/landingPricing';
 import { FluidBackground } from '@/components/landing/FluidBackground';
+import { SITE_URL } from '@/lib/seo';
 
-const siteUrl = (process.env.NEXT_PUBLIC_APP_URL || 'https://businesstuner.it').replace(/\/+$/, '');
+const siteUrl = SITE_URL;
 const PARTNER_FAQS = [
     {
         q: 'Cos\'è il Programma Partner in termini pratici?',

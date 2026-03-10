@@ -2,6 +2,7 @@
 
 import { motion } from 'framer-motion';
 import { FluidBackground } from '@/components/landing/FluidBackground';
+import { SITE_URL } from '@/lib/seo';
 
 const faqs = [
     {
@@ -37,7 +38,7 @@ const faqs = [
         answer: "Sì. Le integrazioni disponibili dipendono dal piano. Per esigenze enterprise e integrazioni su misura, il piano Business viene definito con il team Sales."
     }
 ];
-const siteUrl = (process.env.NEXT_PUBLIC_APP_URL || 'https://businesstuner.it').replace(/\/+$/, '');
+const siteUrl = SITE_URL;
 const faqPageJsonLd = {
     '@context': 'https://schema.org',
     '@graph': [

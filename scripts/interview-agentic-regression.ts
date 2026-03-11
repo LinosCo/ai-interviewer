@@ -884,6 +884,11 @@ function buildJsonReport(params: {
     };
 }
 
+function logScenarioDebug(scenarioId: string, step: string, details?: Record<string, unknown>): void {
+    const payload = details ? ` ${JSON.stringify(details)}` : '';
+    console.log(`[scenario:${scenarioId}] ${step}${payload}`);
+}
+
 async function deleteConversation(prisma: PrismaClient, conversationId: string): Promise<void> {
     await prisma.message.deleteMany({ where: { conversationId } });
     await prisma.conversation.delete({ where: { id: conversationId } });
@@ -904,6 +909,11 @@ async function runScenario(params: {
     rand: () => number;
 }): Promise<RunReport> {
     const { prisma, openai, args, bot, persona, scenario, rand } = params;
+    logScenarioDebug(scenario.id, 'start', {
+        persona: persona.name,
+        baseUrl: args.baseUrl,
+        intervieweeModel: args.intervieweeModel,
+    });
     const language = bot.language || 'it';
     const candidateFields = Array.isArray(bot.candidateDataFields)
         ? bot.candidateDataFields.map((value) => String(value || '').trim()).filter(Boolean)
@@ -918,6 +928,7 @@ async function runScenario(params: {
         offTopicUsed: false,
     };
 
+    logScenarioDebug(scenario.id, 'conversation.create.begin');
     const conversation = await prisma.conversation.create({
         data: {
             botId: bot.id,
@@ -930,6 +941,7 @@ async function runScenario(params: {
             },
         },
     });
+    logScenarioDebug(scenario.id, 'conversation.create.done', { conversationId: conversation.id });
 
     const transcriptLocal: Array<{ role: 'assistant' | 'user'; content: string }> = [];
     const assistantLatencies: number[] = [];
@@ -938,6 +950,9 @@ async function runScenario(params: {
     let completed = false;
 
     try {
+        logScenarioDebug(scenario.id, 'callChat.initial.begin', {
+            conversationId: conversation.id,
+        });
         const firstReply = await callChat({
             baseUrl: args.baseUrl,
             conversationId: conversation.id,
@@ -945,10 +960,22 @@ async function runScenario(params: {
             messages: [],
             effectiveDuration: 0,
         });
+        logScenarioDebug(scenario.id, 'callChat.initial.done', {
+            completed: firstReply.isCompleted,
+            textLength: String(firstReply.text || '').length,
+        });
         let firstAssistant: ObservedAssistantTurn;
         try {
+            logScenarioDebug(scenario.id, 'fetchAssistantTurn.initial.begin', {
+                conversationId: conversation.id,
+            });
             firstAssistant = await fetchAssistantTurn(prisma, conversation.id);
+            logScenarioDebug(scenario.id, 'fetchAssistantTurn.initial.done', {
+                phase: firstAssistant.metadata.phase || null,
+                textLength: String(firstAssistant.content || '').length,
+            });
         } catch {
+            logScenarioDebug(scenario.id, 'fetchAssistantTurn.initial.fallback');
             firstAssistant = {
                 content: String(firstReply.text || ''),
                 metadata: {},
@@ -963,6 +990,10 @@ async function runScenario(params: {
         let currentAssistant = firstAssistant;
 
         while (!completed && transcriptLocal.filter((turn) => turn.role === 'user').length < args.maxTurns) {
+            logScenarioDebug(scenario.id, 'turn.begin', {
+                userTurns: transcriptLocal.filter((turn) => turn.role === 'user').length,
+                phase: currentAssistant.metadata.phase || null,
+            });
             const userText = await generateUserReply({
                 openai,
                 model: args.intervieweeModel,
@@ -979,6 +1010,10 @@ async function runScenario(params: {
             effectiveDuration += estimateEffectiveSeconds(userText, rand, scenario.forceTimePressure);
             const clientMessageId = `${scenario.id}-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
             const startedAt = Date.now();
+            logScenarioDebug(scenario.id, 'callChat.turn.begin', {
+                clientMessageId,
+                effectiveDuration,
+            });
             const chatReply = await callChat({
                 baseUrl: args.baseUrl,
                 conversationId: conversation.id,
@@ -987,7 +1022,18 @@ async function runScenario(params: {
                 effectiveDuration,
                 clientMessageId,
             });
+            logScenarioDebug(scenario.id, 'callChat.turn.done', {
+                clientMessageId,
+                completed: chatReply.isCompleted,
+                textLength: String(chatReply.text || '').length,
+            });
+            logScenarioDebug(scenario.id, 'fetchAssistantTurn.turn.begin', { clientMessageId });
             const assistant = await fetchAssistantTurn(prisma, conversation.id, clientMessageId);
+            logScenarioDebug(scenario.id, 'fetchAssistantTurn.turn.done', {
+                clientMessageId,
+                phase: assistant.metadata.phase || null,
+                textLength: String(assistant.content || '').length,
+            });
             const latency = typeof assistant.metadata.responseLatencyMs === 'number'
                 ? assistant.metadata.responseLatencyMs
                 : Date.now() - startedAt;
@@ -998,6 +1044,9 @@ async function runScenario(params: {
             currentAssistant = assistant;
         }
 
+        logScenarioDebug(scenario.id, 'conversation.snapshot.begin', {
+            conversationId: conversation.id,
+        });
         const conversationSnapshot = await prisma.conversation.findUnique({
             where: { id: conversation.id },
             select: {
@@ -1008,6 +1057,10 @@ async function runScenario(params: {
                     select: { role: true, content: true, metadata: true },
                 },
             },
+        });
+        logScenarioDebug(scenario.id, 'conversation.snapshot.done', {
+            status: conversationSnapshot?.status || null,
+            messageCount: conversationSnapshot?.messages?.length || 0,
         });
 
         const candidateProfile = (conversationSnapshot?.candidateProfile && typeof conversationSnapshot.candidateProfile === 'object')
@@ -1088,9 +1141,17 @@ async function runScenario(params: {
             candidateProfile,
         };
     } finally {
+        logScenarioDebug(scenario.id, 'cleanup.begin', {
+            cleanup: args.cleanup,
+            conversationId: conversation.id,
+        });
         if (args.cleanup) {
             await deleteConversation(prisma, conversation.id);
         }
+        logScenarioDebug(scenario.id, 'cleanup.done', {
+            cleanup: args.cleanup,
+            conversationId: conversation.id,
+        });
     }
 }
 

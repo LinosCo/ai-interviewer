@@ -673,6 +673,7 @@ export async function POST(req: Request) {
         let systemPrompt = "";
         let nextTopicId = currentTopic.id;
         let supervisorInsight: SupervisorInsight = createDefaultSupervisorInsight();
+        const isAvanzato = interviewerQuality === 'avanzato';
         // Mutable ref so buildDeepOfferInsight (defined below) can read the CIL result
         // that is only resolved later via await cilPromise.
         const cilAnalysisRef: { current: CILAnalysis | null } = { current: null };
@@ -1277,7 +1278,6 @@ export async function POST(req: Request) {
         }
 
         // --- CIL PRE-PASS (avanzato only, parallel with remaining sync work) ---
-        const isAvanzato = interviewerQuality === 'avanzato';
         const AVANZATO_CIL_RECENT_TURNS = 6;
 
         const cilPromise: Promise<CILAnalysis | null> = isAvanzato

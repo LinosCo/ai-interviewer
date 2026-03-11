@@ -901,16 +901,24 @@ async function runScenario(params: {
             messages: [],
             effectiveDuration: 0,
         });
-        const firstAssistant = await fetchAssistantTurn(prisma, conversation.id);
+        let firstAssistant: ObservedAssistantTurn;
+        try {
+            firstAssistant = await fetchAssistantTurn(prisma, conversation.id);
+        } catch {
+            firstAssistant = {
+                content: String(firstReply.text || ''),
+                metadata: {},
+            };
+        }
         transcriptLocal.push({ role: 'assistant', content: firstAssistant.content });
         if (typeof firstAssistant.metadata.responseLatencyMs === 'number') {
             assistantLatencies.push(firstAssistant.metadata.responseLatencyMs);
         }
         if (firstAssistant.metadata.phase) phasesSeen.add(firstAssistant.metadata.phase);
         completed = firstReply.isCompleted;
+        let currentAssistant = firstAssistant;
 
         while (!completed && transcriptLocal.filter((turn) => turn.role === 'user').length < args.maxTurns) {
-            const currentAssistant = await fetchAssistantTurn(prisma, conversation.id);
             const userText = await generateUserReply({
                 openai,
                 model: args.intervieweeModel,
@@ -943,6 +951,7 @@ async function runScenario(params: {
             if (assistant.metadata.phase) phasesSeen.add(assistant.metadata.phase);
             transcriptLocal.push({ role: 'assistant', content: assistant.content });
             completed = chatReply.isCompleted;
+            currentAssistant = assistant;
         }
 
         const conversationSnapshot = await prisma.conversation.findUnique({

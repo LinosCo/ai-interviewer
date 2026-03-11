@@ -782,7 +782,8 @@ export async function POST(req: Request) {
                     interviewPlan,
                     maxDurationMins,
                     effectiveSec,
-                    bonusTurnCap: tierConfig.budgets.bonusTurnCap
+                    bonusTurnCap: tierConfig.budgets.bonusTurnCap,
+                    advanceAfterUsableFirstAnswer: interviewerQuality === 'standard'
                 });
 
                 // Merge explore result into nextState
@@ -1496,7 +1497,8 @@ hard_rules:
                 language,
                 phase: nextState.phase,
                 topicLabel: plannerTopic?.label || currentTopic.label,
-                decision: microPlannerDecision
+                decision: microPlannerDecision,
+                interviewerQuality
             });
             if (microPlannerPrompt) {
                 systemPrompt += `\n\n${microPlannerPrompt}`;
@@ -1547,6 +1549,11 @@ hard_rules:
             systemPrompt += (language || '').toLowerCase().startsWith('it')
                 ? `\n\n## STILE RISPOSTA\nMantieni la risposta visibile breve: massimo 2 frasi. Se fai un aggancio, fallo in una frase corta e concreta, poi fai una sola domanda specifica. Evita formule ripetitive come "è interessante" o "è un punto importante" se non aggiungono informazione.`
                 : `\n\n## RESPONSE STYLE\nKeep the visible response short: at most 2 sentences. If you bridge, do it in one short concrete sentence, then ask one specific question. Avoid repetitive fillers like "that's interesting" or "that's an important point" unless they add information.`;
+            if (interviewerQuality === 'standard') {
+                systemPrompt += (language || '').toLowerCase().startsWith('it')
+                    ? `\n\n## MODALITA STANDARD\nResta naturale e conversazionale, ma lavora come un'intervista diagnostica leggera.\n- Dopo una risposta gia utile, passa al topic successivo invece di fare follow-up opzionali.\n- Preferisci domande concrete e confrontabili: pratica attuale, frequenza, ostacolo, chi decide, canale, metrica, esempio recente o prossimo passo.\n- Evita allargamenti filosofici o troppo esplorativi se non servono.`
+                    : `\n\n## STANDARD MODE\nStay natural and conversational, but act like a lightweight diagnostic interview.\n- Once the user has given a usable answer, move to the next topic instead of asking optional follow-ups.\n- Prefer concrete, comparable questions: current practice, frequency, blocker, owner, channel, metric, recent example, or next step.\n- Avoid philosophical or overly exploratory broadening unless clearly useful.`;
+            }
         }
 
         // ====================================================================
@@ -1563,9 +1570,10 @@ hard_rules:
             messagesForAI = canonicalMessages.slice(-6).map((m: any) => ({ role: m.role, content: m.content }));
         } else if (supervisorInsight?.status === 'DEEP_OFFER_ASK') {
             // Bigger context: the AI needs interview history to craft a genuine, contextualised offer
-            messagesForAI = canonicalMessages.slice(-16).map((m: any) => ({ role: m.role, content: m.content }));
+            const deepOfferWindow = interviewerQuality === 'avanzato' ? 16 : 12;
+            messagesForAI = canonicalMessages.slice(-deepOfferWindow).map((m: any) => ({ role: m.role, content: m.content }));
         } else if (nextState.phase === 'EXPLORE' || nextState.phase === 'DEEPEN') {
-            const topicWindow = interviewerQuality === 'avanzato' ? 14 : 10;
+            const topicWindow = interviewerQuality === 'avanzato' ? 14 : 8;
             messagesForAI = canonicalMessages.slice(-topicWindow).map((m: any) => ({ role: m.role, content: m.content }));
         }
 
@@ -1809,8 +1817,9 @@ hard_rules:
                         previousAssistantQuestion: duplicateMatch.matchedQuestion || previousAssistantQuestion,
                         semanticBridgeHint: userBridgeHint,
                         avoidBridgeStems: recentBridgeStems,
-                        requireAcknowledgment: true,
+                        requireAcknowledgment: interviewerQuality === 'avanzato',
                         transitionMode: supervisorInsight?.transitionMode,
+                        interviewerQuality,
                         onUsage: collectLlmUsage
                     });
                     qualityTelemetry.regenerated = true;
@@ -2060,7 +2069,8 @@ hard_rules:
                             previousAssistantQuestion,
                             semanticBridgeHint: userBridgeHint,
                             avoidBridgeStems: recentBridgeStems,
-                            requireAcknowledgment: true,
+                            requireAcknowledgment: interviewerQuality === 'avanzato',
+                            interviewerQuality,
                             onUsage: collectLlmUsage
                         });
                         if (process.env.NODE_ENV === 'development') console.log("🧭 [SUPERVISOR] Question-only response:", responseText.slice(0, 300));

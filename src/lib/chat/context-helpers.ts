@@ -71,7 +71,7 @@ export function shouldUseCriticalModelForTopicTurn(params: {
     userTurnSignal: 'none' | 'clarification' | 'off_topic_question';
     userMessage?: string | null;
     language: string;
-    criticalEscalation?: 'selective' | 'aggressive';
+    criticalEscalation?: 'minimal' | 'selective' | 'aggressive';
 }): { useCritical: boolean; reason: string } {
     if (params.phase !== 'EXPLORE' && params.phase !== 'DEEPEN') {
         return { useCritical: false, reason: 'not_topic_phase' };
@@ -82,12 +82,15 @@ export function shouldUseCriticalModelForTopicTurn(params: {
         return { useCritical: true, reason: 'aggressive_escalation' };
     }
 
-    // Selective mode (standard): critical only for high-value turns (~25-30%)
     if (params.userTurnSignal === 'clarification') {
         return { useCritical: true, reason: 'clarification_turn' };
     }
     if (params.userTurnSignal === 'off_topic_question') {
         return { useCritical: true, reason: 'scope_recovery_turn' };
+    }
+
+    if (params.criticalEscalation === 'minimal') {
+        return { useCritical: false, reason: 'minimal_standard_turn' };
     }
 
     const supervisorStatus = String(params.supervisorStatus || '');

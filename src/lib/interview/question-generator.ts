@@ -34,6 +34,7 @@ export async function generateQuestionOnly(params: {
     avoidBridgeStems?: string[];
     requireAcknowledgment?: boolean;
     transitionMode?: 'bridge' | 'clean_pivot';
+    interviewerQuality?: 'standard' | 'avanzato';
     onUsage?: LLMUsageCollector;
 }) {
     const {
@@ -47,7 +48,8 @@ export async function generateQuestionOnly(params: {
         semanticBridgeHint,
         avoidBridgeStems,
         requireAcknowledgment,
-        transitionMode
+        transitionMode,
+        interviewerQuality
     } = params;
     const questionSchema = z.object({
         question: z.string().describe("A single interview question ending with a question mark.")
@@ -81,8 +83,12 @@ export async function generateQuestionOnly(params: {
         semanticBridgeHint ? `Bridge hint: ${semanticBridgeHint}` : null,
         `Acknowledgment quality: reference one concrete detail from the user's message (fact, constraint, example, or cause/effect).`,
         `Keep the visible response lean: max 2 sentences total, short acknowledgment, then one question.`,
+        `Prefer follow-ups about one of these: obstacle, decision, trade-off, concrete example, measurable impact, or next operational step.`,
         `Avoid stock openers like "molto interessante", "e un punto importante", "grazie per aver condiviso", "very interesting", "that's an important point", "thanks for sharing".`,
         `Prefer concrete follow-ups over broad prompts like "cosa ne pensi?" / "what do you think?" unless no better signal is available.`,
+        interviewerQuality === 'standard'
+            ? `In standard mode, stay conversational but favor diagnostic, comparable questions. After one usable answer, move on rather than widening or philosophizing.`
+            : `In advanced mode, if the user opens a promising thread, you may keep a slightly richer bridge before the question.`,
         diagnosticHint || null,
         structureInstruction,
         transitionInstruction,

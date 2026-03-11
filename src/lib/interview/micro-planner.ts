@@ -437,6 +437,7 @@ export function buildMicroPlannerPromptBlock(params: {
     phase: MicroPlannerPhase;
     topicLabel: string;
     decision: MicroPlannerDecision;
+    interviewerQuality?: 'standard' | 'avanzato';
 }): string {
     if (params.phase !== 'EXPLORE' && params.phase !== 'DEEPEN') return '';
 
@@ -456,6 +457,9 @@ export function buildMicroPlannerPromptBlock(params: {
 
     if (isItalian) {
         const hints = naturalnessHintsIT.length > 0 ? '\n' + naturalnessHintsIT.join('\n') + '\n' : '';
+        const tierHint = params.interviewerQuality === 'standard'
+            ? `7) Modalita standard: resta conversazionale, ma privilegia domande snelle e confrontabili. Dopo una risposta gia utile, passa al topic successivo invece di scavare ancora.\n8) Preferisci angoli diagnostici concreti: pratica attuale, frequenza, ostacolo, responsabilita, canale, metrica o prossimo passo. Evita domande troppo ampie o speculative.`
+            : `7) Se c'è spazio qualitativo, puoi approfondire il punto più promettente invece di coprire solo il minimo.`;
         return `
 ## MICRO-PLANNER PRE-TURN (NO FALLBACK REWRITE)
 - Topic attivo: "${params.topicLabel}"
@@ -473,10 +477,14 @@ Regole operative:
 4) Se strategia=probe_example/probe_impact/probe_constraint, approfondisci quel punto prima di allargare.
 5) Mantieni naturalezza: UNA domanda sola, niente liste, niente chiusure.
 6) Se coerente con il contesto utente, preferisci un follow-up diagnostico concreto con un vincolo leggero (tempo, segmento, canale o metrica). Se forzato, evita.
+${tierHint}
 `.trim();
     }
 
     const hints = naturalnessHintsEN.length > 0 ? '\n' + naturalnessHintsEN.join('\n') + '\n' : '';
+    const tierHint = params.interviewerQuality === 'standard'
+        ? `7) Standard mode: stay conversational, but prefer lean comparable questions. Once the user has given a usable answer, move on instead of digging further.\n8) Prefer concrete diagnostic angles: current practice, frequency, blocker, owner, channel, metric, or next step. Avoid overly broad or speculative prompts.`
+        : `7) If qualitative value is emerging, you may deepen the most promising thread instead of covering only the minimum.`;
     return `
 ## MICRO-PLANNER PRE-TURN (NO FALLBACK REWRITE)
 - Active topic: "${params.topicLabel}"
@@ -494,5 +502,6 @@ Operational rules:
 4) If strategy=probe_example/probe_impact/probe_constraint, deepen that point before broadening.
 5) Keep it natural: one question only, no lists, no closure cues.
 6) If coherent with user context, prefer a concrete diagnostic follow-up with one light constraint (timeframe, segment, channel, or metric). If forced, skip it.
+${tierHint}
 `.trim();
 }

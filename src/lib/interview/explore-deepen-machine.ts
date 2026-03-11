@@ -27,7 +27,8 @@ export function handleExplorePhase({
     interviewPlan,
     maxDurationMins,
     effectiveSec,
-    bonusTurnCap = 2
+    bonusTurnCap = 2,
+    advanceAfterUsableFirstAnswer = false
 }: {
     state: InterviewState;
     currentTopic: TopicBlock;
@@ -38,10 +39,13 @@ export function handleExplorePhase({
     maxDurationMins: number;
     effectiveSec: number;
     bonusTurnCap?: number;
+    advanceAfterUsableFirstAnswer?: boolean;
 }): ExploreDeepResult {
     const nextState: Partial<InterviewState> = { ...state };
     let supervisorInsight: SupervisorInsight = { status: 'EXPLORING' };
     let nextTopicId: string | undefined;
+    const maxDurationSec = maxDurationMins * 60;
+    const remainingSec = maxDurationSec - effectiveSec;
 
     // Get topic budget
     const topicBudget = state.topicBudgets[currentTopic.id];
@@ -84,8 +88,20 @@ export function handleExplorePhase({
 
     // Determine budget action
     let action = computeBudgetAction(signal.band, topicBudget.turnsUsed, topicBudget, bonusTurnCap);
+    const wordCount = String(lastUserMessage || '').split(/\s+/).filter(Boolean).length;
+    const looksLikeClarification = /\?\s*$/.test(String(lastUserMessage || '').trim());
+    const hasUsableFirstAnswer = wordCount >= 4 || /\b\d{1,4}\b/.test(lastUserMessage) || signal.score >= 0.12;
+    if (
+        advanceAfterUsableFirstAnswer &&
+        topicBudget.turnsUsed === 0 &&
+        hasUsableFirstAnswer &&
+        !looksLikeClarification &&
+        signal.band !== 'HIGH'
+    ) {
+        action = 'advance';
+    }
 
-    console.log(`📊 [EXPLORE] "${currentTopic.label}" signal=${signal.band} action=${action} turns=${topicBudget.turnsUsed}/${topicBudget.baseTurns}`);
+    console.log(`📊 [EXPLORE] "${currentTopic.label}" signal=${signal.band} action=${action} turns=${topicBudget.turnsUsed}/${topicBudget.baseTurns} remaining=${remainingSec}s`);
 
     if (action === 'continue') {
         // Stay on this topic, increment turn
@@ -131,15 +147,13 @@ export function handleExplorePhase({
             const departingSnippet = (state.topicKeyInsights || {})[currentTopic.id] || '';
             supervisorInsight = {
                 status: 'TRANSITION',
+                transitionMode: 'bridge',
                 ...(departingSnippet && { engagingSnippet: departingSnippet })
             };
             console.log(`  → Transition to "${botTopics[nextState.topicIndex].label}"`);
 
         } else {
             // End of EXPLORE: decide on DEEPEN vs DEEP_OFFER
-            const maxDurationSec = maxDurationMins * 60;
-            const remainingSec = maxDurationSec - effectiveSec;
-
             // Calculate uncovered topics for DEEPEN - ensure ALL topics have budgets initialized
             const updatedBudgets = { ...state.topicBudgets };
 

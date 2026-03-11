@@ -2,16 +2,17 @@
  * 2-Tier Interview Quality Configuration
  *
  * Single source of truth for all tier-specific parameters.
- * standard = current baseline behavior (zero changes).
+ * standard = lean, conversational interview optimized for comparable quantitative data.
  * avanzato = professional qualitative interview.
  */
 
 export type InterviewTier = 'standard' | 'avanzato';
-export type CriticalEscalationMode = 'selective' | 'aggressive';
+export type CriticalEscalationMode = 'minimal' | 'selective' | 'aggressive';
 
 export interface TierConfig {
   modelRouting: {
     /**
+     * 'minimal'    — cheapest path: critical only for clarification/scope recovery
      * 'selective'  — current logic: critical used ~25-30% of turns
      *                (first turn on topic, clarification, off-topic, high-signal deepening, transition)
      * 'aggressive' — critical for ALL explore/deepen/transition turns (~70-80%)
@@ -54,21 +55,21 @@ export interface TierConfig {
 }
 
 const STANDARD: TierConfig = {
-  modelRouting: { criticalEscalation: 'selective' },
+  modelRouting: { criticalEscalation: 'minimal' },
   budgets: {
-    bonusTurnCap: 1,
+    bonusTurnCap: 0,
     deepenMaxTurnsPerTopic: 1,
     deepExtraTurnCap: 10,
-    planBaseTurnsDivisor: 55,
-    planBaseTurnsMin: 2,
-    planMaxTurnsBonus: 1,
+    planBaseTurnsDivisor: 70,
+    planBaseTurnsMin: 1,
+    planMaxTurnsBonus: 0,
     deepenFallbackTurns: 1,
-    probeExampleThreshold: 0.28,
-    probeImpactExploreThreshold: 0.42,
-    probeImpactDeepenThreshold: 0.34,
+    probeExampleThreshold: 0.40,
+    probeImpactExploreThreshold: 0.58,
+    probeImpactDeepenThreshold: 0.44,
   },
-  knowledge: { runtimeKnowledgeTimeoutMs: 1400, expandedCues: false },
-  tone: { useLlm: true },
+  knowledge: { runtimeKnowledgeTimeoutMs: 900, expandedCues: false },
+  tone: { useLlm: false },
   naturalness: {
     reflectiveTurns: false,
     crossTopicSynthesis: false,
@@ -78,7 +79,7 @@ const STANDARD: TierConfig = {
     narrativeTransitions: false,
     contextDrivenReordering: false,
   },
-  latency: { mainResponseTimeoutMs: 45_000 },
+  latency: { mainResponseTimeoutMs: 25_000 },
 };
 
 const AVANZATO: TierConfig = {

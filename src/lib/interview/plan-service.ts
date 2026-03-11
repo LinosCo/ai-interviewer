@@ -1,8 +1,9 @@
 import { prisma } from '@/lib/prisma';
 import type { Bot, TopicBlock } from '@prisma/client';
 import type { InterviewPlan, InterviewPlanOverrides, PlanTopic } from './plan-types';
+import { getTierConfig } from '@/config/interview-tiers';
 
-const PLAN_LOGIC_VERSION = '2.0';
+const PLAN_LOGIC_VERSION = '2.1';
 
 export interface PlanBudgetConfig {
   planBaseTurnsDivisor: number;   // seconds per turn (default 45)
@@ -20,6 +21,12 @@ const DEFAULT_BUDGET_CONFIG: PlanBudgetConfig = {
   deepenMaxTurnsPerTopic: 2,
 };
 
+function resolveBudgetConfig(bot: Bot, budgetConfig?: Partial<PlanBudgetConfig>): Partial<PlanBudgetConfig> {
+  if (budgetConfig) return budgetConfig;
+  const interviewerQuality = ((bot as any).interviewerQuality === 'avanzato') ? 'avanzato' : 'standard';
+  return getTierConfig(interviewerQuality).budgets;
+}
+
 function buildTopicsSignature(topics: TopicBlock[]) {
   return topics
     .map(t => `${t.id}:${t.orderIndex}:${t.maxTurns}:${t.label}:${(t.subGoals || []).join('|')}`)
@@ -27,7 +34,7 @@ function buildTopicsSignature(topics: TopicBlock[]) {
 }
 
 export function buildBaseInterviewPlan(bot: Bot, topics: TopicBlock[], budgetConfig?: Partial<PlanBudgetConfig>): InterviewPlan {
-  const cfg = { ...DEFAULT_BUDGET_CONFIG, ...budgetConfig };
+  const cfg = { ...DEFAULT_BUDGET_CONFIG, ...resolveBudgetConfig(bot, budgetConfig) };
   const totalTimeSec = (bot.maxDurationMins || 10) * 60;
   const perTopicTimeSec = totalTimeSec / Math.max(1, topics.length);
   const timeBasedMax = Math.max(1, Math.floor(perTopicTimeSec / cfg.planBaseTurnsDivisor));
@@ -146,7 +153,8 @@ export function mergeInterviewPlan(base: InterviewPlan, overrides?: InterviewPla
 
 export async function getOrCreateInterviewPlan(bot: Bot & { topics: TopicBlock[] }, budgetConfig?: Partial<PlanBudgetConfig>) {
   const topics = [...bot.topics].sort((a, b) => a.orderIndex - b.orderIndex);
-  const basePlan = buildBaseInterviewPlan(bot, topics, budgetConfig);
+  const resolvedBudgetConfig = resolveBudgetConfig(bot, budgetConfig);
+  const basePlan = buildBaseInterviewPlan(bot, topics, resolvedBudgetConfig);
 
   const existing = await prisma.interviewPlan.findUnique({
     where: { botId: bot.id }
@@ -195,7 +203,8 @@ export async function regenerateInterviewPlan(botId: string, budgetConfig?: Part
   });
   if (!bot) throw new Error('Bot not found');
 
-  const basePlan = buildBaseInterviewPlan(bot, bot.topics, budgetConfig);
+  const resolvedBudgetConfig = resolveBudgetConfig(bot, budgetConfig);
+  const basePlan = buildBaseInterviewPlan(bot, bot.topics, resolvedBudgetConfig);
   const existing = await prisma.interviewPlan.findUnique({ where: { botId } });
   const overrides = existing?.overrides as InterviewPlanOverrides | null;
 

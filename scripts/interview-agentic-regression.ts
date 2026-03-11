@@ -21,7 +21,7 @@ type CliArgs = {
     botId: string;
     baseUrl: string;
     intervieweeModel: string;
-    judgeModel: string;
+    judgeModel: string | null;
     maxTurns: number;
     cleanup: boolean;
     outputPrefix: string;
@@ -106,6 +106,7 @@ type RunReport = {
     totalEffectiveSec: number;
     assertions: RunAssertion[];
     judge: JudgeResult | null;
+    runError?: string | null;
     transcript: Array<{
         role: string;
         text: string;
@@ -193,11 +194,16 @@ function parseArgs(): CliArgs {
         return Number.isFinite(parsed) ? Math.floor(parsed) : fallback;
     };
 
+    const rawJudgeModel = String(named.get('--judgeModel') || 'gpt-4.1').trim();
+    const judgeModel = /^(none|off|disabled|false)$/i.test(rawJudgeModel)
+        ? null
+        : rawJudgeModel;
+
     return {
         botId,
         baseUrl: String(named.get('--baseUrl') || 'http://127.0.0.1:3000').trim(),
         intervieweeModel: String(named.get('--intervieweeModel') || 'gpt-4o-mini').trim(),
-        judgeModel: String(named.get('--judgeModel') || 'gpt-4.1').trim(),
+        judgeModel,
         maxTurns: Math.max(8, parseNum(named.get('--maxTurns'), 26)),
         cleanup: parseBool(named.get('--cleanup'), true),
         outputPrefix: String(named.get('--outputPrefix') || 'docs/analysis/interview-agentic-regression').trim(),
@@ -624,11 +630,15 @@ async function generateUserReply(params: {
 
 async function judgeRun(params: {
     openai: ReturnType<typeof createOpenAI>;
-    model: string;
+    model: string | null;
     language: string;
     transcript: Array<{ role: string; text: string; phase?: string; topicLabel?: string }>;
     scenario: ScenarioDefinition;
 }): Promise<JudgeResult | null> {
+    if (!params.model) {
+        return null;
+    }
+
     const schema = z.object({
         overallScore: z.number(),
         interviewerQuality: z.number(),
@@ -636,8 +646,8 @@ async function judgeRun(params: {
         engagement: z.number(),
         control: z.number(),
         verdict: z.enum(['pass', 'warn', 'fail']),
-        strengths: z.array(z.string()).max(5),
-        issues: z.array(z.string()).max(6),
+        strengths: z.array(z.string()),
+        issues: z.array(z.string()),
     });
 
     const transcriptText = params.transcript
@@ -673,8 +683,8 @@ async function judgeRun(params: {
             engagement: clampScore(result.object.engagement),
             control: clampScore(result.object.control),
             verdict: result.object.verdict,
-            strengths: result.object.strengths || [],
-            issues: result.object.issues || [],
+            strengths: (result.object.strengths || []).slice(0, 5),
+            issues: (result.object.issues || []).slice(0, 6),
         };
     } catch (error) {
         console.error(`[judge] Failed for scenario=${params.scenario.id}`, error);
@@ -774,7 +784,7 @@ function buildMarkdownReport(params: {
     botId: string;
     botName: string;
     intervieweeModel: string;
-    judgeModel: string;
+    judgeModel: string | null;
     runs: RunReport[];
 }): string {
     const lines: string[] = [];
@@ -783,7 +793,7 @@ function buildMarkdownReport(params: {
     lines.push(`- botId: ${params.botId}`);
     lines.push(`- botName: ${params.botName}`);
     lines.push(`- intervieweeModel: ${params.intervieweeModel}`);
-    lines.push(`- judgeModel: ${params.judgeModel}`);
+    lines.push(`- judgeModel: ${params.judgeModel || 'disabled'}`);
     lines.push(`- runs: ${params.runs.length}`);
     lines.push('');
 
@@ -802,6 +812,9 @@ function buildMarkdownReport(params: {
         lines.push(`- meanAssistantLatencyMs: ${Math.round(run.meanAssistantLatencyMs)}`);
         lines.push(`- p95AssistantLatencyMs: ${Math.round(run.p95AssistantLatencyMs)}`);
         lines.push(`- totalEffectiveSec: ${run.totalEffectiveSec}`);
+        if (run.runError) {
+            lines.push(`- runError: ${run.runError}`);
+        }
         if (run.judge) {
             lines.push(`- judgeVerdict: ${run.judge.verdict}`);
             lines.push(`- judgeOverallScore: ${run.judge.overallScore}`);
@@ -838,6 +851,37 @@ function buildMarkdownReport(params: {
     }
 
     return lines.join('\n');
+}
+
+function buildJsonReport(params: {
+    bot: { id: string; name: string | null };
+    args: CliArgs;
+    runs: RunReport[];
+    fatalError?: string | null;
+}) {
+    const { bot, args, runs, fatalError } = params;
+
+    return {
+        botId: bot.id,
+        botName: bot.name,
+        generatedAt: new Date().toISOString(),
+        baseUrl: args.baseUrl,
+        intervieweeModel: args.intervieweeModel,
+        judgeModel: args.judgeModel,
+        cleanup: args.cleanup,
+        fatalError: fatalError || null,
+        runs,
+        summary: {
+            totalRuns: runs.length,
+            completedRuns: runs.filter((run) => run.completed).length,
+            meanSemanticScore: mean(runs.map((run) => run.semanticScore)),
+            meanAssistantLatencyMs: mean(runs.map((run) => run.meanAssistantLatencyMs)),
+            p95AssistantLatencyMs: p95(runs.map((run) => run.p95AssistantLatencyMs)),
+            hardPassRuns: runs.filter((run) => run.assertions.every((assertion) => assertion.passed)).length,
+            judgePassRuns: runs.filter((run) => run.judge?.verdict === 'pass').length,
+            runErrors: runs.filter((run) => Boolean(run.runError)).length,
+        },
+    };
 }
 
 async function deleteConversation(prisma: PrismaClient, conversationId: string): Promise<void> {
@@ -1092,6 +1136,29 @@ async function main() {
         const openai = createOpenAI({ apiKey });
         const personas = makePersonas();
         const runs: RunReport[] = [];
+        const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+        const baseName = `${args.outputPrefix}-${slugify(bot.name || bot.id)}-${timestamp}`;
+        const jsonPath = path.resolve(`${baseName}.json`);
+        const markdownPath = path.resolve(`${baseName}.md`);
+        mkdirSync(path.dirname(jsonPath), { recursive: true });
+
+        const persistReports = (fatalError?: string | null) => {
+            const jsonReport = buildJsonReport({
+                bot,
+                args,
+                runs,
+                fatalError,
+            });
+
+            writeFileSync(jsonPath, JSON.stringify(jsonReport, null, 2), 'utf8');
+            writeFileSync(markdownPath, buildMarkdownReport({
+                botId: bot.id,
+                botName: bot.name,
+                intervieweeModel: args.intervieweeModel,
+                judgeModel: args.judgeModel,
+                runs,
+            }), 'utf8');
+        };
 
         console.log('\nInterview Agentic Regression');
         console.log('============================');
@@ -1099,23 +1166,60 @@ async function main() {
         console.log(`botName=${bot.name}`);
         console.log(`baseUrl=${args.baseUrl}`);
         console.log(`intervieweeModel=${args.intervieweeModel}`);
-        console.log(`judgeModel=${args.judgeModel}`);
+        console.log(`judgeModel=${args.judgeModel || 'disabled'}`);
         console.log(`cleanup=${args.cleanup}`);
         console.log(`candidateFields=[${candidateFields.join(', ')}]`);
         console.log(`scenarios=${scenarios.map((scenario) => scenario.id).join(', ')}`);
+        console.log(`report_json=${jsonPath}`);
+        console.log(`report_md=${markdownPath}`);
 
         for (const scenario of scenarios) {
             const persona = pick(rand, personas);
-            const run = await runScenario({
-                prisma,
-                openai,
-                args,
-                bot,
-                persona,
-                scenario,
-                rand,
-            });
+            let run: RunReport;
+
+            try {
+                run = await runScenario({
+                    prisma,
+                    openai,
+                    args,
+                    bot,
+                    persona,
+                    scenario,
+                    rand,
+                });
+            } catch (error) {
+                const message = error instanceof Error ? error.stack || error.message : String(error);
+                console.error(`[scenario] Failed for scenario=${scenario.id}`, error);
+                run = {
+                    scenarioId: scenario.id,
+                    description: scenario.description,
+                    persona: persona.name,
+                    conversationId: 'unknown',
+                    completed: false,
+                    assistantTurns: 0,
+                    userTurns: 0,
+                    phasesSeen: [],
+                    semanticScore: 0,
+                    semanticFailedTurns: 0,
+                    transitionFailures: 0,
+                    consentFailures: 0,
+                    meanAssistantLatencyMs: 0,
+                    p95AssistantLatencyMs: 0,
+                    totalEffectiveSec: 0,
+                    assertions: [{
+                        id: 'scenario_execution',
+                        passed: false,
+                        expected: 'Lo scenario deve completarsi senza errori del runner.',
+                        observed: message,
+                    }],
+                    judge: null,
+                    runError: message,
+                    transcript: [],
+                    candidateProfile: {},
+                };
+            }
             runs.push(run);
+            persistReports();
 
             const hardFailures = run.assertions.filter((assertion) => !assertion.passed).length;
             console.log(
@@ -1124,41 +1228,7 @@ async function main() {
                 `judge=${run.judge?.verdict || 'n/a'} latencyP95=${Math.round(run.p95AssistantLatencyMs)}ms`
             );
         }
-
-        const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-        const baseName = `${args.outputPrefix}-${slugify(bot.name || bot.id)}-${timestamp}`;
-        const jsonPath = path.resolve(`${baseName}.json`);
-        const markdownPath = path.resolve(`${baseName}.md`);
-        mkdirSync(path.dirname(jsonPath), { recursive: true });
-
-        const jsonReport = {
-            botId: bot.id,
-            botName: bot.name,
-            generatedAt: new Date().toISOString(),
-            baseUrl: args.baseUrl,
-            intervieweeModel: args.intervieweeModel,
-            judgeModel: args.judgeModel,
-            cleanup: args.cleanup,
-            runs,
-            summary: {
-                totalRuns: runs.length,
-                completedRuns: runs.filter((run) => run.completed).length,
-                meanSemanticScore: mean(runs.map((run) => run.semanticScore)),
-                meanAssistantLatencyMs: mean(runs.map((run) => run.meanAssistantLatencyMs)),
-                p95AssistantLatencyMs: p95(runs.map((run) => run.p95AssistantLatencyMs)),
-                hardPassRuns: runs.filter((run) => run.assertions.every((assertion) => assertion.passed)).length,
-                judgePassRuns: runs.filter((run) => run.judge?.verdict === 'pass').length,
-            },
-        };
-
-        writeFileSync(jsonPath, JSON.stringify(jsonReport, null, 2), 'utf8');
-        writeFileSync(markdownPath, buildMarkdownReport({
-            botId: bot.id,
-            botName: bot.name,
-            intervieweeModel: args.intervieweeModel,
-            judgeModel: args.judgeModel,
-            runs,
-        }), 'utf8');
+        persistReports();
 
         console.log('\nSummary');
         console.log('-------');
@@ -1171,6 +1241,9 @@ async function main() {
         console.log(`p95AssistantLatencyMs=${Math.round(p95(runs.map((run) => run.p95AssistantLatencyMs)))}`);
         console.log(`report_json=${jsonPath}`);
         console.log(`report_md=${markdownPath}`);
+    } catch (error) {
+        console.error(error);
+        process.exitCode = 1;
     } finally {
         await prisma.$disconnect();
     }

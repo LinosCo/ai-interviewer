@@ -22,6 +22,7 @@ export interface TierConfig {
   budgets: {
     bonusTurnCap: number;
     deepenMaxTurnsPerTopic: number;
+    deepExtraTurnCap: number;
     planBaseTurnsDivisor: number;
     planBaseTurnsMin: number;
     planMaxTurnsBonus: number;
@@ -55,12 +56,13 @@ export interface TierConfig {
 const STANDARD: TierConfig = {
   modelRouting: { criticalEscalation: 'selective' },
   budgets: {
-    bonusTurnCap: 2,
-    deepenMaxTurnsPerTopic: 2,
-    planBaseTurnsDivisor: 45,
+    bonusTurnCap: 1,
+    deepenMaxTurnsPerTopic: 1,
+    deepExtraTurnCap: 10,
+    planBaseTurnsDivisor: 55,
     planBaseTurnsMin: 2,
-    planMaxTurnsBonus: 2,
-    deepenFallbackTurns: 2,
+    planMaxTurnsBonus: 1,
+    deepenFallbackTurns: 1,
     probeExampleThreshold: 0.28,
     probeImpactExploreThreshold: 0.42,
     probeImpactDeepenThreshold: 0.34,
@@ -80,19 +82,20 @@ const STANDARD: TierConfig = {
 };
 
 const AVANZATO: TierConfig = {
-  modelRouting: { criticalEscalation: 'aggressive' },
+  modelRouting: { criticalEscalation: 'selective' },
   budgets: {
-    bonusTurnCap: 4,
-    deepenMaxTurnsPerTopic: 3,
-    planBaseTurnsDivisor: 35,
-    planBaseTurnsMin: 3,
-    planMaxTurnsBonus: 3,
-    deepenFallbackTurns: 3,
+    bonusTurnCap: 2,
+    deepenMaxTurnsPerTopic: 2,
+    deepExtraTurnCap: 10,
+    planBaseTurnsDivisor: 42,
+    planBaseTurnsMin: 2,
+    planMaxTurnsBonus: 2,
+    deepenFallbackTurns: 2,
     probeExampleThreshold: 0.18,
     probeImpactExploreThreshold: 0.30,
     probeImpactDeepenThreshold: 0.24,
   },
-  knowledge: { runtimeKnowledgeTimeoutMs: 1800, expandedCues: true },
+  knowledge: { runtimeKnowledgeTimeoutMs: 1200, expandedCues: true },
   tone: { useLlm: false },
   naturalness: {
     reflectiveTurns: true,
@@ -103,7 +106,7 @@ const AVANZATO: TierConfig = {
     narrativeTransitions: true,
     contextDrivenReordering: true,
   },
-  latency: { mainResponseTimeoutMs: 35_000 },
+  latency: { mainResponseTimeoutMs: 30_000 },
 };
 
 export function getTierConfig(quality?: string | null): TierConfig {

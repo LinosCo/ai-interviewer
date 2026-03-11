@@ -71,6 +71,7 @@ export interface InterviewStateLike {
   extensionReturnTopicIndex?: number | null;
   extensionReturnTurnInTopic?: number | null;
   extensionOfferAttempts?: number;
+  deepTurnBudgetRemaining?: number | null;
   deepTopicOrder?: string[];
   deepTurnsByTopic?: Record<string, number>;
   uncoveredTopics?: string[];
@@ -103,6 +104,7 @@ export interface DeepOfferPhaseParams {
   shouldCollectData: boolean;
   maxDurationMins: number;
   effectiveSec: number;
+  deepExtraTurnCap: number;
   deps: DeepOfferPhaseDeps;
 }
 
@@ -113,7 +115,7 @@ export interface DeepOfferPhaseResult {
 }
 
 export async function runDeepOfferPhase(params: DeepOfferPhaseParams): Promise<DeepOfferPhaseResult> {
-  const { state, nextState, botTopics, canonicalMessages, lastUserMessage, shouldCollectData, maxDurationMins, effectiveSec, deps } = params;
+  const { state, nextState, botTopics, canonicalMessages, lastUserMessage, shouldCollectData, maxDurationMins, effectiveSec, deepExtraTurnCap, deps } = params;
   let supervisorInsight: SupervisorInsight = deps.buildDeepOfferInsight(state);
   let nextTopicId: string | undefined;
 
@@ -124,6 +126,7 @@ export async function runDeepOfferPhase(params: DeepOfferPhaseParams): Promise<D
 
   const moveToDataCollection = () => {
     nextState.extensionOfferAttempts = 0;
+    nextState.deepTurnBudgetRemaining = null;
     nextState.extensionReturnPhase = null;
     nextState.extensionReturnTopicIndex = null;
     nextState.extensionReturnTurnInTopic = null;
@@ -175,6 +178,7 @@ export async function runDeepOfferPhase(params: DeepOfferPhaseParams): Promise<D
     const returnPhase = state.extensionReturnPhase || 'DEEPEN';
     nextState.deepAccepted = true;
     nextState.extensionOfferAttempts = 0;
+    nextState.deepTurnBudgetRemaining = deepExtraTurnCap;
     nextState.extensionReturnPhase = null;
     nextState.extensionReturnTopicIndex = null;
     nextState.extensionReturnTurnInTopic = null;

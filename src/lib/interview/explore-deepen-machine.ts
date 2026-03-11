@@ -213,7 +213,8 @@ export function handleDeepenPhase({
     language,
     maxDurationMins,
     effectiveSec,
-    deepenMaxTurnsPerTopic = 2
+    deepenMaxTurnsPerTopic = 2,
+    deepExtraTurnCap = 10
 }: {
     state: InterviewState;
     currentTopic: TopicBlock;
@@ -222,12 +223,25 @@ export function handleDeepenPhase({
     maxDurationMins: number;
     effectiveSec: number;
     deepenMaxTurnsPerTopic?: number;
+    deepExtraTurnCap?: number;
 }): ExploreDeepResult {
     const nextState: Partial<InterviewState> = { ...state };
     let supervisorInsight: SupervisorInsight = { status: 'DEEPENING' };
     let nextTopicId: string | undefined;
 
     const uncoveredTopics = state.uncoveredTopics || [];
+    const deepBudgetRemaining = state.deepAccepted === true
+        ? Math.max(0, Number(state.deepTurnBudgetRemaining ?? deepExtraTurnCap))
+        : null;
+
+    if (deepBudgetRemaining === 0) {
+        nextState.phase = 'DATA_COLLECTION';
+        nextState.deepTurnBudgetRemaining = 0;
+        supervisorInsight = { status: 'DATA_COLLECTION' };
+        console.log('🧱 [DEEPEN] Extra-turn budget exhausted. Moving to DATA_COLLECTION.');
+        return { nextState, supervisorInsight };
+    }
+
     if (uncoveredTopics.length === 0) {
         // All topics covered, move to DATA_COLLECTION
         nextState.phase = 'DATA_COLLECTION';
@@ -259,6 +273,9 @@ export function handleDeepenPhase({
     } else {
         // Continue on current topic
         nextState.turnInTopic = (state.turnInTopic || 0) + 1;
+        if (deepBudgetRemaining !== null) {
+            nextState.deepTurnBudgetRemaining = Math.max(0, deepBudgetRemaining - 1);
+        }
         const insight = state.topicKeyInsights[currentTopic.id];
         supervisorInsight = { status: 'DEEPENING', engagingSnippet: insight };
         console.log(`📊 [DEEPEN] "${currentTopic.label}" turn ${nextState.turnInTopic}/${maxTurnsForDeepen}`);

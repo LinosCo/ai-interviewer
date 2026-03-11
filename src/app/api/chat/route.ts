@@ -141,6 +141,7 @@ export interface InterviewState {
     extensionReturnTopicIndex?: number | null;
     extensionReturnTurnInTopic?: number | null;
     extensionOfferAttempts?: number;
+    deepTurnBudgetRemaining?: number | null;
     runtimeInterviewKnowledge?: RuntimeInterviewKnowledge | null;
     runtimeInterviewKnowledgeSignature?: string | null;
     cilState?: CILState | null;
@@ -599,6 +600,7 @@ export async function POST(req: Request) {
             extensionReturnTopicIndex: rawMetadata.extensionReturnTopicIndex ?? null,
             extensionReturnTurnInTopic: rawMetadata.extensionReturnTurnInTopic ?? null,
             extensionOfferAttempts: rawMetadata.extensionOfferAttempts ?? 0,
+            deepTurnBudgetRemaining: rawMetadata.deepTurnBudgetRemaining ?? null,
             runtimeInterviewKnowledge: rawMetadata.runtimeInterviewKnowledge ?? null,
             runtimeInterviewKnowledgeSignature: rawMetadata.runtimeInterviewKnowledgeSignature ?? null,
             cilState: rawMetadata.cilState ?? null,
@@ -805,6 +807,7 @@ export async function POST(req: Request) {
                     shouldCollectData,
                     maxDurationMins,
                     effectiveSec,
+                    deepExtraTurnCap: tierConfig.budgets.deepExtraTurnCap,
                     deps: {
                         checkUserIntent: async (userMessage: string, context: 'deep_offer') =>
                             checkUserIntent(userMessage, openAIKey, language, context, { onUsage: collectLlmUsage }),
@@ -853,7 +856,8 @@ export async function POST(req: Request) {
                     language,
                     maxDurationMins,
                     effectiveSec,
-                    deepenMaxTurnsPerTopic: tierConfig.budgets.deepenMaxTurnsPerTopic
+                    deepenMaxTurnsPerTopic: tierConfig.budgets.deepenMaxTurnsPerTopic,
+                    deepExtraTurnCap: tierConfig.budgets.deepExtraTurnCap
                 });
 
                 // Merge deepen result into nextState
@@ -1539,6 +1543,11 @@ hard_rules:
                 ? `\n\n## OBBLIGATORIO: La risposta deve terminare con un punto interrogativo (?).`
                 : `\n\n## MANDATORY: Your response MUST end with a question mark (?).`;
         }
+        if (nextState.phase === 'EXPLORE' || nextState.phase === 'DEEPEN') {
+            systemPrompt += (language || '').toLowerCase().startsWith('it')
+                ? `\n\n## STILE RISPOSTA\nMantieni la risposta visibile breve: massimo 2 frasi. Se fai un aggancio, fallo in una frase corta e concreta, poi fai una sola domanda specifica. Evita formule ripetitive come "è interessante" o "è un punto importante" se non aggiungono informazione.`
+                : `\n\n## RESPONSE STYLE\nKeep the visible response short: at most 2 sentences. If you bridge, do it in one short concrete sentence, then ask one specific question. Avoid repetitive fillers like "that's interesting" or "that's an important point" unless they add information.`;
+        }
 
         // ====================================================================
         // 5. GENERATE RESPONSE
@@ -1554,7 +1563,10 @@ hard_rules:
             messagesForAI = canonicalMessages.slice(-6).map((m: any) => ({ role: m.role, content: m.content }));
         } else if (supervisorInsight?.status === 'DEEP_OFFER_ASK') {
             // Bigger context: the AI needs interview history to craft a genuine, contextualised offer
-            messagesForAI = canonicalMessages.slice(-20).map((m: any) => ({ role: m.role, content: m.content }));
+            messagesForAI = canonicalMessages.slice(-16).map((m: any) => ({ role: m.role, content: m.content }));
+        } else if (nextState.phase === 'EXPLORE' || nextState.phase === 'DEEPEN') {
+            const topicWindow = interviewerQuality === 'avanzato' ? 14 : 10;
+            messagesForAI = canonicalMessages.slice(-topicWindow).map((m: any) => ({ role: m.role, content: m.content }));
         }
 
         const criticalTurnRouting = shouldUseCriticalModelForTopicTurn({

@@ -78,6 +78,7 @@ import {
     enforceDeepOfferQuestion,
 } from '@/lib/interview/question-generator';
 import { completeInterview } from '@/lib/interview/interview-completion';
+import { alignStateWithCompletionGuard } from '@/lib/interview/completion-guard-alignment';
 import { ToneAnalyzer } from '@/lib/tone/tone-analyzer';
 import { buildToneAdaptationPrompt } from '@/lib/tone/tone-prompt-adapter';
 import { getTierConfig } from '@/config/interview-tiers';
@@ -2253,6 +2254,10 @@ hard_rules:
             if (completionGuardAction === 'ask_consent') {
                 flowTelemetry.completionGuardIntercepted = true;
                 flowTelemetry.completionBlockedForConsent = true;
+                supervisorInsight = alignStateWithCompletionGuard({
+                    action: 'ask_consent',
+                    nextState
+                });
                 // Guardrail: never allow completion before an explicit contact-consent step.
                 console.log(`⚠️ [SUPERVISOR] Bot said INTERVIEW_COMPLETED before consent resolution. OVERRIDING with consent question.`);
                 const enforcedSystem = `Write one short linking sentence acknowledging interview closure, then ask a single yes/no question asking permission to collect contact details.`;
@@ -2265,6 +2270,11 @@ hard_rules:
             } else if (completionGuardAction === 'ask_missing_field' && missingFieldForCompletion) {
                 flowTelemetry.completionGuardIntercepted = true;
                 flowTelemetry.completionBlockedForMissingField = true;
+                supervisorInsight = alignStateWithCompletionGuard({
+                    action: 'ask_missing_field',
+                    nextState,
+                    missingField: missingFieldForCompletion
+                });
                 // Guardrail: consent granted but fields still missing -> ask the specific field, not completion.
                 const fieldLabel = getFieldLabel(missingFieldForCompletion, language);
                 console.log(`⚠️ [SUPERVISOR] Bot said INTERVIEW_COMPLETED but "${missingFieldForCompletion}" is still missing. OVERRIDING with field question.`);

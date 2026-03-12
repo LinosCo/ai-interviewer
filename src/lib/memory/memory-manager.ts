@@ -157,6 +157,7 @@ export class MemoryManager {
      */
     static formatForPrompt(memory: ConversationMemoryData, options?: {
         language?: string;
+        compact?: boolean;
         topicMemories?: Array<{
             label: string;
             engagementScore: number;
@@ -167,28 +168,35 @@ export class MemoryManager {
     }): string {
         const sections: string[] = [];
         const isItalian = (options?.language || 'en').toLowerCase().startsWith('it');
+        const compact = options?.compact === true;
 
         // Fatti raccolti
         if (memory.factsCollected.length > 0) {
             const factsText = memory.factsCollected
                 .filter(f => f.confidence >= 0.6)
+                .slice(0, compact ? 3 : 8)
                 .map(f => `• ${f.content}`)
                 .join('\n');
 
             sections.push(isItalian ? `## INFORMAZIONI GIÀ RACCOLTE
 ${factsText}
 
-⚠️ NON chiedere nuovamente informazioni su questi temi. Se devi approfondire, parti da quello che già sai.` : `## FACTS ALREADY COLLECTED
+${compact
+                    ? `⚠️ Non chiedere di nuovo questi elementi.`
+                    : `⚠️ NON chiedere nuovamente informazioni su questi temi. Se devi approfondire, parti da quello che già sai.`}` : `## FACTS ALREADY COLLECTED
 ${factsText}
 
-⚠️ Do NOT ask again about these topics. If you need to deepen, start from what you know.`);
+${compact
+                    ? `⚠️ Do not ask again about these points.`
+                    : `⚠️ Do NOT ask again about these topics. If you need to deepen, start from what you know.`}`);
         }
 
         // Topic esplorati + KEY INSIGHTS (NEW)
         if (memory.topicsExplored.length > 0 || options?.topicMemories) {
             const topicMemories = options?.topicMemories || [];
             const topicsText = memory.topicsExplored
-                .map((t, idx) => {
+                .slice(0, compact ? 3 : 8)
+                .map((t) => {
                     const memData = topicMemories.find(m => m.label === t.topicLabel);
                     const engagementLabel = memData?.engagementScore ? (memData.engagementScore > 0.6 ? 'HIGH' : memData.engagementScore > 0.3 ? 'MEDIUM' : 'LOW') : '';
                     const coverage = memData ? `${memData.coveredSubGoals}/${memData.totalSubGoals}` : `${t.subGoalsCovered.length}/${t.subGoalsCovered.length}`;
@@ -211,13 +219,17 @@ ${topicsText}`);
         if (memory.userFatigueScore > 0.5) {
             sections.push(isItalian ? `## ⚠️ ATTENZIONE: SEGNALI DI FATICA
 L'utente mostra segni di stanchezza (score: ${memory.userFatigueScore.toFixed(2)}).
-- Fai domande più brevi e dirette
+${compact
+                    ? `- Accorcia e semplifica la prossima domanda`
+                    : `- Fai domande più brevi e dirette
 - Considera di saltare approfondimenti non essenziali
-- Valuta se concludere prima del previsto` : `## ⚠️ FATIGUE SIGNALS DETECTED
+- Valuta se concludere prima del previsto`}` : `## ⚠️ FATIGUE SIGNALS DETECTED
 User shows signs of fatigue (score: ${memory.userFatigueScore.toFixed(2)}).
-- Ask shorter, more direct questions
+${compact
+                    ? `- Shorten and simplify the next question`
+                    : `- Ask shorter, more direct questions
 - Skip non-essential deepening
-- Consider early closure`);
+- Consider early closure`}`);
         }
 
         // Stile comunicativo
@@ -236,9 +248,9 @@ User shows signs of fatigue (score: ${memory.userFatigueScore.toFixed(2)}).
 
             sections.push(isItalian ? `## STILE COMUNICATIVO RILEVATO
 ${toneInstructions[memory.detectedTone] || ''}
-${memory.usesEmoji ? 'L\'utente usa emoji, puoi usarle occasionalmente.' : ''}` : `## DETECTED COMMUNICATION STYLE
+${compact ? '' : memory.usesEmoji ? 'L\'utente usa emoji, puoi usarle occasionalmente.' : ''}` : `## DETECTED COMMUNICATION STYLE
 ${toneInstructions[memory.detectedTone] || ''}
-${memory.usesEmoji ? 'User uses emoji, you can use them occasionally.' : ''}`);
+${compact ? '' : memory.usesEmoji ? 'User uses emoji, you can use them occasionally.' : ''}`);
         }
 
         return sections.join('\n\n');

@@ -42,12 +42,12 @@ export class PromptBuilder {
         const safeTone = sanitizeConfig(bot.tone);
 
         const knowledgeText = (bot.knowledgeSources || [])
-            .slice(0, 3)
+            .slice(0, isAvanzato ? 2 : 3)
             .map((source) => {
                 const title = sanitizeConfig(source.title || 'Untitled', 200);
                 const preview = sanitizeConfig(
                     String(source.content || '').replace(/\s+/g, ' ').trim(),
-                    260
+                    isAvanzato ? 120 : 260
                 );
                 return `- ${title}: ${preview}${preview.length >= 260 ? '…' : ''}`;
             })
@@ -62,6 +62,42 @@ export class PromptBuilder {
 - You are a professional qualitative researcher. Do not accept superficial answers.
 - Seek unexpected insights and connections between themes.
 - Never numeric scales ("from 1 to 10"). Always open questions that produce narrative.` : '';
+
+        if (isAvanzato) {
+            return isItalian ? `
+## IDENTITÀ
+Sei "${safeName}", ricercatore qualitativo professionista.
+Missione: "${safeGoal}"
+Pubblico: "${safeAudience}"
+Tono: "${safeTone || 'Professionale, naturale, empatico'}"
+
+## REGOLE BASE
+- Una sola domanda per turno.
+- Niente contatti fuori da DATA_COLLECTION.
+- Niente promo, link o CTA.
+- Evita ripetizioni letterali e opener rituali.
+- Cerca insight reali, ma con domande brevi e specifiche.
+
+## KNOWLEDGE BASE
+${knowledgeText}
+`.trim() : `
+## IDENTITY
+You are "${safeName}", a professional qualitative researcher.
+Mission: "${safeGoal}"
+Audience: "${safeAudience}"
+Tone: "${safeTone || 'Professional, natural, empathetic'}"
+
+## BASE RULES
+- One question per turn.
+- No contact requests outside DATA_COLLECTION.
+- No promo, links, or CTA.
+- Avoid literal repetition and ritual openers.
+- Seek real insight, but keep questions brief and specific.
+
+## KNOWLEDGE BASE
+${knowledgeText}
+`.trim();
+        }
 
         return isItalian ? `
 ## IDENTITÀ & REGOLE BASE
@@ -175,9 +211,11 @@ ${knowledgeText}
     private static buildInterviewContextBlock(
         conversation: Conversation,
         bot: Bot & { topics: TopicBlock[] },
-        effectiveDurationSeconds: number
+        effectiveDurationSeconds: number,
+        interviewerQuality?: string
     ): string {
         const isItalian = String(bot.language || 'en').toLowerCase().startsWith('it');
+        const isAvanzato = interviewerQuality === 'avanzato';
         const maxMins = bot.maxDurationMins || 10;
         const elapsedMins = Math.floor(effectiveDurationSeconds / 60);
         const remainingMins = maxMins - elapsedMins;
@@ -210,11 +248,20 @@ ${knowledgeText}
         }
 
         // Topic roadmap (labels are admin-configured)
-        const topicLines = allTopics.map((t, idx) => {
-            const marker = idx === currentTopicIndex ? '→ ' : '  ';
-            const safeLabel = sanitizeConfig(t.label, 200);
-            return `${marker}${idx + 1}. ${safeLabel}`;
-        }).join('\n');
+        const topicLines = isAvanzato
+            ? [
+                currentTopicIndex >= 0 && allTopics[currentTopicIndex]
+                    ? `${isItalian ? 'Corrente' : 'Current'}: ${sanitizeConfig(allTopics[currentTopicIndex].label, 200)}`
+                    : null,
+                currentTopicIndex + 1 < allTopics.length && allTopics[currentTopicIndex + 1]
+                    ? `${isItalian ? 'Prossimo' : 'Next'}: ${sanitizeConfig(allTopics[currentTopicIndex + 1].label, 200)}`
+                    : null
+            ].filter(Boolean).join('\n')
+            : allTopics.map((t, idx) => {
+                const marker = idx === currentTopicIndex ? '→ ' : '  ';
+                const safeLabel = sanitizeConfig(t.label, 200);
+                return `${marker}${idx + 1}. ${safeLabel}`;
+            }).join('\n');
 
         return isItalian ? `
 ## CONTESTO INTERVISTA
@@ -262,23 +309,13 @@ ${topicLines}
             const isAvanzatoLocal = ((bot as any)?.interviewerQuality || 'standard') === 'avanzato';
 
             const metodoIT = isAvanzatoLocal
-                ? `Metodo: Ascolta prima, poi rispondi in modo autentico. Non fare echo letterale.
-- Sintetizza in modo originale ciò che l'utente ha detto (non ripetere le sue parole)
-- Se rilevante, collega a qualcosa detto in turni precedenti ("Prima hai accennato a... — c'è un filo comune?")
-- Formula un'ipotesi e testala con la domanda ("Sembra che... — è così?")
-- Puoi deviare dal sub-goal pianificato per inseguire un segnale significativo
-Obiettivo: qualità dell'insight, non copertura sistematica.`
+                ? `Metodo: agganciati a un dettaglio concreto e fai una sola domanda distintiva sul sub-goal più promettente.`
                 : `Metodo: Apri con un riconoscimento genuino e specifico di ciò che l'utente ha appena detto (es. riprendi un dettaglio concreto o un'emozione espressa). Poi poni UNA sola domanda esplorativa focalizzata sul sub-goal.
 Evita aperture rituali generiche ("Interessante!", "Capisco", "Grazie per averlo condiviso") senza contenuto specifico.
 Ascolta segnali di profondità: esempi concreti, impatti vissuti, vincoli, contraddizioni.`;
 
             const methodEN = isAvanzatoLocal
-                ? `Method: Listen first, then respond authentically. Do not echo the user's words back literally.
-- Synthesize what the user said in your own words
-- If relevant, connect to something said in previous turns ("You mentioned earlier... — is there a connection?")
-- Form a hypothesis and test it with your question ("It seems like... — is that right?")
-- You may deviate from the planned sub-goal to follow a significant signal
-Goal: quality of insight, not systematic coverage.`
+                ? `Method: hook into one concrete detail and ask a single distinctive question on the most promising sub-goal.`
                 : `Method: Open with a genuine, specific acknowledgment of what the user just said (e.g. reflect a concrete detail or emotion they expressed). Then ask ONE exploratory question focused on the sub-goal.
 Avoid generic ritual openers ("Interesting!", "I see", "Thanks for sharing") without specific content.
 Listen for depth signals: concrete examples, lived impacts, constraints, contradictions.`;
@@ -487,11 +524,18 @@ Brief connection, then ONE exploratory question.
      * BLOCK 4: MEMORY
      * Delegates to MemoryManager.formatForPrompt()
      */
-    private static async buildMemoryBlock(conversation: Conversation): Promise<string | null> {
+    private static async buildMemoryBlock(
+        conversation: Conversation,
+        interviewerQuality?: string,
+        language?: string
+    ): Promise<string | null> {
         try {
             const memory = await MemoryManager.get(conversation.id);
             if (memory && memory.factsCollected.length > 0) {
-                return MemoryManager.formatForPrompt(memory);
+                return MemoryManager.formatForPrompt(memory, {
+                    language: language || 'en',
+                    compact: interviewerQuality === 'avanzato'
+                });
             }
         } catch (error) {
             console.error('[PromptBuilder] Memory fetch failed:', error);
@@ -508,39 +552,47 @@ Brief connection, then ONE exploratory question.
         currentTopic: PlanTopic | null,
         interviewPlan?: InterviewPlan,
         manualGuide?: string,
-        language?: string
+        language?: string,
+        interviewerQuality?: string
     ): string {
         if (!currentTopic) return '';
+        const isAvanzato = interviewerQuality === 'avanzato';
+        const isItalian = String(language || 'en').toLowerCase().startsWith('it');
 
         // Manual knowledge takes precedence
         if (manualGuide) {
+            if (isAvanzato) {
+                const compactGuide = sanitize(String(manualGuide || '').replace(/\s+/g, ' ').trim(), 420);
+                return isItalian
+                    ? `## GUIDA TOPIC\n${compactGuide}`
+                    : `## TOPIC GUIDE\n${compactGuide}`;
+            }
             return manualGuide;
         }
 
         // Use plan intelligence (LLM-generated content — sanitize as user data)
         if (currentTopic.interpretationCues && currentTopic.significanceSignals && currentTopic.probeAngles) {
-            const cues = currentTopic.interpretationCues.filter(Boolean).map(c => sanitize(c, 300));
-            const signals = currentTopic.significanceSignals.filter(Boolean).map(s => sanitize(s, 300));
-            const angles = currentTopic.probeAngles.filter(Boolean).map(a => sanitize(a, 300));
+            const cues = currentTopic.interpretationCues.filter(Boolean).map(c => sanitize(c, isAvanzato ? 160 : 300));
+            const signals = currentTopic.significanceSignals.filter(Boolean).map(s => sanitize(s, isAvanzato ? 160 : 300));
+            const angles = currentTopic.probeAngles.filter(Boolean).map(a => sanitize(a, isAvanzato ? 160 : 300));
 
             if (cues.length === 0 && signals.length === 0 && angles.length === 0) {
                 return '';
             }
 
-            const isItalian = String(language || 'en').toLowerCase().startsWith('it');
             const parts = [];
 
             if (cues.length > 0) {
                 const label = isItalian ? 'INTERPRETAZIONI:' : 'INTERPRETATIONS:';
-                parts.push(`${label} ${cues.join(' | ')}`);
+                parts.push(`${label} ${(isAvanzato ? cues.slice(0, 1) : cues).join(' | ')}`);
             }
             if (signals.length > 0) {
                 const label = isItalian ? 'SEGNALI:' : 'SIGNALS:';
-                parts.push(`${label} ${signals.join(' | ')}`);
+                parts.push(`${label} ${(isAvanzato ? signals.slice(0, 1) : signals).join(' | ')}`);
             }
             if (angles.length > 0) {
                 const label = isItalian ? 'ANGOLI:' : 'ANGLES:';
-                parts.push(`${label} ${angles.join(' | ')}`);
+                parts.push(`${label} ${(isAvanzato ? angles.slice(0, 1) : angles).join(' | ')}`);
             }
 
             return `\n## KNOWLEDGE - ${sanitizeConfig(currentTopic.label, 200)}\n${parts.join('\n')}`;
@@ -594,20 +646,20 @@ Brief connection, then ONE exploratory question.
         parts.push(this.buildIdentityBlock(bot, interviewerQuality));
 
         // Block 2: Interview Context
-        parts.push(this.buildInterviewContextBlock(conversation, bot, effectiveDurationSeconds));
+        parts.push(this.buildInterviewContextBlock(conversation, bot, effectiveDurationSeconds, interviewerQuality));
 
         // Block 3: Topic Focus
         parts.push(this.buildTopicFocusBlock(currentTopic, bot.topics, supervisorInsight, bot));
 
         // Block 4: Memory
-        const memory = await this.buildMemoryBlock(conversation);
+        const memory = await this.buildMemoryBlock(conversation, interviewerQuality, bot.language);
         if (memory) parts.push(memory);
 
         // Block 5: Knowledge
         const planTopic = currentTopic && interviewPlan
             ? (interviewPlan.explore?.topics || []).find(t => t.topicId === currentTopic.id)
             : null;
-        const knowledge = this.buildKnowledgeBlock(planTopic || null, interviewPlan, manualKnowledgeGuide, bot.language);
+        const knowledge = this.buildKnowledgeBlock(planTopic || null, interviewPlan, manualKnowledgeGuide, bot.language, interviewerQuality);
         if (knowledge) parts.push(knowledge);
 
         // Block 5.5: Avanzato Qualitative Methodology (only for avanzato)

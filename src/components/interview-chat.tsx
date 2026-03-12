@@ -1193,7 +1193,8 @@ export default function InterviewChat({
                                         keyboardAnchorTimersRef.current.forEach((timerId) => window.clearTimeout(timerId));
                                         keyboardAnchorTimersRef.current = [];
                                     }}
-                                    disabled={isLoading}
+                                    readOnly={isLoading}
+                                    aria-disabled={isLoading}
                                     placeholder={t.typePlaceholder}
                                     rows={1}
                                     inputMode="text"
@@ -1208,6 +1209,7 @@ export default function InterviewChat({
                                 <div className="pb-2 md:pb-3 pr-2 md:pr-3 flex items-end">
                                     <button
                                         type="submit"
+                                        onPointerDown={(e) => e.preventDefault()}
                                         disabled={!input.trim() || isLoading}
                                         className="w-10 h-10 md:w-12 md:h-12 rounded-xl flex items-center justify-center text-white shadow-lg transition-all transform disabled:opacity-50 disabled:scale-95 disabled:shadow-none hover:scale-105 active:scale-95"
                                         style={{

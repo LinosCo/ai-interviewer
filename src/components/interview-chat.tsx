@@ -187,6 +187,7 @@ export default function InterviewChat({
     const [isInputFocused, setIsInputFocused] = useState(false);
     const [mobileKeyboardInset, setMobileKeyboardInset] = useState(0);
     const [visualViewportHeight, setVisualViewportHeight] = useState<number | null>(null);
+    const [visualViewportWidth, setVisualViewportWidth] = useState<number | null>(null);
     const [footerHeight, setFooterHeight] = useState(isEmbedded ? 96 : 148);
     const chatViewportRef = useRef<HTMLDivElement>(null);
     const questionCardRef = useRef<HTMLDivElement>(null);
@@ -253,6 +254,7 @@ export default function InterviewChat({
 
             setMobileKeyboardInset(normalizedInset);
             setVisualViewportHeight(viewportHeight);
+            setVisualViewportWidth(Math.round(viewport.width));
 
             const restHeight = visualViewportRestHeightRef.current;
             const heightDrop = restHeight ? Math.max(0, restHeight - viewportHeight) : 0;
@@ -558,6 +560,10 @@ export default function InterviewChat({
     const progress = Math.min((elapsedMinutes / estimatedMinutes) * 100, 95);
     const supportsVisualViewport = typeof window !== 'undefined' && Boolean(window.visualViewport);
     const effectiveViewportHeight = !isEmbedded && visualViewportHeight ? Math.round(visualViewportHeight) : null;
+    const effectiveViewportWidth = !isEmbedded
+        ? (visualViewportWidth ?? (typeof window !== 'undefined' ? window.innerWidth : null))
+        : null;
+    const isMobileViewport = Boolean(effectiveViewportWidth && effectiveViewportWidth < 768);
     const visualViewportHeightDrop = visualViewportHeight && visualViewportRestHeightRef.current
         ? Math.max(0, visualViewportRestHeightRef.current - visualViewportHeight)
         : 0;
@@ -611,7 +617,7 @@ export default function InterviewChat({
         ? footerHeight
         : footerHeight + (isMobileKeyboardOpen ? 18 : 34);
     const questionScrollMarginBottomPx = footerHeight + (isMobileKeyboardOpen ? 20 : 28);
-    const showDockedQuestion = isMobileKeyboardOpen && Boolean(currentQuestion) && !isLoading && !isCompleted;
+    const showDockedQuestion = isMobileViewport && isInputFocused && Boolean(currentQuestion) && !isLoading && !isCompleted;
     const dockedQuestionBottomPx = footerBottomOffsetPx + footerHeight + 8;
     const dockedQuestionMaxHeightPx = effectiveViewportHeight
         ? Math.max(120, Math.min(280, Math.round(effectiveViewportHeight * 0.32)))

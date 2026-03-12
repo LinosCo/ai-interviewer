@@ -186,7 +186,11 @@ export default function InterviewChat({
     const [consentGiven, setConsentGiven] = useState(false);
     const [isInputFocused, setIsInputFocused] = useState(false);
     const [mobileKeyboardInset, setMobileKeyboardInset] = useState(0);
+    const [visualViewportHeight, setVisualViewportHeight] = useState<number | null>(null);
+    const [footerHeight, setFooterHeight] = useState(isEmbedded ? 96 : 148);
+    const chatViewportRef = useRef<HTMLDivElement>(null);
     const questionCardRef = useRef<HTMLDivElement>(null);
+    const footerRef = useRef<HTMLDivElement>(null);
 
     // Warm-up State
     const [showWarmup, setShowWarmup] = useState(false);
@@ -238,6 +242,7 @@ export default function InterviewChat({
         const handleViewportChange = () => {
             const inset = Math.max(0, Math.round(window.innerHeight - viewport.height - viewport.offsetTop));
             setMobileKeyboardInset(inset > 96 ? inset : 0);
+            setVisualViewportHeight(Math.round(viewport.height));
         };
 
         handleViewportChange();
@@ -249,6 +254,33 @@ export default function InterviewChat({
             viewport.removeEventListener('scroll', handleViewportChange);
         };
     }, [isEmbedded]);
+
+    useEffect(() => {
+        if (typeof window === 'undefined' || isEmbedded) return;
+        const footerEl = footerRef.current;
+        if (!footerEl) return;
+
+        const updateFooterHeight = () => {
+            const rect = footerEl.getBoundingClientRect();
+            setFooterHeight(Math.round(rect.height));
+        };
+
+        updateFooterHeight();
+
+        if (typeof ResizeObserver === 'undefined') {
+            window.addEventListener('resize', updateFooterHeight);
+            return () => window.removeEventListener('resize', updateFooterHeight);
+        }
+
+        const observer = new ResizeObserver(() => updateFooterHeight());
+        observer.observe(footerEl);
+        window.addEventListener('resize', updateFooterHeight);
+
+        return () => {
+            observer.disconnect();
+            window.removeEventListener('resize', updateFooterHeight);
+        };
+    }, [isEmbedded, isCompleted, isLoading, input, language, showCompletionActions]);
 
     const handleStart = async () => {
         setShowLanding(false);
@@ -504,14 +536,24 @@ export default function InterviewChat({
     const estimatedMinutes = parseInt(estimatedDuration?.replace(/\D/g, '') || '10');
     const progress = Math.min((elapsedMinutes / estimatedMinutes) * 100, 95);
     const supportsVisualViewport = typeof window !== 'undefined' && Boolean(window.visualViewport);
+    const effectiveViewportHeight = !isEmbedded && visualViewportHeight ? Math.round(visualViewportHeight) : null;
 
     useEffect(() => {
-        if (!currentQuestionId || !isInputFocused || (!mobileKeyboardInset && supportsVisualViewport)) return;
+        if (!currentQuestionId || !chatViewportRef.current || !questionCardRef.current) return;
+        if (!isInputFocused || (!mobileKeyboardInset && supportsVisualViewport)) return;
         const timer = window.setTimeout(() => {
-            questionCardRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
+            const viewportEl = chatViewportRef.current;
+            const cardEl = questionCardRef.current;
+            if (!viewportEl || !cardEl) return;
+            const questionAnchorOffsetPx = footerHeight + 20;
+            const targetTop = Math.max(
+                0,
+                cardEl.offsetTop + cardEl.offsetHeight - viewportEl.clientHeight + questionAnchorOffsetPx
+            );
+            viewportEl.scrollTo({ top: targetTop, behavior: 'smooth' });
         }, 120);
         return () => window.clearTimeout(timer);
-    }, [currentQuestionId, isInputFocused, mobileKeyboardInset, supportsVisualViewport]);
+    }, [currentQuestionId, footerHeight, isInputFocused, mobileKeyboardInset, supportsVisualViewport]);
 
     // Dynamic Background logic
     const brandColor = primaryColor || colors.amber;
@@ -521,12 +563,13 @@ export default function InterviewChat({
     const inputTopPaddingClass = isEmbedded
         ? 'pt-4'
         : isMobileKeyboardOpen
-            ? 'pt-1 md:pt-12'
+            ? 'pt-2 md:pt-12'
             : 'pt-8 md:pt-12';
     const footerBottomOffsetPx = isEmbedded ? 0 : mobileKeyboardInset;
     const chatBottomPaddingPx = isEmbedded
-        ? 96
-        : (isMobileKeyboardOpen ? 160 : 224) + footerBottomOffsetPx;
+        ? footerHeight
+        : footerHeight + (isMobileKeyboardOpen ? 18 : 34);
+    const questionScrollMarginBottomPx = footerHeight + (isMobileKeyboardOpen ? 20 : 28);
 
 
 
@@ -717,7 +760,9 @@ export default function InterviewChat({
             className="min-h-screen flex flex-col font-sans relative overflow-x-hidden"
             style={{
                 background: mainBackground,
-                color: colors.text
+                color: colors.text,
+                minHeight: effectiveViewportHeight ? `${effectiveViewportHeight}px` : undefined,
+                height: effectiveViewportHeight ? `${effectiveViewportHeight}px` : undefined
             }}
         >
             {/* Dynamic Background Elements */}
@@ -800,7 +845,8 @@ export default function InterviewChat({
 
             {/* Chat Area */}
             <div
-                className={`flex-1 flex flex-col items-center ${chatVerticalAlignClass} px-4 ${isEmbedded ? 'pt-16' : 'pt-32 md:pt-40'} w-full max-w-4xl mx-auto relative z-10`}
+                ref={chatViewportRef}
+                className={`flex-1 min-h-0 overflow-y-auto overscroll-contain flex flex-col items-center ${chatVerticalAlignClass} px-4 ${isEmbedded ? 'pt-16' : 'pt-32 md:pt-40'} w-full max-w-4xl mx-auto relative z-10`}
                 style={{ paddingBottom: `${chatBottomPaddingPx}px` }}
             >
 
@@ -892,6 +938,7 @@ export default function InterviewChat({
                             exit={{ opacity: 0, y: -10, scale: 0.99 }}
                             transition={{ duration: 0.3, ease: [0.23, 1, 0.32, 1] }}
                             className="w-full max-w-2xl"
+                            style={{ scrollMarginBottom: `${questionScrollMarginBottomPx}px` }}
                             ref={questionCardRef}
                         >
                             {/* Bot Question Card */}
@@ -977,6 +1024,7 @@ export default function InterviewChat({
 
             {/* Input Area or Completion Screen */}
             <div
+                ref={footerRef}
                 className={`${isEmbedded ? 'absolute' : 'fixed'} bottom-0 left-0 right-0 z-50 p-3 md:p-6 ${isEmbedded ? 'pb-4' : 'pb-4 md:pb-8'} bg-gradient-to-t from-white via-white/95 to-transparent ${inputTopPaddingClass}`}
                 style={isEmbedded ? undefined : { bottom: `${footerBottomOffsetPx}px` }}
             >

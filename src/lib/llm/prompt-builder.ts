@@ -33,134 +33,115 @@ export class PromptBuilder {
     ): string {
         const isAvanzato = interviewerQuality === 'avanzato';
         const isItalian = String(bot.language || 'en').toLowerCase().startsWith('it');
-        const qualityTier = (bot as any).interviewerQuality || 'standard';
 
         // Sanitize admin-configured fields before prompt interpolation
         const safeName = sanitizeConfig(bot.name);
         const safeGoal = sanitizeConfig(bot.researchGoal);
         const safeAudience = sanitizeConfig(bot.targetAudience);
         const safeTone = sanitizeConfig(bot.tone);
+        const knowledgePreviewLimit = isAvanzato ? 120 : 180;
 
         const knowledgeText = (bot.knowledgeSources || [])
-            .slice(0, 3)
+            .slice(0, isAvanzato ? 2 : 3)
             .map((source) => {
                 const title = sanitizeConfig(source.title || 'Untitled', 200);
                 const preview = sanitizeConfig(
                     String(source.content || '').replace(/\s+/g, ' ').trim(),
-                    260
+                    knowledgePreviewLimit
                 );
-                return `- ${title}: ${preview}${preview.length >= 260 ? '…' : ''}`;
+                return `- ${title}: ${preview}${preview.length >= knowledgePreviewLimit ? '…' : ''}`;
             })
             .join('\n');
 
-        const avanzatoIT = isAvanzato ? `
-- Sei un ricercatore qualitativo professionista. Non accettare risposte superficiali.
-- Cerca insight inaspettati e connessioni tra temi.
-- Mai scale numeriche ("da 1 a 10"). Sempre domande aperte che producano narrazione.` : '';
-
-        const avanzatoEN = isAvanzato ? `
-- You are a professional qualitative researcher. Do not accept superficial answers.
-- Seek unexpected insights and connections between themes.
-- Never numeric scales ("from 1 to 10"). Always open questions that produce narrative.` : '';
-
-        return isItalian ? `
-## IDENTITÀ & REGOLE BASE
-Sei "${safeName}", una ricerca qualitativa.
-Ruolo: ${isAvanzato ? 'Ricercatore qualitativo professionista' : 'Intervistatore esperienza'}
+        if (isAvanzato) {
+            return isItalian ? `
+## IDENTITÀ
+Sei "${safeName}", ricercatore qualitativo professionista.
 Missione: "${safeGoal}"
 Pubblico: "${safeAudience}"
-Tono: "${safeTone || 'Amichevole, professionale, empatico'}"
-Lingua: Italiano
+Tono: "${safeTone || 'Professionale, naturale, empatico'}"
 
-## TUA IDENTITÀ
-- Sei "${safeName}", conducendo una ricerca qualitativa.
-- La persona con cui parli è l'INTERVISTATO — che condivide esperienza e opinioni.
-- Non assumere il loro ruolo (partecipante, creatore, cliente) a meno che esplicitamente dichiarato.
-- Non dire "Il tuo progetto" a meno che specificamente configurato.
-- Raccogli la loro prospettiva onesta su i temi dell'intervista.${avanzatoIT}
-
-## REGOLE FONDAMENTALI (SEMPRE)
-1. Una sola domanda per turno.
-2. Nessun contatto fuori da DATA_COLLECTION.
-3. Nessuna promo, link, o CTA.
-4. Ogni risposta termina con "?".
-5. Mantieni lingua e tono consistenti.
-6. No a ripetizioni letterali di domande precedenti.
-
-## FLUSSO INTERVISTA
-- ESPLORAZIONE: copri i topic previsti con domande mirate, un sub-goal per volta.
-- APPROFONDIMENTO: approfondisci solo i segnali ad alto valore (esempi, impatti, vincoli).
-- DATA_COLLECTION: chiedi consenso e poi raccogli i campi uno alla volta.
-- Chiusura: solo quando il supervisor lo indica.
-
-## PRINCIPI OPERATIVI
-1. Mantieni tono naturale e concreto, senza formule rituali.
-2. In ogni turno: apri con un riconoscimento breve e specifico di ciò che l'utente ha detto, poi poni UNA domanda.
-3. Se emerge un segnale forte (impatto, esempio, vincolo), approfondiscilo prima di cambiare focus.
-4. Evita ripetizioni letterali della domanda precedente.
-5. No promo/link/CTA; no contatti fuori da DATA_COLLECTION.
-${qualityTier === 'avanzato' ? `
-## MODALITÀ QUALITATIVA PROFONDA
-Sei in modalità intervista qualitativa avanzata. Il tuo obiettivo non è coprire sistematicamente i topic ma ottenere insight autentici e profondi.
-- Puoi deviare dall'ordine pianificato se emerge un segnale significativo
-- Sintetizza quanto detto nei turni precedenti ("Prima hai detto X, ora parli di Y — sembra che...")
-- Formula ipotesi e chiedi conferma ("Mi sembra che per te Z sia più importante di W — è così?")
-- Cerca la contraddizione produttiva: metti in dialogo affermazioni diverse dell'utente
-- Priorità: qualità dell'insight, non copertura sistematica dei topic
-- NON usare scale numeriche (1-10, NPS, stelle, rating): cerca la narrazione e il significato, non il dato
-` : ''}
-## ESEMPI DI BRIDGE (STILE)
-Utente: "Siamo curiosi, ci interessa il rapporto col mercato."
-AI: "Mi colpisce il focus sul mercato. In quali momenti questo pesa di più nelle vostre decisioni?"
-
-Utente: "Non ho capito, intendi clienti o fornitori?"
-AI: "Intendo il rapporto con i clienti finali. Quale parte oggi è più difficile da gestire?"
+## REGOLE BASE
+- Una sola domanda per turno.
+- Niente contatti fuori da DATA_COLLECTION.
+- Niente promo, link o CTA.
+- Evita ripetizioni letterali e opener rituali.
+- Cerca insight reali, ma con domande brevi e specifiche.
 
 ## KNOWLEDGE BASE
 ${knowledgeText}
 `.trim() : `
-## IDENTITY & BASE RULES
-You are "${safeName}", conducting qualitative research.
-Role: ${isAvanzato ? 'Professional qualitative researcher' : 'Expert interviewer'}
+## IDENTITY
+You are "${safeName}", a professional qualitative researcher.
 Mission: "${safeGoal}"
 Audience: "${safeAudience}"
-Tone: "${safeTone || 'Friendly, professional, empathetic'}"
-Language: English
+Tone: "${safeTone || 'Professional, natural, empathetic'}"
 
-## YOUR IDENTITY
-- You are "${safeName}", conducting qualitative research.
-- The person you are talking to is the INTERVIEWEE — someone sharing their experience and opinions.
-- DO NOT assume their role (participant, creator, customer) unless explicitly stated.
-- DO NOT say "Your project" unless specifically configured.
-- Gather their honest perspective on the interview topics.${avanzatoEN}
+## BASE RULES
+- One question per turn.
+- No contact requests outside DATA_COLLECTION.
+- No promo, links, or CTA.
+- Avoid literal repetition and ritual openers.
+- Seek real insight, but keep questions brief and specific.
 
-## FUNDAMENTAL RULES (ALWAYS)
-1. One question per turn.
-2. No contact requests outside DATA_COLLECTION.
-3. No promo, links, or CTA.
-4. Every response ends with "?".
-5. Keep language and tone consistent.
-6. Avoid literal repetition of previous questions.
+## KNOWLEDGE BASE
+${knowledgeText}
+`.trim();
+        }
 
-## INTERVIEW FLOW
-- EXPLORING: cover planned topics with focused questions, one sub-goal at a time.
-- DEEPENING: deepen only high-value signals (examples, impact, constraints).
-- DATA_COLLECTION: ask consent then collect fields one at a time.
-- Closure: only when the supervisor indicates it.
+        return isItalian ? `
+## IDENTITÀ
+Sei "${safeName}", intervistatore professionale per una ricerca.
+Missione: "${safeGoal}"
+Pubblico: "${safeAudience}"
+Tono: "${safeTone || 'Naturale, professionale, empatico'}"
 
-## OPERATING PRINCIPLES
-1. Keep the tone natural and concrete, without ritual phrases.
-2. Each turn: open with a brief, specific acknowledgment of what the user said, then ask ONE question.
-3. If a strong signal appears (impact, example, constraint), deepen it before shifting focus.
-4. Avoid literal repetition of the previous question.
-5. No promo/link/CTA; no contact requests outside DATA_COLLECTION.
+## REGOLE BASE
+- Una sola domanda per turno.
+- Niente contatti fuori da DATA_COLLECTION.
+- Niente promo, link o CTA.
+- Mantieni il tono naturale ed evita opener rituali o ripetizioni letterali.
+- Preferisci domande concrete, comparabili e facili da aggregare.
 
-## BRIDGE STYLE EXAMPLES
-User: "We're curious about the market relationship."
-AI: "Your market focus stands out. In which decisions does this matter most today?"
+## FLOW
+- ESPLORAZIONE: copri i topic con una domanda mirata sul sub-goal più utile.
+- APPROFONDIMENTO: approfondisci solo se emerge un esempio, un impatto o un vincolo davvero utile.
+- DATA_COLLECTION: chiedi consenso e poi raccogli un campo per volta.
+- CHIUSURA: solo quando il supervisor lo indica.
 
-User: "I didn't understand, do you mean clients or suppliers?"
-AI: "I mean end clients. Which part is hardest to manage right now?"
+## MODALITÀ STANDARD
+- Resta conversazionale, ma diagnostico.
+- Dopo una risposta già utile, avanza invece di aprire piste opzionali.
+- Preferisci pratica attuale, frequenza, ostacolo, owner, canale, metrica, esempio recente o prossimo passo.
+- Evita allargamenti troppo astratti o filosofici.
+
+## KNOWLEDGE BASE
+${knowledgeText}
+`.trim() : `
+## IDENTITY
+You are "${safeName}", a professional research interviewer.
+Mission: "${safeGoal}"
+Audience: "${safeAudience}"
+Tone: "${safeTone || 'Natural, professional, empathetic'}"
+
+## BASE RULES
+- One question per turn.
+- No contact requests outside DATA_COLLECTION.
+- No promo, links, or CTA.
+- Keep the tone natural and avoid ritual openers or literal repetition.
+- Prefer concrete, comparable questions that are easy to aggregate.
+
+## FLOW
+- EXPLORING: cover topics with one focused question on the most useful sub-goal.
+- DEEPENING: deepen only when a real example, impact, or constraint appears.
+- DATA_COLLECTION: ask consent, then collect one field at a time.
+- CLOSURE: only when the supervisor indicates it.
+
+## STANDARD MODE
+- Stay conversational, but diagnostic.
+- Once the user gives a usable answer, advance instead of opening optional threads.
+- Prefer current practice, frequency, blocker, owner, channel, metric, recent example, or next step.
+- Avoid abstract or philosophical widening unless clearly useful.
 
 ## KNOWLEDGE BASE
 ${knowledgeText}
@@ -175,9 +156,11 @@ ${knowledgeText}
     private static buildInterviewContextBlock(
         conversation: Conversation,
         bot: Bot & { topics: TopicBlock[] },
-        effectiveDurationSeconds: number
+        effectiveDurationSeconds: number,
+        interviewerQuality?: string
     ): string {
         const isItalian = String(bot.language || 'en').toLowerCase().startsWith('it');
+        const isAvanzato = interviewerQuality === 'avanzato';
         const maxMins = bot.maxDurationMins || 10;
         const elapsedMins = Math.floor(effectiveDurationSeconds / 60);
         const remainingMins = maxMins - elapsedMins;
@@ -210,11 +193,24 @@ ${knowledgeText}
         }
 
         // Topic roadmap (labels are admin-configured)
-        const topicLines = allTopics.map((t, idx) => {
-            const marker = idx === currentTopicIndex ? '→ ' : '  ';
-            const safeLabel = sanitizeConfig(t.label, 200);
-            return `${marker}${idx + 1}. ${safeLabel}`;
-        }).join('\n');
+        const useCompactRoadmap = isAvanzato || allTopics.length > 3;
+        const topicLines = useCompactRoadmap
+            ? [
+                currentTopicIndex >= 0 && allTopics[currentTopicIndex]
+                    ? `${isItalian ? 'Corrente' : 'Current'}: ${sanitizeConfig(allTopics[currentTopicIndex].label, 200)}`
+                    : null,
+                currentTopicIndex + 1 < allTopics.length && allTopics[currentTopicIndex + 1]
+                    ? `${isItalian ? 'Prossimo' : 'Next'}: ${sanitizeConfig(allTopics[currentTopicIndex + 1].label, 200)}`
+                    : null,
+                allTopics.length > 0
+                    ? `${isItalian ? 'Restanti' : 'Remaining'}: ${Math.max(0, allTopics.length - Math.max(currentTopicIndex, 0) - 1)}`
+                    : null
+            ].filter(Boolean).join('\n')
+            : allTopics.map((t, idx) => {
+                const marker = idx === currentTopicIndex ? '→ ' : '  ';
+                const safeLabel = sanitizeConfig(t.label, 200);
+                return `${marker}${idx + 1}. ${safeLabel}`;
+            }).join('\n');
 
         return isItalian ? `
 ## CONTESTO INTERVISTA
@@ -262,26 +258,12 @@ ${topicLines}
             const isAvanzatoLocal = ((bot as any)?.interviewerQuality || 'standard') === 'avanzato';
 
             const metodoIT = isAvanzatoLocal
-                ? `Metodo: Ascolta prima, poi rispondi in modo autentico. Non fare echo letterale.
-- Sintetizza in modo originale ciò che l'utente ha detto (non ripetere le sue parole)
-- Se rilevante, collega a qualcosa detto in turni precedenti ("Prima hai accennato a... — c'è un filo comune?")
-- Formula un'ipotesi e testala con la domanda ("Sembra che... — è così?")
-- Puoi deviare dal sub-goal pianificato per inseguire un segnale significativo
-Obiettivo: qualità dell'insight, non copertura sistematica.`
-                : `Metodo: Apri con un riconoscimento genuino e specifico di ciò che l'utente ha appena detto (es. riprendi un dettaglio concreto o un'emozione espressa). Poi poni UNA sola domanda esplorativa focalizzata sul sub-goal.
-Evita aperture rituali generiche ("Interessante!", "Capisco", "Grazie per averlo condiviso") senza contenuto specifico.
-Ascolta segnali di profondità: esempi concreti, impatti vissuti, vincoli, contraddizioni.`;
+                ? `Metodo: agganciati a un dettaglio concreto e fai una sola domanda distintiva sul sub-goal più promettente.`
+                : `Metodo: agganciati a un dettaglio concreto appena emerso e fai UNA sola domanda diagnostica, chiara e confrontabile sul sub-goal più utile. Evita opener rituali e domande troppo ampie.`;
 
             const methodEN = isAvanzatoLocal
-                ? `Method: Listen first, then respond authentically. Do not echo the user's words back literally.
-- Synthesize what the user said in your own words
-- If relevant, connect to something said in previous turns ("You mentioned earlier... — is there a connection?")
-- Form a hypothesis and test it with your question ("It seems like... — is that right?")
-- You may deviate from the planned sub-goal to follow a significant signal
-Goal: quality of insight, not systematic coverage.`
-                : `Method: Open with a genuine, specific acknowledgment of what the user just said (e.g. reflect a concrete detail or emotion they expressed). Then ask ONE exploratory question focused on the sub-goal.
-Avoid generic ritual openers ("Interesting!", "I see", "Thanks for sharing") without specific content.
-Listen for depth signals: concrete examples, lived impacts, constraints, contradictions.`;
+                ? `Method: hook into one concrete detail and ask a single distinctive question on the most promising sub-goal.`
+                : `Method: hook into one concrete detail that just emerged and ask ONE clear, comparable diagnostic question on the most useful sub-goal. Avoid ritual openers and overly broad prompts.`;
 
             return isItalian ? `
 ## FASE: ESPLORAZIONE${bonus}
@@ -487,11 +469,22 @@ Brief connection, then ONE exploratory question.
      * BLOCK 4: MEMORY
      * Delegates to MemoryManager.formatForPrompt()
      */
-    private static async buildMemoryBlock(conversation: Conversation): Promise<string | null> {
+    private static async buildMemoryBlock(
+        conversation: Conversation,
+        interviewerQuality?: string,
+        language?: string
+    ): Promise<string | null> {
         try {
             const memory = await MemoryManager.get(conversation.id);
             if (memory && memory.factsCollected.length > 0) {
-                return MemoryManager.formatForPrompt(memory);
+                return MemoryManager.formatForPrompt(memory, {
+                    language: language || 'en',
+                    compactStyle: interviewerQuality === 'avanzato'
+                        ? 'avanzato'
+                        : interviewerQuality === 'standard'
+                            ? 'standard'
+                            : undefined
+                });
             }
         } catch (error) {
             console.error('[PromptBuilder] Memory fetch failed:', error);
@@ -508,39 +501,47 @@ Brief connection, then ONE exploratory question.
         currentTopic: PlanTopic | null,
         interviewPlan?: InterviewPlan,
         manualGuide?: string,
-        language?: string
+        language?: string,
+        interviewerQuality?: string
     ): string {
         if (!currentTopic) return '';
+        const isAvanzato = interviewerQuality === 'avanzato';
+        const isItalian = String(language || 'en').toLowerCase().startsWith('it');
+        const guideLimit = isAvanzato ? 420 : 700;
+        const cueLimit = isAvanzato ? 1 : 2;
+        const cueTextLimit = isAvanzato ? 160 : 220;
 
         // Manual knowledge takes precedence
         if (manualGuide) {
-            return manualGuide;
+            const compactGuide = sanitize(String(manualGuide || '').replace(/\s+/g, ' ').trim(), guideLimit);
+            return isItalian
+                ? `## GUIDA TOPIC\n${compactGuide}`
+                : `## TOPIC GUIDE\n${compactGuide}`;
         }
 
         // Use plan intelligence (LLM-generated content — sanitize as user data)
         if (currentTopic.interpretationCues && currentTopic.significanceSignals && currentTopic.probeAngles) {
-            const cues = currentTopic.interpretationCues.filter(Boolean).map(c => sanitize(c, 300));
-            const signals = currentTopic.significanceSignals.filter(Boolean).map(s => sanitize(s, 300));
-            const angles = currentTopic.probeAngles.filter(Boolean).map(a => sanitize(a, 300));
+            const cues = currentTopic.interpretationCues.filter(Boolean).map(c => sanitize(c, cueTextLimit));
+            const signals = currentTopic.significanceSignals.filter(Boolean).map(s => sanitize(s, cueTextLimit));
+            const angles = currentTopic.probeAngles.filter(Boolean).map(a => sanitize(a, cueTextLimit));
 
             if (cues.length === 0 && signals.length === 0 && angles.length === 0) {
                 return '';
             }
 
-            const isItalian = String(language || 'en').toLowerCase().startsWith('it');
             const parts = [];
 
             if (cues.length > 0) {
                 const label = isItalian ? 'INTERPRETAZIONI:' : 'INTERPRETATIONS:';
-                parts.push(`${label} ${cues.join(' | ')}`);
+                parts.push(`${label} ${cues.slice(0, cueLimit).join(' | ')}`);
             }
             if (signals.length > 0) {
                 const label = isItalian ? 'SEGNALI:' : 'SIGNALS:';
-                parts.push(`${label} ${signals.join(' | ')}`);
+                parts.push(`${label} ${signals.slice(0, cueLimit).join(' | ')}`);
             }
             if (angles.length > 0) {
                 const label = isItalian ? 'ANGOLI:' : 'ANGLES:';
-                parts.push(`${label} ${angles.join(' | ')}`);
+                parts.push(`${label} ${angles.slice(0, cueLimit).join(' | ')}`);
             }
 
             return `\n## KNOWLEDGE - ${sanitizeConfig(currentTopic.label, 200)}\n${parts.join('\n')}`;
@@ -558,24 +559,18 @@ Brief connection, then ONE exploratory question.
 
         return isItalian ? `
 ## MODALITÀ QUALITATIVA PROFONDA
-- 1-2 frasi di riconoscimento riflessivo che agganciano un dettaglio specifico della risposta.
-- Mai "Interessante!" come opener. Riformula mostrando comprensione della sfumatura.
-- Mai scale numeriche ("da 1 a 10", "quanto è importante da 1 a 5"). Chiedi SEMPRE con domande aperte che producano racconto ed esperienza.
-- Se l'utente esita ("non so", "forse", "dipende"): sonda gentilmente "Cosa ti frena dal dare una risposta netta?"
-- Se l'utente ha un'affermazione forte ("sicuramente", "sempre", "mai"): gioca l'avvocato del diavolo con garbo.
-- Cross-topic: se rilevi un collegamento con un tema precedente, evidenzialo brevemente.
-- Transizioni: NO "Passiamo a..." — usa ponti narrativi naturali legati all'ultimo contenuto.
-- Se noti risposte sempre più brevi (fatica), accorcia le tue domande e considera di avanzare.
+- Riconosci una sfumatura concreta della risposta, senza opener vuoti come "Interessante!".
+- Preferisci domande aperte, narrative e specifiche; evita scale numeriche.
+- Se l'utente esita, chiarisci o rendi la domanda più concreta.
+- Se emerge un collegamento con un tema precedente, integralo brevemente.
+- Se noti fatica o risposte brevi, accorcia e semplifica.
 `.trim() : `
 ## DEEP QUALITATIVE MODE
-- 1-2 sentences of reflective acknowledgment that hook into a specific detail from the response.
-- Never "Interesting!" as an opener. Rephrase showing understanding of the nuance.
-- Never numeric scales ("from 1 to 10", "how important from 1 to 5"). ALWAYS use open questions that produce narrative and experience.
-- If the user hesitates ("I don't know", "maybe", "it depends"): gently probe "What holds you back from giving a clear answer?"
-- If the user makes a strong assertion ("definitely", "always", "never"): gently play devil's advocate.
-- Cross-topic: if you detect a connection with a previous theme, briefly highlight it.
-- Transitions: NO "Let's move on to..." — use natural narrative bridges tied to the last content.
-- If you notice increasingly shorter answers (fatigue), shorten your questions and consider advancing.
+- Acknowledge one concrete nuance from the answer; avoid empty openers like "Interesting!".
+- Prefer open, narrative, specific questions; avoid numeric scales.
+- If the user hesitates, clarify or make the question more concrete.
+- If a cross-topic link emerges, weave it in briefly.
+- If the user shows fatigue, shorten and simplify.
 `.trim();
     }
 
@@ -600,20 +595,20 @@ Brief connection, then ONE exploratory question.
         parts.push(this.buildIdentityBlock(bot, interviewerQuality));
 
         // Block 2: Interview Context
-        parts.push(this.buildInterviewContextBlock(conversation, bot, effectiveDurationSeconds));
+        parts.push(this.buildInterviewContextBlock(conversation, bot, effectiveDurationSeconds, interviewerQuality));
 
         // Block 3: Topic Focus
         parts.push(this.buildTopicFocusBlock(currentTopic, bot.topics, supervisorInsight, bot));
 
         // Block 4: Memory
-        const memory = await this.buildMemoryBlock(conversation);
+        const memory = await this.buildMemoryBlock(conversation, interviewerQuality, bot.language);
         if (memory) parts.push(memory);
 
         // Block 5: Knowledge
         const planTopic = currentTopic && interviewPlan
             ? (interviewPlan.explore?.topics || []).find(t => t.topicId === currentTopic.id)
             : null;
-        const knowledge = this.buildKnowledgeBlock(planTopic || null, interviewPlan, manualKnowledgeGuide, bot.language);
+        const knowledge = this.buildKnowledgeBlock(planTopic || null, interviewPlan, manualKnowledgeGuide, bot.language, interviewerQuality);
         if (knowledge) parts.push(knowledge);
 
         // Block 5.5: Avanzato Qualitative Methodology (only for avanzato)

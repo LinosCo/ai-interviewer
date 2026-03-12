@@ -172,6 +172,64 @@ function isLikelySitemapInput(rawUrl: string): boolean {
     }
 }
 
+function extractDnsHostFromError(error: unknown): string | null {
+    const message = error instanceof Error ? error.message : String(error || '');
+    const match = message.match(/ENOTFOUND\s+([a-z0-9.-]+)/i) || message.match(/getaddrinfo\s+ENOTFOUND\s+([a-z0-9.-]+)/i);
+    return match?.[1] || null;
+}
+
+function isDnsResolutionError(error: unknown): boolean {
+    const message = error instanceof Error ? error.message : String(error || '');
+    return /ENOTFOUND|getaddrinfo/i.test(message);
+}
+
+function getWwwFallbackUrl(rawUrl: string): string | null {
+    try {
+        const parsed = new URL(rawUrl);
+        if (!['http:', 'https:'].includes(parsed.protocol)) return null;
+        if (parsed.hostname.startsWith('www.')) return null;
+        parsed.hostname = `www.${parsed.hostname}`;
+        return parsed.toString();
+    } catch {
+        return null;
+    }
+}
+
+function stripWww(hostname: string): string {
+    return hostname.replace(/^www\./i, '').toLowerCase();
+}
+
+function alignUrlToCanonicalHost(rawUrl: string, canonicalHost: string): string {
+    try {
+        const parsed = new URL(rawUrl);
+        if (stripWww(parsed.hostname) === stripWww(canonicalHost)) {
+            parsed.hostname = canonicalHost;
+            return parsed.toString();
+        }
+        return rawUrl;
+    } catch {
+        return rawUrl;
+    }
+}
+
+async function fetchWithDnsFallback(
+    url: string,
+    options: RequestInit
+): Promise<{ response: Response; resolvedUrl: string }> {
+    try {
+        const response = await fetch(url, options);
+        return { response, resolvedUrl: url };
+    } catch (error) {
+        if (!isDnsResolutionError(error)) throw error;
+
+        const fallbackUrl = getWwwFallbackUrl(url);
+        if (!fallbackUrl) throw error;
+
+        console.warn(`[scraping] DNS resolution failed for ${url}. Retrying with ${fallbackUrl}`);
+        const response = await fetch(fallbackUrl, options);
+        return { response, resolvedUrl: fallbackUrl };
+    }
+}
 export async function scrapeUrl(url: string): Promise<ScrapedContent> {
     try {
         if (isLikelySitemapInput(url)) {
@@ -188,7 +246,7 @@ export async function scrapeUrl(url: string): Promise<ScrapedContent> {
             throw new Error('Sitemap provided but no URLs were discovered');
         }
 
-        const response = await fetch(url, {
+        const { response, resolvedUrl } = await fetchWithDnsFallback(url, {
             headers: {
                 'User-Agent': 'Mozilla/5.0 (compatible; BrandAuditBot/1.0)',
                 'Accept-Language': 'it-IT,it;q=0.9,en;q=0.8'
@@ -228,11 +286,19 @@ export async function scrapeUrl(url: string): Promise<ScrapedContent> {
             title,
             content,
             description,
-            url
+            url: resolvedUrl
         };
     } catch (error: unknown) {
         const message = error instanceof Error ? error.message : 'Unknown scraping error';
-        console.error(`Scraping error for ${url}:`, error);
+        const dnsHost = extractDnsHostFromError(error);
+        if (dnsHost) {
+            const dnsError = new Error(`Failed to scrape URL: DNS lookup failed for ${dnsHost}`) as Error & { code?: string; hostname?: string };
+            dnsError.code = 'ENOTFOUND';
+            dnsError.hostname = dnsHost;
+            console.warn(`[scraping] DNS lookup failed for ${dnsHost} (${url})`);
+            throw dnsError;
+        }
+        console.warn(`Scraping error for ${url}:`, error);
         throw new Error(`Failed to scrape URL: ${message}`);
     }
 }
@@ -399,27 +465,35 @@ export async function scrapeWebsiteWithSubpages(
         }
     }
 
-    // 1. Scrape homepage first
-    const response = await fetch(homepageUrl, {
+    // 1. Scrape homepage first (with DNS fallback + canonical host resolution)
+    const { response: homepageResponse, resolvedUrl: resolvedHomepageUrl } = await fetchWithDnsFallback(homepageUrl, {
         headers: {
             'User-Agent': 'Mozilla/5.0 (compatible; BrandAuditBot/1.0)',
             'Accept-Language': 'it-IT,it;q=0.9,en;q=0.8'
         }
     });
 
-    if (!response.ok) {
-        throw new Error(`Failed to fetch URL: ${response.status} ${response.statusText}`);
+    if (!homepageResponse.ok) {
+        throw new Error(`Failed to fetch URL: ${homepageResponse.status} ${homepageResponse.statusText}`);
     }
 
-    const homepageHtml = await response.text();
-    const homepage = await scrapeUrl(homepageUrl);
+    const homepageHtml = await homepageResponse.text();
+    const homepage = await scrapeUrl(resolvedHomepageUrl);
     console.log(`[scraping] Homepage scraped: ${homepage.title}`);
+
+    let canonicalHost = '';
+    try {
+        canonicalHost = new URL(homepage.url).hostname;
+    } catch {
+        canonicalHost = '';
+    }
 
     // 2. Scrape additional URLs first (user-specified, high priority)
     const subpages: ScrapedPage[] = [];
     const scrapedUrls = new Set<string>(); // Track already scraped URLs
     const normalizedHomepageUrl = normalizeComparableUrl(homepageUrl);
     if (normalizedHomepageUrl) scrapedUrls.add(normalizedHomepageUrl);
+    const blockedHosts = new Set<string>();
 
     if (additionalUrls.length > 0) {
         console.log(`[scraping] Scraping ${additionalUrls.length} additional user-specified URLs...`);
@@ -429,8 +503,18 @@ export async function scrapeWebsiteWithSubpages(
             // Stagger requests
             await new Promise(resolve => setTimeout(resolve, i * 200));
 
+            const normalizedAdditionalUrl = canonicalHost
+                ? alignUrlToCanonicalHost(additionalUrl.url, canonicalHost)
+                : additionalUrl.url;
+
+            let additionalHost = '';
+            try { additionalHost = new URL(normalizedAdditionalUrl).hostname; } catch { /* ignore */ }
+            if (additionalHost && blockedHosts.has(additionalHost)) {
+                continue;
+            }
+
             try {
-                const content = await scrapeUrl(additionalUrl.url);
+                const content = await scrapeUrl(normalizedAdditionalUrl);
                 console.log(`[scraping] Scraped custom page: ${additionalUrl.label} - ${content.title}`);
 
                 subpages.push({
@@ -438,9 +522,13 @@ export async function scrapeWebsiteWithSubpages(
                     pageType: 'custom',
                     customLabel: additionalUrl.label
                 });
-                const normalizedAdditional = normalizeComparableUrl(additionalUrl.url);
+                const normalizedAdditional = normalizeComparableUrl(normalizedAdditionalUrl);
                 if (normalizedAdditional) scrapedUrls.add(normalizedAdditional);
             } catch (error) {
+                const maybeDnsError = error as { code?: string };
+                if (maybeDnsError?.code === 'ENOTFOUND' && additionalHost) {
+                    blockedHosts.add(additionalHost);
+                }
                 console.warn(`[scraping] Failed to scrape additional URL ${additionalUrl.url}:`, error);
             }
         }
@@ -513,8 +601,18 @@ export async function scrapeWebsiteWithSubpages(
             await new Promise(resolve => setTimeout(resolve, index * 200));
 
             try {
-                const content = await scrapeUrl(link);
-                const pageType = getPageType(link);
+                const normalizedLink = canonicalHost
+                    ? alignUrlToCanonicalHost(link, canonicalHost)
+                    : link;
+
+                let linkHost = '';
+                try { linkHost = new URL(normalizedLink).hostname; } catch { /* ignore */ }
+                if (linkHost && blockedHosts.has(linkHost)) {
+                    return null;
+                }
+
+                const content = await scrapeUrl(normalizedLink);
+                const pageType = getPageType(normalizedLink);
 
                 console.log(`[scraping] Scraped subpage: ${pageType} - ${content.title}`);
 
@@ -523,6 +621,15 @@ export async function scrapeWebsiteWithSubpages(
                     pageType
                 } as ScrapedPage;
             } catch (error) {
+                const maybeDnsError = error as { code?: string };
+                try {
+                    const linkHost = new URL(link).hostname;
+                    if (maybeDnsError?.code === 'ENOTFOUND') {
+                        blockedHosts.add(linkHost);
+                    }
+                } catch {
+                    // ignore malformed link
+                }
                 console.warn(`[scraping] Failed to scrape ${link}:`, error);
                 return null;
             }

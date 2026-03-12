@@ -133,7 +133,7 @@ const scenarios: Scenario[] = [
       {
         label: PHASE_LABELS[1],
         icon: PHASE_ICONS[1],
-        text: 'Il Copilot produce una sintesi strategica con priorita, pattern e raccomandazioni basate su 90 interviste.',
+        text: 'Il Copilot produce una sintesi strategica con priorità, pattern e raccomandazioni basate su 90 interviste.',
       },
       {
         label: PHASE_LABELS[2],

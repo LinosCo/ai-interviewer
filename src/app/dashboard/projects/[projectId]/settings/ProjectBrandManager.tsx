@@ -109,11 +109,12 @@ export function ProjectBrandManager({ projectId, projectName }: ProjectBrandMana
 
     const totalBrands = brands.length + unlinkedBrands.length;
     const canAddMore = maxBrands === -1 || totalBrands < maxBrands;
+    const maxBrandsLabel = maxBrands === -1 ? 'Illimitati' : String(maxBrands);
 
     return (
         <Card>
             <CardHeader>
-                <div className="flex items-center justify-between">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                     <div>
                         <CardTitle className="flex items-center gap-2">
                             <Eye className="w-5 h-5 text-purple-600" />
@@ -123,8 +124,8 @@ export function ProjectBrandManager({ projectId, projectName }: ProjectBrandMana
                             Gestisci i brand monitorati per questo progetto
                         </CardDescription>
                     </div>
-                    <Badge variant="outline" className="text-sm">
-                        {totalBrands} / {maxBrands} brand
+                    <Badge variant="outline" className="w-fit text-sm">
+                        {totalBrands} / {maxBrandsLabel} brand
                     </Badge>
                 </div>
             </CardHeader>
@@ -146,46 +147,48 @@ export function ProjectBrandManager({ projectId, projectName }: ProjectBrandMana
                             {brands.map(brand => (
                                 <div
                                     key={brand.id}
-                                    className="flex items-center justify-between p-3 bg-purple-50 rounded-lg border border-purple-100"
+                                    className="rounded-lg border border-purple-100 bg-purple-50 p-3"
                                 >
-                                    <div className="flex items-center gap-3">
-                                        <div className="p-2 bg-purple-100 rounded-lg">
-                                            <Eye className="w-4 h-4 text-purple-600" />
+                                    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                                        <div className="flex min-w-0 items-center gap-3">
+                                            <div className="rounded-lg bg-purple-100 p-2">
+                                                <Eye className="w-4 h-4 text-purple-600" />
+                                            </div>
+                                            <div className="min-w-0">
+                                                <p className="truncate font-medium text-gray-900">{brand.brandName}</p>
+                                                <p className="truncate text-xs text-gray-500">{brand.category}</p>
+                                            </div>
                                         </div>
-                                        <div>
-                                            <p className="font-medium text-gray-900">{brand.brandName}</p>
-                                            <p className="text-xs text-gray-500">{brand.category}</p>
-                                        </div>
-                                    </div>
-                                    <div className="flex items-center gap-2">
-                                        {brand.latestScore !== null && (
-                                            <Badge className={brand.latestScore >= 50 ? 'bg-green-600' : 'bg-amber-500'}>
-                                                {brand.latestScore}%
-                                            </Badge>
-                                        )}
-                                        <Link href={`/dashboard/visibility?brandId=${brand.id}`}>
-                                            <Button variant="ghost" size="sm">
-                                                <BarChart3 className="w-4 h-4" />
-                                            </Button>
-                                        </Link>
-                                        <Link href={`/dashboard/visibility/create?configId=${brand.id}&projectId=${projectId}`}>
-                                            <Button variant="ghost" size="sm">
-                                                <Settings className="w-4 h-4" />
-                                            </Button>
-                                        </Link>
-                                        <Button
-                                            variant="ghost"
-                                            size="sm"
-                                            onClick={() => unlinkBrand(brand.id)}
-                                            disabled={actionLoading === brand.id}
-                                            className="text-red-600 hover:text-red-700 hover:bg-red-50"
-                                        >
-                                            {actionLoading === brand.id ? (
-                                                <Loader2 className="w-4 h-4 animate-spin" />
-                                            ) : (
-                                                <Unlink className="w-4 h-4" />
+                                        <div className="flex flex-wrap items-center gap-1 self-end sm:self-auto">
+                                            {brand.latestScore !== null && (
+                                                <Badge className={brand.latestScore >= 50 ? 'bg-green-600' : 'bg-amber-500'}>
+                                                    {brand.latestScore}%
+                                                </Badge>
                                             )}
-                                        </Button>
+                                            <Link href={`/dashboard/visibility?brandId=${brand.id}`}>
+                                                <Button variant="ghost" size="sm">
+                                                    <BarChart3 className="w-4 h-4" />
+                                                </Button>
+                                            </Link>
+                                            <Link href={`/dashboard/visibility/create?configId=${brand.id}&projectId=${projectId}`}>
+                                                <Button variant="ghost" size="sm">
+                                                    <Settings className="w-4 h-4" />
+                                                </Button>
+                                            </Link>
+                                            <Button
+                                                variant="ghost"
+                                                size="sm"
+                                                onClick={() => unlinkBrand(brand.id)}
+                                                disabled={actionLoading === brand.id}
+                                                className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                                            >
+                                                {actionLoading === brand.id ? (
+                                                    <Loader2 className="w-4 h-4 animate-spin" />
+                                                ) : (
+                                                    <Unlink className="w-4 h-4" />
+                                                )}
+                                            </Button>
+                                        </div>
                                     </div>
                                 </div>
                             ))}
@@ -203,33 +206,35 @@ export function ProjectBrandManager({ projectId, projectName }: ProjectBrandMana
                             {unlinkedBrands.map(brand => (
                                 <div
                                     key={brand.id}
-                                    className="flex items-center justify-between p-3 bg-gray-50 rounded-lg border"
+                                    className="rounded-lg border bg-gray-50 p-3"
                                 >
-                                    <div className="flex items-center gap-3">
-                                        <div className="p-2 bg-gray-100 rounded-lg">
-                                            <Eye className="w-4 h-4 text-gray-400" />
+                                    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                                        <div className="flex min-w-0 items-center gap-3">
+                                            <div className="rounded-lg bg-gray-100 p-2">
+                                                <Eye className="w-4 h-4 text-gray-400" />
+                                            </div>
+                                            <div className="min-w-0">
+                                                <p className="truncate font-medium text-gray-900">{brand.brandName}</p>
+                                                <p className="truncate text-xs text-gray-500">{brand.category}</p>
+                                            </div>
                                         </div>
-                                        <div>
-                                            <p className="font-medium text-gray-900">{brand.brandName}</p>
-                                            <p className="text-xs text-gray-500">{brand.category}</p>
-                                        </div>
+                                        <Button
+                                            variant="outline"
+                                            size="sm"
+                                            onClick={() => linkBrand(brand.id)}
+                                            disabled={actionLoading === brand.id}
+                                            className="gap-1 self-end sm:self-auto"
+                                        >
+                                            {actionLoading === brand.id ? (
+                                                <Loader2 className="w-4 h-4 animate-spin" />
+                                            ) : (
+                                                <>
+                                                    <Link2 className="w-4 h-4" />
+                                                    Collega
+                                                </>
+                                            )}
+                                        </Button>
                                     </div>
-                                    <Button
-                                        variant="outline"
-                                        size="sm"
-                                        onClick={() => linkBrand(brand.id)}
-                                        disabled={actionLoading === brand.id}
-                                        className="gap-1"
-                                    >
-                                        {actionLoading === brand.id ? (
-                                            <Loader2 className="w-4 h-4 animate-spin" />
-                                        ) : (
-                                            <>
-                                                <Link2 className="w-4 h-4" />
-                                                Collega
-                                            </>
-                                        )}
-                                    </Button>
                                 </div>
                             ))}
                         </div>

@@ -352,7 +352,7 @@ Output richiesto:
                     userId: session.user.id,
                     inputTokens: result.usage.inputTokens || 0,
                     outputTokens: result.usage.outputTokens || 0,
-                    category: 'COPILOT',
+                    category: 'SYSTEM',
                     model: modelUsed,
                     operation: 'regenerate-marketing-kb',
                     resourceType: 'settings_marketing_kb',

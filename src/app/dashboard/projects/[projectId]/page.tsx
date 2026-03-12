@@ -3,15 +3,12 @@ import { prisma } from '@/lib/prisma';
 import { notFound, redirect } from 'next/navigation';
 import { cookies } from 'next/headers';
 import {
-    LayoutGrid,
     Bot,
     MessageSquare,
     Eye,
     Plus,
     Settings2,
     BarChart3,
-    Calendar,
-    ArrowRight,
     Zap,
     Search,
     Link as LinkIcon
@@ -19,10 +16,12 @@ import {
 import Link from 'next/link';
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ProjectUserManagementDialog } from './user-management-dialog';
 import { PLANS, subscriptionTierToPlanType, PlanType } from '@/config/plans';
 import { assertProjectAccess } from '@/lib/domain/workspace';
+import { ProjectActivationChecklist } from '@/components/guidance/ProjectActivationChecklist';
+import { ProjectWorkspaceShell } from '@/components/projects/ProjectWorkspaceShell';
 
 export default async function ProjectCockpitPage({ params }: { params: Promise<{ projectId: string }> }) {
     const session = await auth();
@@ -85,64 +84,74 @@ export default async function ProjectCockpitPage({ params }: { params: Promise<{
 
     const interviews = project.bots.filter(b => (b as any).botType === 'interview' || !(b as any).botType);
     const chatbots = project.bots.filter(b => (b as any).botType === 'chatbot');
-    let trackers = [];
-    try {
-        trackers = await prisma.visibilityConfig.findMany({
-            where: {
-                organizationId: project.organizationId || undefined,
-                OR: [
-                    { projectId },
-                    { projectShares: { some: { projectId } } }
-                ]
-            },
-            orderBy: { createdAt: 'desc' },
-            include: { scans: { orderBy: { startedAt: 'desc' }, take: 1 } }
-        });
-    } catch (error: any) {
-        if (error?.code !== 'P2021') throw error;
-        trackers = await prisma.visibilityConfig.findMany({
-            where: {
-                organizationId: project.organizationId || undefined,
-                projectId
-            },
-            orderBy: { createdAt: 'desc' },
-            include: { scans: { orderBy: { startedAt: 'desc' }, take: 1 } }
-        });
-    }
+    const [trackers, tipCount, enabledRoutingCount] = await Promise.all([
+        (async () => {
+            try {
+                return await prisma.visibilityConfig.findMany({
+                    where: {
+                        organizationId: project.organizationId || undefined,
+                        OR: [
+                            { projectId },
+                            { projectShares: { some: { projectId } } }
+                        ]
+                    },
+                    orderBy: { createdAt: 'desc' },
+                    include: { scans: { orderBy: { startedAt: 'desc' }, take: 1 } }
+                });
+            } catch (error: any) {
+                if (error?.code !== 'P2021') throw error;
+                return prisma.visibilityConfig.findMany({
+                    where: {
+                        organizationId: project.organizationId || undefined,
+                        projectId
+                    },
+                    orderBy: { createdAt: 'desc' },
+                    include: { scans: { orderBy: { startedAt: 'desc' }, take: 1 } }
+                });
+            }
+        })(),
+        prisma.projectTip.count({ where: { projectId } }),
+        prisma.tipRoutingRule.count({ where: { projectId, enabled: true } }),
+    ]);
+
+    const activationLabel = tipCount > 0 && enabledRoutingCount > 0
+        ? 'Pronto a eseguire'
+        : 'Attivazione in corso';
 
     return (
-        <div className="space-y-8 p-6 max-w-7xl mx-auto">
-            {/* Header */}
-            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 pb-2 border-b border-slate-100">
-                <div className="space-y-1">
-                    <div className="flex items-center gap-2 text-slate-400 text-[10px] font-black uppercase tracking-[0.2em] mb-1">
-                        <Link href="/dashboard/projects" className="hover:text-amber-600 transition-colors">Progetti</Link>
-                        <span className="text-slate-200">/</span>
-                        <span className="text-slate-900">{project.name}</span>
-                    </div>
-                    <h1 className="text-3xl font-black text-slate-900 flex items-center gap-3">
-                        {project.name}
-                        <Badge className="bg-amber-50 text-amber-600 border-amber-100 font-bold uppercase text-[9px]">Cockpit</Badge>
-                    </h1>
-                </div>
-                <div className="flex items-center gap-3">
-                    <ProjectUserManagementDialog projectId={projectId} />
-                    <Link href={`/dashboard/projects/${projectId}/analytics`}>
-                        <Button size="sm" variant="outline" className="border-slate-200 hover:bg-slate-50 text-slate-700 rounded-xl shadow-sm font-bold transition-all px-5">
-                            <BarChart3 className="w-4 h-4 mr-2" />
-                            Analytics
-                        </Button>
-                    </Link>
-                    <Link href={`/dashboard/projects/${projectId}/settings`}>
-                        <Button size="sm" className="bg-slate-900 hover:bg-slate-800 text-white rounded-xl shadow-md font-bold transition-all px-5">
-                            <Settings2 className="w-4 h-4 mr-2" />
-                            Impostazioni
-                        </Button>
-                    </Link>
-                </div>
-            </div>
-
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        <div className="max-w-7xl mx-auto p-6">
+            <ProjectWorkspaceShell
+                projectId={projectId}
+                projectName={project.name}
+                activeSection="overview"
+                eyebrow="Quadro"
+                title="Cockpit progetto"
+                description="Controlla lo stato operativo del progetto, verifica quali tool stanno generando segnali e vedi se il workspace e pronto a passare da tip a routing."
+                metrics={[
+                    { label: 'Tool attivi', value: String(interviews.length + chatbots.length + trackers.length), tone: 'accent' },
+                    { label: 'Tip canonici', value: String(tipCount), tone: tipCount > 0 ? 'success' : 'default' },
+                    { label: 'Routing attivo', value: `${enabledRoutingCount} regole`, tone: enabledRoutingCount > 0 ? 'success' : 'warning' },
+                    { label: 'Stato progetto', value: activationLabel, tone: tipCount > 0 && enabledRoutingCount > 0 ? 'success' : 'warning' },
+                ]}
+                action={
+                    <>
+                        <ProjectUserManagementDialog projectId={projectId} />
+                        <Link href={`/dashboard/projects/${projectId}/analytics`}>
+                            <Button size="sm" variant="outline" className="border-slate-200 hover:bg-slate-50 text-slate-700 rounded-xl shadow-sm font-bold transition-all px-5">
+                                <BarChart3 className="w-4 h-4 mr-2" />
+                                Misura
+                            </Button>
+                        </Link>
+                        <Link href={`/dashboard/projects/${projectId}/settings`}>
+                            <Button size="sm" className="bg-slate-900 hover:bg-slate-800 text-white rounded-xl shadow-md font-bold transition-all px-5">
+                                <Settings2 className="w-4 h-4 mr-2" />
+                                Impostazioni
+                            </Button>
+                        </Link>
+                    </>
+                }
+            >
+                <div className="mt-8 grid grid-cols-1 gap-8 lg:grid-cols-3">
                 {/* Left Column: Bots & Trackers */}
                 <div className="lg:col-span-2 space-y-10">
 
@@ -368,6 +377,8 @@ export default async function ProjectCockpitPage({ params }: { params: Promise<{
                         </CardContent>
                     </Card>
 
+                    <ProjectActivationChecklist projectId={projectId} />
+
                     <Card className="border-slate-200">
                         <CardHeader>
                             <CardTitle className="text-sm font-black uppercase tracking-widest text-slate-900">Suggerimenti AI</CardTitle>
@@ -401,7 +412,8 @@ export default async function ProjectCockpitPage({ params }: { params: Promise<{
                         </CardContent>
                     </Card>
                 </div >
-            </div >
+                </div>
+            </ProjectWorkspaceShell>
         </div >
     );
 }

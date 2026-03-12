@@ -12,6 +12,38 @@ import { checkIntegrationCreationAllowed } from '@/lib/trial-limits';
 import { NextResponse } from 'next/server';
 import { WorkspaceError, assertProjectAccess } from '@/lib/domain/workspace';
 
+const SUPPORTED_MCP_TYPES = ['WORDPRESS', 'WOOCOMMERCE', 'BREVO'] as const;
+type SupportedMcpType = (typeof SUPPORTED_MCP_TYPES)[number];
+
+function isSupportedMcpType(type: unknown): type is SupportedMcpType {
+  return typeof type === 'string' && SUPPORTED_MCP_TYPES.includes(type as SupportedMcpType);
+}
+
+function hasValidCredentialsForType(type: SupportedMcpType, credentials: unknown): boolean {
+  if (!credentials || typeof credentials !== 'object') return false;
+  const typed = credentials as Record<string, unknown>;
+
+  if (type === 'WORDPRESS') {
+    return typeof typed.username === 'string'
+      && typed.username.trim().length > 0
+      && typeof typed.applicationPassword === 'string'
+      && typed.applicationPassword.trim().length > 0;
+  }
+
+  if (type === 'WOOCOMMERCE') {
+    return typeof typed.consumerKey === 'string'
+      && typed.consumerKey.trim().length > 0
+      && typeof typed.consumerSecret === 'string'
+      && typed.consumerSecret.trim().length > 0;
+  }
+
+  if (type === 'BREVO') {
+    return typeof typed.apiKey === 'string' && typed.apiKey.trim().length > 0;
+  }
+
+  return false;
+}
+
 // GET - List MCP connections for a project
 export async function GET(request: Request) {
   const session = await auth();
@@ -84,9 +116,16 @@ export async function POST(request: Request) {
   }
 
   // Validate type
-  if (!['WORDPRESS', 'WOOCOMMERCE'].includes(type)) {
+  if (!isSupportedMcpType(type)) {
     return NextResponse.json(
-      { error: 'Invalid type. Must be WORDPRESS or WOOCOMMERCE' },
+      { error: `Invalid type. Must be one of: ${SUPPORTED_MCP_TYPES.join(', ')}` },
+      { status: 400 }
+    );
+  }
+
+  if (!hasValidCredentialsForType(type, credentials)) {
+    return NextResponse.json(
+      { error: `Invalid credentials for ${type}` },
       { status: 400 }
     );
   }

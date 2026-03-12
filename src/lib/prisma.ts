@@ -1,6 +1,46 @@
 import { PrismaClient } from '@prisma/client';
 
 const globalForPrisma = globalThis as unknown as { prisma?: PrismaClient };
+let visibilitySchemaCompatibilityPromise: Promise<void> | null = null;
+let projectTipSchemaCompatibilityPromise: Promise<void> | null = null;
+
+async function ensureVisibilityConfigSchemaCompatibility(client: PrismaClient): Promise<void> {
+  if (!visibilitySchemaCompatibilityPromise) {
+    visibilitySchemaCompatibilityPromise = (async () => {
+      try {
+        await client.$executeRawUnsafe(
+          'ALTER TABLE "VisibilityConfig" ADD COLUMN IF NOT EXISTS "websiteUrl" TEXT',
+        );
+        await client.$executeRawUnsafe(
+          'ALTER TABLE "VisibilityConfig" ADD COLUMN IF NOT EXISTS "sitemapUrl" TEXT',
+        );
+        await client.$executeRawUnsafe(
+          'ALTER TABLE "VisibilityConfig" ADD COLUMN IF NOT EXISTS "additionalUrls" JSONB',
+        );
+      } catch (error) {
+        console.warn('[prisma] VisibilityConfig compatibility patch skipped:', error);
+      }
+    })();
+  }
+
+  await visibilitySchemaCompatibilityPromise;
+}
+
+async function ensureProjectTipSchemaCompatibility(client: PrismaClient): Promise<void> {
+  if (!projectTipSchemaCompatibilityPromise) {
+    projectTipSchemaCompatibilityPromise = (async () => {
+      try {
+        await client.$executeRawUnsafe(
+          'ALTER TABLE "ProjectTip" ADD COLUMN IF NOT EXISTS "reviewerNotes" TEXT',
+        );
+      } catch (error) {
+        console.warn('[prisma] ProjectTip compatibility patch skipped:', error);
+      }
+    })();
+  }
+
+  await projectTipSchemaCompatibilityPromise;
+}
 
 function createPrismaClient(): PrismaClient {
   const connectionString = process.env.DIRECT_URL || process.env.DATABASE_URL;
@@ -42,7 +82,27 @@ function createPrismaClient(): PrismaClient {
   });
   const adapter = new PrismaPg(pool);
 
-  return new PrismaClient({ adapter });
+  const baseClient = new PrismaClient({ adapter });
+  // Prisma Client created with adapter-pg can miss middleware APIs like $use.
+  // Use query extension instead to keep the compatibility patch.
+  const client = baseClient.$extends({
+    query: {
+      visibilityConfig: {
+        async $allOperations({ args, query }) {
+          await ensureVisibilityConfigSchemaCompatibility(baseClient);
+          return query(args);
+        },
+      },
+      projectTip: {
+        async $allOperations({ args, query }) {
+          await ensureProjectTipSchemaCompatibility(baseClient);
+          return query(args);
+        },
+      },
+    },
+  });
+
+  return client as PrismaClient;
 }
 
 // Returns the singleton PrismaClient, creating it on first call.

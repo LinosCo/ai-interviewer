@@ -9,7 +9,7 @@
 
 import { useEffect, useState, useCallback } from 'react';
 import Link from 'next/link';
-import { Zap, RefreshCcw } from 'lucide-react';
+import { Zap } from 'lucide-react';
 import { useOrganization } from '@/contexts/OrganizationContext';
 
 interface CreditsData {

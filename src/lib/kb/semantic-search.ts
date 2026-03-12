@@ -27,6 +27,10 @@ function extractSourceUrl(content: string): string | null {
     return match ? match[1] : null;
 }
 
+function escapeRegexLiteral(value: string): string {
+    return String(value || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
 /**
  * Search knowledge sources for a bot using semantic (vector) similarity.
  *
@@ -114,7 +118,10 @@ function keywordSearch(
         const scored = sources.map(s => {
             const text = `${s.title ?? ''} ${s.content}`.toLowerCase();
             const score = queryWords.reduce((acc, word) => {
-                const count = (text.match(new RegExp(word, 'g')) ?? []).length;
+                const safeWord = escapeRegexLiteral(word);
+                const count = safeWord
+                    ? (text.match(new RegExp(safeWord, 'g')) ?? []).length
+                    : 0;
                 return acc + count;
             }, 0);
             return { ...s, score: Math.min(1, score / 20) };

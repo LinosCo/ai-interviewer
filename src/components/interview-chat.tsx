@@ -185,6 +185,15 @@ export default function InterviewChat({
     const [showLanding, setShowLanding] = useState(initialMessages.length === 0 && !skipWelcome);
     const [consentGiven, setConsentGiven] = useState(false);
     const [isInputFocused, setIsInputFocused] = useState(false);
+    const [mobileKeyboardInset, setMobileKeyboardInset] = useState(0);
+    const [visualViewportHeight, setVisualViewportHeight] = useState<number | null>(null);
+    const [visualViewportWidth, setVisualViewportWidth] = useState<number | null>(null);
+    const [footerHeight, setFooterHeight] = useState(isEmbedded ? 96 : 148);
+    const chatViewportRef = useRef<HTMLDivElement>(null);
+    const questionCardRef = useRef<HTMLDivElement>(null);
+    const dockedQuestionContentRef = useRef<HTMLDivElement>(null);
+    const footerRef = useRef<HTMLDivElement>(null);
+    const visualViewportRestHeightRef = useRef<number | null>(null);
 
     // Warm-up State
     const [showWarmup, setShowWarmup] = useState(false);
@@ -203,6 +212,7 @@ export default function InterviewChat({
     const [isCompleted, setIsCompleted] = useState(false);
     const [showCompletionActions, setShowCompletionActions] = useState(false);
     const inFlightRequestRef = useRef(false);
+    const keyboardAnchorTimersRef = useRef<number[]>([]);
 
     useEffect(() => {
         messagesRef.current = messages;
@@ -227,6 +237,70 @@ export default function InterviewChat({
         }
         return () => clearInterval(interval);
     }, [isTyping, isLoading, hasStarted]);
+
+    useEffect(() => {
+        if (typeof window === 'undefined' || isEmbedded) return;
+        const viewport = window.visualViewport;
+        if (!viewport) return;
+
+        const handleViewportChange = () => {
+            const viewportHeight = Math.round(viewport.height);
+            const inset = Math.max(0, Math.round(window.innerHeight - viewport.height - viewport.offsetTop));
+            const normalizedInset = inset > 96 ? inset : 0;
+
+            if (!isInputFocused && normalizedInset === 0) {
+                visualViewportRestHeightRef.current = viewportHeight;
+            }
+
+            setMobileKeyboardInset(normalizedInset);
+            setVisualViewportHeight(viewportHeight);
+            setVisualViewportWidth(Math.round(viewport.width));
+
+            const restHeight = visualViewportRestHeightRef.current;
+            const heightDrop = restHeight ? Math.max(0, restHeight - viewportHeight) : 0;
+            const keyboardLikelyOpen = isInputFocused && (normalizedInset > 0 || heightDrop > 120);
+
+            if (keyboardLikelyOpen) {
+                requestAnimationFrame(() => scheduleKeyboardAnchoring());
+            }
+        };
+
+        handleViewportChange();
+        viewport.addEventListener('resize', handleViewportChange);
+        viewport.addEventListener('scroll', handleViewportChange);
+
+        return () => {
+            viewport.removeEventListener('resize', handleViewportChange);
+            viewport.removeEventListener('scroll', handleViewportChange);
+        };
+    }, [isEmbedded]);
+
+    useEffect(() => {
+        if (typeof window === 'undefined' || isEmbedded) return;
+        const footerEl = footerRef.current;
+        if (!footerEl) return;
+
+        const updateFooterHeight = () => {
+            const rect = footerEl.getBoundingClientRect();
+            setFooterHeight(Math.round(rect.height));
+        };
+
+        updateFooterHeight();
+
+        if (typeof ResizeObserver === 'undefined') {
+            window.addEventListener('resize', updateFooterHeight);
+            return () => window.removeEventListener('resize', updateFooterHeight);
+        }
+
+        const observer = new ResizeObserver(() => updateFooterHeight());
+        observer.observe(footerEl);
+        window.addEventListener('resize', updateFooterHeight);
+
+        return () => {
+            observer.disconnect();
+            window.removeEventListener('resize', updateFooterHeight);
+        };
+    }, [isEmbedded, isCompleted, isLoading, input, language, showCompletionActions]);
 
     const handleStart = async () => {
         setShowLanding(false);
@@ -311,6 +385,9 @@ export default function InterviewChat({
             const nextHeight = Math.min(el.scrollHeight, INPUT_MAX_HEIGHT_PX);
             el.style.height = `${nextHeight}px`;
             lastTextareaHeightRef.current = nextHeight;
+            if (isInputFocused) {
+                requestAnimationFrame(() => scheduleKeyboardAnchoring());
+            }
         });
     };
 
@@ -476,26 +553,260 @@ export default function InterviewChat({
     // Get current question (last assistant message)
     const assistantMessages = messages.filter(m => m.role === 'assistant');
     const currentQuestion = assistantMessages[assistantMessages.length - 1];
+    const currentQuestionId = currentQuestion?.id || null;
     const totalQuestions = assistantMessages.length;
     const elapsedMinutes = Math.floor(effectiveSeconds / 60);
     const estimatedMinutes = parseInt(estimatedDuration?.replace(/\D/g, '') || '10');
     const progress = Math.min((elapsedMinutes / estimatedMinutes) * 100, 95);
+    const supportsVisualViewport = typeof window !== 'undefined' && Boolean(window.visualViewport);
+    const effectiveViewportHeight = !isEmbedded && visualViewportHeight ? Math.round(visualViewportHeight) : null;
+    const effectiveViewportWidth = !isEmbedded
+        ? (visualViewportWidth ?? (typeof window !== 'undefined' ? window.innerWidth : null))
+        : null;
+    const isMobileViewport = Boolean(effectiveViewportWidth && effectiveViewportWidth < 768);
+    const visualViewportHeightDrop = visualViewportHeight && visualViewportRestHeightRef.current
+        ? Math.max(0, visualViewportRestHeightRef.current - visualViewportHeight)
+        : 0;
+    const keyboardHeightGuess = Math.max(mobileKeyboardInset, visualViewportHeightDrop);
+    const anchorQuestionNearComposer = (behavior: ScrollBehavior = 'auto') => {
+        const viewportEl = chatViewportRef.current;
+        const cardEl = questionCardRef.current;
+        if (!viewportEl || !cardEl) return;
+        const questionAnchorOffsetPx = footerHeight + 20;
+        const targetTop = Math.max(
+            0,
+            cardEl.offsetTop + cardEl.offsetHeight - viewportEl.clientHeight + questionAnchorOffsetPx
+        );
+        viewportEl.scrollTo({ top: targetTop, behavior });
+    };
+
+    const scheduleKeyboardAnchoring = () => {
+        keyboardAnchorTimersRef.current.forEach((timerId) => window.clearTimeout(timerId));
+        anchorQuestionNearComposer('auto');
+        keyboardAnchorTimersRef.current = [60, 180, 340, 560].map((delay, index) =>
+            window.setTimeout(() => anchorQuestionNearComposer(index === 0 ? 'auto' : 'smooth'), delay)
+        );
+    };
+
+    useEffect(() => {
+        if (!currentQuestionId || !chatViewportRef.current || !questionCardRef.current) return;
+        if (!isInputFocused || (!keyboardHeightGuess && supportsVisualViewport)) return;
+        const timer = window.setTimeout(() => {
+            scheduleKeyboardAnchoring();
+        }, 120);
+        return () => window.clearTimeout(timer);
+    }, [currentQuestionId, footerHeight, isInputFocused, supportsVisualViewport, keyboardHeightGuess]);
 
     // Dynamic Background logic
     const brandColor = primaryColor || colors.amber;
     const mainBackground = backgroundColor || gradients.mesh;
-    const isMobileKeyboardOpen = isInputFocused && !isEmbedded;
-    const chatVerticalAlignClass = isMobileKeyboardOpen ? 'justify-start md:justify-center' : 'justify-center';
-    const chatBottomPaddingClass = isEmbedded
-        ? 'pb-24'
+    const isMobileKeyboardOpen = !isEmbedded && isInputFocused && (keyboardHeightGuess > 120 || !supportsVisualViewport);
+    const chatVerticalAlignClass = isMobileKeyboardOpen ? 'justify-end md:justify-center' : 'justify-center';
+    const chatTopPaddingClass = isEmbedded
+        ? 'pt-16'
         : isMobileKeyboardOpen
-            ? 'pb-28 md:pb-56'
-            : 'pb-48 md:pb-56';
+            ? 'pt-14 md:pt-40'
+            : 'pt-32 md:pt-40';
     const inputTopPaddingClass = isEmbedded
         ? 'pt-4'
         : isMobileKeyboardOpen
             ? 'pt-2 md:pt-12'
             : 'pt-8 md:pt-12';
+    const footerBottomOffsetPx = isEmbedded ? 0 : (supportsVisualViewport ? 0 : keyboardHeightGuess);
+    const chatBottomPaddingPx = isEmbedded
+        ? footerHeight
+        : footerHeight + (isMobileKeyboardOpen ? 18 : 34);
+    const questionScrollMarginBottomPx = footerHeight + (isMobileKeyboardOpen ? 20 : 28);
+    const showDockedQuestion = isMobileViewport && isInputFocused && Boolean(currentQuestion) && !isCompleted;
+    const dockedQuestionMaxHeightPx = effectiveViewportHeight
+        ? Math.max(120, Math.min(280, Math.round(effectiveViewportHeight * 0.32)))
+        : 220;
+    const dockedQuestionCompactText = dockedQuestionMaxHeightPx <= 170;
+
+    useEffect(() => {
+        if (!isMobileKeyboardOpen) return;
+        const timer = window.setTimeout(() => {
+            scheduleKeyboardAnchoring();
+        }, 80);
+        return () => window.clearTimeout(timer);
+    }, [footerHeight, isMobileKeyboardOpen]);
+
+    useEffect(() => {
+        return () => {
+            keyboardAnchorTimersRef.current.forEach((timerId) => window.clearTimeout(timerId));
+            keyboardAnchorTimersRef.current = [];
+        };
+    }, []);
+
+    useEffect(() => {
+        if (!showDockedQuestion) return;
+        const timer = window.setTimeout(() => {
+            const contentEl = dockedQuestionContentRef.current;
+            if (!contentEl) return;
+            contentEl.scrollTop = contentEl.scrollHeight;
+        }, 50);
+        return () => window.clearTimeout(timer);
+    }, [currentQuestionId, dockedQuestionMaxHeightPx, showDockedQuestion]);
+
+    const renderQuestionCard = (docked = false) => {
+        if (!currentQuestion) return null;
+        return (
+            <motion.div
+                key={`${currentQuestion.id}-${docked ? 'docked' : 'flow'}`}
+                initial={{ opacity: 0, y: 20, scale: 0.99 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                exit={{ opacity: 0, y: -10, scale: 0.99 }}
+                transition={{ duration: 0.3, ease: [0.23, 1, 0.32, 1] }}
+                className={`w-full max-w-2xl ${!docked && isMobileKeyboardOpen ? 'mt-auto' : ''}`}
+                style={docked ? undefined : { scrollMarginBottom: `${questionScrollMarginBottomPx}px` }}
+                ref={docked ? undefined : questionCardRef}
+            >
+                <div className={`relative ${docked ? 'rounded-[24px] bg-white/92 px-5 py-4 shadow-2xl ring-1 ring-black/5 backdrop-blur-md' : ''}`}>
+                    {!docked && (
+                        <div className="absolute -left-12 top-0 hidden md:block" style={{ color: brandColor, opacity: 0.3 }}>
+                            <Icons.Chat size={32} />
+                        </div>
+                    )}
+
+                    <div className={docked ? 'space-y-3' : 'space-y-6'}>
+                        <div className="flex items-center gap-2 font-bold text-sm uppercase tracking-widest" style={{ color: brandColor }}>
+                            <span>{t.question} {totalQuestions}</span>
+                            <div className="h-px w-12" style={{ background: brandColor, opacity: 0.4 }} />
+                        </div>
+
+                        <div
+                            ref={docked ? dockedQuestionContentRef : undefined}
+                            className={`prose max-w-none prose-headings:font-bold prose-p:text-gray-900 prose-p:font-medium prose-a:font-semibold ${docked ? 'prose-base overflow-y-auto overscroll-contain pr-1' : 'prose-lg'}`}
+                            style={docked ? { maxHeight: `${dockedQuestionMaxHeightPx}px` } : undefined}
+                        >
+                            <ReactMarkdown
+                                components={{
+                                    blockquote: ({ children }) => (
+                                        <blockquote className="border-l-4 border-gray-200 pl-4 py-2 my-4 text-gray-500 bg-gray-50 rounded-r-lg italic [&>p]:!text-base [&>p]:!font-medium [&>p]:!text-gray-500 [&>p]:!mb-0">
+                                            {children}
+                                        </blockquote>
+                                    ),
+                                    p: ({ children }) => {
+                                        const text = String(children);
+                                        const isShort = text.length < 80;
+                                        const isLong = text.length > 200;
+
+                                        return (
+                                            <p className={`
+                                                ${isShort ? (docked && dockedQuestionCompactText ? 'text-base font-semibold text-gray-900' : 'text-lg md:text-xl font-semibold text-gray-900') : ''}
+                                                ${!isShort && !isLong ? (docked && dockedQuestionCompactText ? 'text-sm font-medium text-gray-800' : 'text-base md:text-lg font-medium text-gray-800') : ''}
+                                                ${isLong ? (docked && dockedQuestionCompactText ? 'text-sm text-gray-700' : 'text-base md:text-lg text-gray-700') : ''}
+                                                ${docked ? 'leading-relaxed mb-4' : 'leading-relaxed mb-6'}
+                                            `} style={{ textShadow: 'none' }}>
+                                                {children}
+                                            </p>
+                                        );
+                                    },
+                                    strong: ({ children }) => <span style={{ color: brandColor, fontWeight: 700 }}>{children}</span>,
+                                    a: ({ href, children }) => <a href={href} style={{ color: brandColor, textDecoration: 'underline' }}>{children}</a>
+                                }}
+                            >
+                                {currentQuestion.content}
+                            </ReactMarkdown>
+                        </div>
+                    </div>
+                </div>
+            </motion.div>
+        );
+    };
+
+    const renderLoadingIndicator = (docked = false) => {
+        if (!currentQuestion) return null;
+
+        if (docked) {
+            return (
+                <motion.div
+                    initial={{ opacity: 0, y: 8 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -6 }}
+                    className="mb-2 flex items-center justify-center"
+                >
+                    <div className="inline-flex items-center gap-2 rounded-full bg-white/92 px-3 py-2 shadow-lg ring-1 ring-black/5 backdrop-blur-md">
+                        <motion.div
+                            className="relative flex h-9 w-9 items-center justify-center rounded-full bg-white"
+                            style={{ border: `2px solid ${brandColor}30` }}
+                            animate={{ scale: [1, 1.04, 1] }}
+                            transition={{ duration: 1.2, repeat: Infinity, ease: 'easeInOut' }}
+                        >
+                            <motion.div
+                                className="absolute inset-0 rounded-full"
+                                style={{ border: `2px solid ${brandColor}22` }}
+                                animate={{ scale: [1, 1.18, 1], opacity: [0.55, 0.2, 0.55] }}
+                                transition={{ duration: 1.2, repeat: Infinity, ease: 'easeInOut' }}
+                            />
+                            {logoUrl ? (
+                                <div className="flex h-5 w-5 items-center justify-center">
+                                    <img src={logoUrl} alt={botName} className="max-h-full max-w-full object-contain" />
+                                </div>
+                            ) : (
+                                <Icons.Logo size={16} style={{ color: brandColor }} />
+                            )}
+                        </motion.div>
+                        <span className="text-xs font-semibold uppercase tracking-wide text-gray-500">{t.loading}</span>
+                    </div>
+                </motion.div>
+            );
+        }
+
+        return (
+            <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                className={`${isEmbedded ? 'absolute' : 'fixed'} inset-0 z-40 flex items-center justify-center`}
+            >
+                <div className="absolute inset-0 bg-gradient-to-b from-white/60 to-white/40 backdrop-blur-[2px]" />
+                <div className="relative flex items-center justify-center">
+                    <motion.div
+                        className="absolute rounded-full"
+                        style={{
+                            width: 96,
+                            height: 96,
+                            border: `3px solid ${brandColor}30`,
+                        }}
+                        animate={{
+                            scale: [1, 1.15, 1],
+                            opacity: [0.6, 0.2, 0.6],
+                        }}
+                        transition={{
+                            duration: 1.5,
+                            repeat: Infinity,
+                            ease: 'easeInOut',
+                        }}
+                    />
+                    <motion.div
+                        className="relative flex items-center justify-center rounded-full bg-white shadow-lg"
+                        style={{
+                            width: 80,
+                            height: 80,
+                            border: `2px solid ${brandColor}40`,
+                        }}
+                        animate={{
+                            scale: [1, 1.03, 1],
+                        }}
+                        transition={{
+                            duration: 1.5,
+                            repeat: Infinity,
+                            ease: 'easeInOut',
+                        }}
+                    >
+                        {logoUrl ? (
+                            <div className="flex h-11 w-11 items-center justify-center">
+                                <img src={logoUrl} alt={botName} className="max-h-full max-w-full object-contain" />
+                            </div>
+                        ) : (
+                            <Icons.Logo size={36} style={{ color: brandColor }} />
+                        )}
+                    </motion.div>
+                </div>
+            </motion.div>
+        );
+    };
 
 
 
@@ -686,7 +997,9 @@ export default function InterviewChat({
             className="min-h-screen flex flex-col font-sans relative overflow-x-hidden"
             style={{
                 background: mainBackground,
-                color: colors.text
+                color: colors.text,
+                minHeight: effectiveViewportHeight ? `${effectiveViewportHeight}px` : undefined,
+                height: effectiveViewportHeight ? `${effectiveViewportHeight}px` : undefined
             }}
         >
             {/* Dynamic Background Elements */}
@@ -768,11 +1081,15 @@ export default function InterviewChat({
             </header>
 
             {/* Chat Area */}
-            <div className={`flex-1 flex flex-col items-center ${chatVerticalAlignClass} px-4 ${isEmbedded ? 'pt-16' : 'pt-32 md:pt-40'} ${chatBottomPaddingClass} w-full max-w-4xl mx-auto relative z-10`}>
+            <div
+                ref={chatViewportRef}
+                className={`flex-1 min-h-0 overflow-y-auto overscroll-contain flex flex-col items-center ${chatVerticalAlignClass} px-4 ${chatTopPaddingClass} w-full max-w-4xl mx-auto relative z-10`}
+                style={{ paddingBottom: `${chatBottomPaddingPx}px` }}
+            >
 
                 {/* Previous Answer Context - Moved outside keyed motion.div to prevent duplication */}
-                {messages.length > 1 && messages[messages.length - 2]?.role === 'user' && !isLoading && (
-                    <div className="w-full max-w-2xl mb-4">
+                {messages.length > 1 && messages[messages.length - 2]?.role === 'user' && !isLoading && !showDockedQuestion && (
+                    <div className={`w-full max-w-2xl ${isMobileKeyboardOpen ? 'mb-2' : 'mb-4'}`}>
                         <motion.div
                             key={`answer-${messages[messages.length - 2].id}`}
                             initial={{ opacity: 0, x: 20 }}
@@ -789,129 +1106,10 @@ export default function InterviewChat({
                     </div>
                 )}
 
-                {/* Loading/Thinking Indicator - Pulsing circle with logo */}
-                {isLoading && currentQuestion && (
-                    <motion.div
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: 1 }}
-                        exit={{ opacity: 0 }}
-                        className={`${isEmbedded ? 'absolute' : 'fixed'} inset-0 z-40 flex items-center justify-center`}
-                    >
-                        {/* Subtle backdrop */}
-                        <div className="absolute inset-0 bg-gradient-to-b from-white/60 to-white/40 backdrop-blur-[2px]" />
-
-                        {/* Centered loading indicator - Logo in pulsing circle */}
-                        <div className="relative flex items-center justify-center">
-                            {/* Outer pulsing ring */}
-                            <motion.div
-                                className="absolute rounded-full"
-                                style={{
-                                    width: 96,
-                                    height: 96,
-                                    border: `3px solid ${brandColor}30`,
-                                }}
-                                animate={{
-                                    scale: [1, 1.15, 1],
-                                    opacity: [0.6, 0.2, 0.6],
-                                }}
-                                transition={{
-                                    duration: 1.5,
-                                    repeat: Infinity,
-                                    ease: 'easeInOut',
-                                }}
-                            />
-                            {/* Inner circle with logo */}
-                            <motion.div
-                                className="relative flex items-center justify-center rounded-2xl bg-white shadow-lg"
-                                style={{
-                                    width: 80,
-                                    height: 80,
-                                    border: `2px solid ${brandColor}40`,
-                                }}
-                                animate={{
-                                    scale: [1, 1.03, 1],
-                                }}
-                                transition={{
-                                    duration: 1.5,
-                                    repeat: Infinity,
-                                    ease: 'easeInOut',
-                                }}
-                            >
-                                {logoUrl ? (
-                                    <img src={logoUrl} alt={botName} className="w-12 h-12 object-contain" />
-                                ) : (
-                                    <Icons.Logo size={36} style={{ color: brandColor }} />
-                                )}
-                            </motion.div>
-                        </div>
-                    </motion.div>
-                )}
+                {isLoading && currentQuestion && !showDockedQuestion && renderLoadingIndicator(false)}
 
                 <AnimatePresence mode="wait">
-                    {currentQuestion && !isLoading && (
-                        <motion.div
-                            key={currentQuestion.id}
-                            initial={{ opacity: 0, y: 20, scale: 0.99 }}
-                            animate={{ opacity: 1, y: 0, scale: 1 }}
-                            exit={{ opacity: 0, y: -10, scale: 0.99 }}
-                            transition={{ duration: 0.3, ease: [0.23, 1, 0.32, 1] }}
-                            className="w-full max-w-2xl"
-                        >
-                            {/* Bot Question Card */}
-                            <div className="relative">
-                                {/* Decor */}
-                                <div className="absolute -left-12 top-0 hidden md:block" style={{ color: brandColor, opacity: 0.3 }}>
-                                    <Icons.Chat size={32} />
-                                </div>
-
-                                <div className="space-y-6">
-                                    {/* Question Index */}
-                                    <div className="flex items-center gap-2 font-bold text-sm uppercase tracking-widest" style={{ color: brandColor }}>
-                                        <span>{t.question} {totalQuestions}</span>
-                                        <div className="h-px w-12" style={{ background: brandColor, opacity: 0.4 }} />
-                                    </div>
-
-                                    {/* Question Text */}
-                                    <div className="prose prose-lg max-w-none prose-headings:font-bold prose-p:text-gray-900 prose-p:font-medium prose-a:font-semibold">
-                                        <ReactMarkdown
-                                            components={{
-                                                // Handle Blockquotes (Transitions) - Make them distinct and smaller
-                                                blockquote: ({ children }) => (
-                                                    <blockquote className="border-l-4 border-gray-200 pl-4 py-2 my-6 text-gray-500 bg-gray-50 rounded-r-lg italic [&>p]:!text-base [&>p]:!font-medium [&>p]:!text-gray-500 [&>p]:!mb-0">
-                                                        {children}
-                                                    </blockquote>
-                                                ),
-                                                p: ({ children }) => {
-                                                    const text = String(children);
-                                                    // Much more conservative sizing logic
-                                                    const isShort = text.length < 80;
-                                                    const isLong = text.length > 200;
-
-                                                    // If it looks like a transition message (starts with >), handled by blockquote usually, 
-                                                    // but if safe-guarding:
-
-                                                    return (
-                                                        <p className={`
-                                                            ${isShort ? 'text-lg md:text-xl font-semibold text-gray-900' : ''} 
-                                                            ${!isShort && !isLong ? 'text-base md:text-lg font-medium text-gray-800' : ''}
-                                                            ${isLong ? 'text-base md:text-lg text-gray-700' : ''}
-                                                            leading-relaxed mb-6
-                                                        `} style={{ textShadow: 'none' }}>
-                                                            {children}
-                                                        </p>
-                                                    );
-                                                },
-                                                strong: ({ children }) => <span style={{ color: brandColor, fontWeight: 700 }}>{children}</span>,
-                                                a: ({ href, children }) => <a href={href} style={{ color: brandColor, textDecoration: 'underline' }}>{children}</a>
-                                            }}
-                                        >
-                                            {currentQuestion.content}
-                                        </ReactMarkdown>
-                                    </div>
-                                </div>
-                            </div>
-                        </motion.div>
-                    )}
+                    {currentQuestion && !isLoading && !showDockedQuestion && renderQuestionCard(false)}
 
                     {isLoading && !currentQuestion && (
                         <motion.div
@@ -922,8 +1120,14 @@ export default function InterviewChat({
                             <div className="relative w-16 h-16">
                                 <div className="absolute inset-0 rounded-full border-4" style={{ borderColor: `${brandColor}20` }}></div>
                                 <div className="absolute inset-0 rounded-full border-4 border-t-transparent animate-spin" style={{ borderColor: brandColor, borderTopColor: 'transparent' }}></div>
-                                <div className="absolute inset-0 flex items-center justify-center">
-                                    <Icons.Logo size={24} />
+                                <div className="absolute inset-[10px] rounded-full bg-white shadow-sm flex items-center justify-center">
+                                    {logoUrl ? (
+                                        <div className="flex h-7 w-7 items-center justify-center">
+                                            <img src={logoUrl} alt={botName} className="max-h-full max-w-full object-contain" />
+                                        </div>
+                                    ) : (
+                                        <Icons.Logo size={22} style={{ color: brandColor }} />
+                                    )}
                                 </div>
                             </div>
                             <p className="text-gray-400 font-medium tracking-wide text-sm uppercase animate-pulse">{t.loading}</p>
@@ -933,8 +1137,24 @@ export default function InterviewChat({
             </div>
 
             {/* Input Area or Completion Screen */}
-            <div className={`${isEmbedded ? 'absolute' : 'fixed'} bottom-0 left-0 right-0 z-50 p-3 md:p-6 ${isEmbedded ? 'pb-4' : 'pb-4 md:pb-8'} bg-gradient-to-t from-white via-white/95 to-transparent ${inputTopPaddingClass}`}>
+            <div
+                ref={footerRef}
+                className={`${isEmbedded ? 'absolute' : 'fixed'} bottom-0 left-0 right-0 z-50 p-3 md:p-6 ${isEmbedded ? 'pb-4' : 'pb-4 md:pb-8'} bg-gradient-to-t from-white via-white/95 to-transparent ${inputTopPaddingClass}`}
+                style={isEmbedded ? undefined : { bottom: `${footerBottomOffsetPx}px` }}
+            >
                 <div className="max-w-3xl mx-auto w-full relative">
+                    {showDockedQuestion && isLoading && currentQuestion && !isCompleted && (
+                        <div className="pointer-events-none">
+                            {renderLoadingIndicator(true)}
+                        </div>
+                    )}
+
+                    {showDockedQuestion && !isCompleted && (
+                        <div className="mb-3 pointer-events-auto">
+                            {renderQuestionCard(true)}
+                        </div>
+                    )}
+
                     {isCompleted ? (
                         <div className="bg-white rounded-[18px] shadow-2xl p-8 text-center border ring-1 ring-black/5 animate-in slide-in-from-bottom-5 fade-in duration-500">
                             <div className="w-16 h-16 rounded-full bg-green-100 text-green-600 flex items-center justify-center mx-auto mb-4">
@@ -1005,9 +1225,17 @@ export default function InterviewChat({
                                         autoResizeTextarea();
                                     }}
                                     onKeyDown={handleKeyDown}
-                                    onFocus={() => setIsInputFocused(true)}
-                                    onBlur={() => setIsInputFocused(false)}
-                                    disabled={isLoading}
+                                    onFocus={() => {
+                                        setIsInputFocused(true);
+                                        requestAnimationFrame(() => scheduleKeyboardAnchoring());
+                                    }}
+                                    onBlur={() => {
+                                        setIsInputFocused(false);
+                                        keyboardAnchorTimersRef.current.forEach((timerId) => window.clearTimeout(timerId));
+                                        keyboardAnchorTimersRef.current = [];
+                                    }}
+                                    readOnly={isLoading}
+                                    aria-disabled={isLoading}
                                     placeholder={t.typePlaceholder}
                                     rows={1}
                                     inputMode="text"
@@ -1022,6 +1250,7 @@ export default function InterviewChat({
                                 <div className="pb-2 md:pb-3 pr-2 md:pr-3 flex items-end">
                                     <button
                                         type="submit"
+                                        onPointerDown={(e) => e.preventDefault()}
                                         disabled={!input.trim() || isLoading}
                                         className="w-10 h-10 md:w-12 md:h-12 rounded-xl flex items-center justify-center text-white shadow-lg transition-all transform disabled:opacity-50 disabled:scale-95 disabled:shadow-none hover:scale-105 active:scale-95"
                                         style={{

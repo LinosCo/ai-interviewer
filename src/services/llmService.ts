@@ -1,12 +1,13 @@
 import { prisma } from '@/lib/prisma';
 import { createOpenAI } from '@ai-sdk/openai';
 import { createAnthropic } from '@ai-sdk/anthropic';
+import { createGoogleGenerativeAI } from '@ai-sdk/google';
 import { Bot } from '@prisma/client';
 import fs from 'fs';
 import path from 'path';
 import { getConfigValue } from '@/lib/config';
 
-export type ModelProvider = 'openai' | 'anthropic';
+export type ModelProvider = 'openai' | 'anthropic' | 'gemini';
 export type InterviewModelRole = 'primary' | 'critical' | 'quality' | 'dataCollection';
 
 interface InterviewModelNames {
@@ -16,12 +17,25 @@ interface InterviewModelNames {
     dataCollection: string;
 }
 
+interface InterviewModelSelection {
+    provider: ModelProvider;
+    name: string;
+}
+
+interface InterviewModelSelections {
+    primary: InterviewModelSelection;
+    critical: InterviewModelSelection;
+    quality: InterviewModelSelection;
+    dataCollection: InterviewModelSelection;
+}
+
 export interface InterviewRuntimeModels {
     primary: any;
     critical: any;
     quality: any;
     dataCollection: any;
     names: InterviewModelNames;
+    providers: Record<InterviewModelRole, ModelProvider>;
 }
 
 // Cache for methodology file - loaded once at startup
@@ -30,6 +44,7 @@ let methodologyCache: string | null = null;
 type LLMGlobalConfig = {
     openaiApiKey: string | null;
     anthropicApiKey: string | null;
+    geminiApiKey: string | null;
 };
 
 // Cache for GlobalConfig - TTL 5 minutes
@@ -50,7 +65,65 @@ export class LLMService {
         if (provider === 'anthropic') {
             return bot.modelName || 'claude-haiku-4-5';
         }
+        if (provider === 'gemini') {
+            return bot.modelName || 'gemini-2.5-flash';
+        }
         return bot.modelName || 'gpt-4.1-mini';
+    }
+
+    private static createSingleProviderSelections(
+        provider: ModelProvider,
+        names: InterviewModelNames
+    ): InterviewModelSelections {
+        return {
+            primary: { provider, name: names.primary },
+            critical: { provider, name: names.critical },
+            quality: { provider, name: names.quality },
+            dataCollection: { provider, name: names.dataCollection }
+        };
+    }
+
+    private static selectionsToNames(selections: InterviewModelSelections): InterviewModelNames {
+        return {
+            primary: selections.primary.name,
+            critical: selections.critical.name,
+            quality: selections.quality.name,
+            dataCollection: selections.dataCollection.name
+        };
+    }
+
+    private static buildAdvancedSelections(availability: Record<ModelProvider, boolean>): InterviewModelSelections {
+        const primary: InterviewModelSelection = availability.openai
+            ? { provider: 'openai', name: 'gpt-4o-mini' }
+            : availability.gemini
+                ? { provider: 'gemini', name: 'gemini-2.5-flash' }
+                : availability.anthropic
+                    ? { provider: 'anthropic', name: 'claude-haiku-4-5' }
+                    : { provider: 'openai', name: 'gpt-4.1-mini' };
+
+        const critical: InterviewModelSelection = availability.openai
+            ? { provider: 'openai', name: 'gpt-4o' }
+            : availability.anthropic
+                ? { provider: 'anthropic', name: 'claude-haiku-4-5' }
+                : availability.gemini
+                    ? { provider: 'gemini', name: 'gemini-2.5-flash' }
+                    : primary;
+
+        const quality: InterviewModelSelection = availability.openai
+            ? { provider: 'openai', name: 'gpt-4o' }
+            : availability.anthropic
+                ? { provider: 'anthropic', name: 'claude-haiku-4-5' }
+                : availability.gemini
+                    ? { provider: 'gemini', name: 'gemini-2.5-flash' }
+                    : critical;
+
+        const dataCollection: InterviewModelSelection = availability.openai
+            ? { provider: 'openai', name: 'gpt-4o-mini' }
+            : availability.gemini
+                ? { provider: 'gemini', name: 'gemini-2.5-flash-lite' }
+            : primary;
+
+        return { primary, critical, quality, dataCollection };
     }
 
     /**
@@ -60,29 +133,38 @@ export class LLMService {
      * Tier → model rationale:
      *  - quantitativo: gpt-4.1-mini primary + gpt-4.1 critical — fast/cheap mass interviews, smarter supervisor
      *  - intermedio:   gpt-4.1 all roles — flagship OpenAI, good signal detection
-     *  - avanzato:     claude-sonnet-4-5-20250929 — genuine superiority for cross-turn synthesis + qualitative reasoning
+     *  - avanzato:     mixed fast primary + stronger critical path — keeps conversational quality while containing latency
      */
     private static applyQualityTierOverride(
-        names: InterviewModelNames,
-        qualityTier: string
-    ): { names: InterviewModelNames; overrideProvider?: ModelProvider } {
+        selections: InterviewModelSelections,
+        qualityTier: string,
+        availability: Record<ModelProvider, boolean>
+    ): InterviewModelSelections {
         if (qualityTier === 'quantitativo') {
+            const names = this.selectionsToNames(selections);
             // Upgrade legacy gpt-4o-mini → gpt-4.1-mini; legacy gpt-4o → gpt-4.1
             const primary = names.primary === 'gpt-4o-mini' ? 'gpt-4.1-mini' : names.primary;
             const critical = names.critical === 'gpt-4o' ? 'gpt-4.1' : names.critical;
-            return { names: { ...names, primary, critical, quality: critical, dataCollection: critical } };
+            return this.createSingleProviderSelections(selections.primary.provider, {
+                ...names,
+                primary,
+                critical,
+                quality: critical,
+                dataCollection: critical
+            });
         }
         if (qualityTier === 'intermedio') {
-            return { names: { primary: 'gpt-4.1', critical: 'gpt-4.1', quality: 'gpt-4.1', dataCollection: 'gpt-4.1' } };
+            return this.createSingleProviderSelections('openai', {
+                primary: 'gpt-4.1',
+                critical: 'gpt-4.1',
+                quality: 'gpt-4.1',
+                dataCollection: 'gpt-4.1'
+            });
         }
         if (qualityTier === 'avanzato') {
-            const claudeModel = 'claude-sonnet-4-5-20250929';
-            return {
-                names: { primary: claudeModel, critical: claudeModel, quality: claudeModel, dataCollection: claudeModel },
-                overrideProvider: 'anthropic'
-            };
+            return this.buildAdvancedSelections(availability);
         }
-        return { names };
+        return selections;
     }
 
     private static getOpenAICriticalFallback(baseModelName: string): string {
@@ -100,7 +182,11 @@ export class LLMService {
     }
 
     private static resolveModelNames(provider: ModelProvider, baseModelName: string): InterviewModelNames {
-        const providerPrefix = provider === 'anthropic' ? 'ANTHROPIC' : 'OPENAI';
+        const providerPrefix = provider === 'anthropic'
+            ? 'ANTHROPIC'
+            : provider === 'gemini'
+                ? 'GEMINI'
+                : 'OPENAI';
         const selectiveRoutingEnabled = this.parseBooleanEnv(
             process.env[`${providerPrefix}_INTERVIEW_SELECTIVE_MODEL_ROUTING`] || process.env.INTERVIEW_SELECTIVE_MODEL_ROUTING,
             true
@@ -135,7 +221,8 @@ export class LLMService {
             where: { id: "default" },
             select: {
                 openaiApiKey: true,
-                anthropicApiKey: true
+                anthropicApiKey: true,
+                geminiApiKey: true
             }
         });
         globalConfigCacheTime = now;
@@ -159,59 +246,84 @@ export class LLMService {
         const globalConfig = await this.getGlobalConfig();
         if (provider === 'openai') {
             return globalConfig?.openaiApiKey || await getConfigValue('openaiApiKey');
-        } else {
+        }
+        if (provider === 'anthropic') {
             return globalConfig?.anthropicApiKey || await getConfigValue('anthropicApiKey');
         }
+        return globalConfig?.geminiApiKey || await getConfigValue('geminiApiKey');
+    }
+
+    private static createProviderFactory(provider: ModelProvider, apiKey: string): any {
+        if (provider === 'anthropic') {
+            return createAnthropic({ apiKey });
+        }
+        if (provider === 'gemini') {
+            return createGoogleGenerativeAI({ apiKey });
+        }
+        return createOpenAI({ apiKey });
     }
 
     static async getInterviewRuntimeModels(bot: Bot): Promise<InterviewRuntimeModels> {
         const provider = (bot.modelProvider as ModelProvider) || 'openai';
         const baseModelName = this.getDefaultModelName(provider, bot);
         const baseNames = this.resolveModelNames(provider, baseModelName);
+        const baseSelections = this.createSingleProviderSelections(provider, baseNames);
+        const [openaiKey, anthropicKey, geminiKey] = await Promise.all([
+            this.getApiKey(bot, 'openai'),
+            this.getApiKey(bot, 'anthropic'),
+            this.getApiKey(bot, 'gemini')
+        ]);
+        const providerAvailability: Record<ModelProvider, boolean> = {
+            openai: Boolean(openaiKey),
+            anthropic: Boolean(anthropicKey),
+            gemini: Boolean(geminiKey)
+        };
 
-        // Apply quality tier override (may switch provider to Anthropic for 'avanzato')
+        // Apply quality tier override. 'avanzato' can mix providers by role.
         const qualityTier = (bot as any).interviewerQuality || 'quantitativo';
-        const { names: tieredNames, overrideProvider } = this.applyQualityTierOverride(baseNames, qualityTier);
-
-        // Determine effective provider and API key
-        const effectiveProvider = overrideProvider || provider;
-        const apiKey = await this.getApiKey(bot, effectiveProvider);
-
-        // Fallback: if avanzato requests Anthropic but no key is configured → use gpt-4.1 (intermedio level)
-        const finalNames = (qualityTier === 'avanzato' && !apiKey)
-            ? { primary: 'gpt-4.1', critical: 'gpt-4.1', quality: 'gpt-4.1', dataCollection: 'gpt-4.1' }
-            : tieredNames;
-
-        const resolvedProvider = (qualityTier === 'avanzato' && !apiKey) ? provider : effectiveProvider;
-        const resolvedApiKey = (qualityTier === 'avanzato' && !apiKey)
-            ? await this.getApiKey(bot, provider)
-            : apiKey;
-
-        if (!resolvedApiKey) {
-            throw new Error(`API key missing for provider: ${resolvedProvider}`);
+        let finalSelections = this.applyQualityTierOverride(baseSelections, qualityTier, providerAvailability);
+        if (qualityTier === 'avanzato' && !providerAvailability.openai && !providerAvailability.anthropic && !providerAvailability.gemini) {
+            finalSelections = this.createSingleProviderSelections('openai', {
+                primary: 'gpt-4.1-mini',
+                critical: 'gpt-4.1',
+                quality: 'gpt-4.1',
+                dataCollection: 'gpt-4.1-mini'
+            });
         }
+        const finalNames = this.selectionsToNames(finalSelections);
 
-        console.log(`🧠 [MODEL_ROUTING] tier=${qualityTier} provider=${resolvedProvider} primary=${finalNames.primary} critical=${finalNames.critical}`);
+        const providerCache = new Map<ModelProvider, any>();
 
-        if (resolvedProvider === 'anthropic') {
-            const anthropic = createAnthropic({ apiKey: resolvedApiKey });
-            return {
-                primary: anthropic(finalNames.primary),
-                critical: anthropic(finalNames.critical),
-                quality: anthropic(finalNames.quality),
-                dataCollection: anthropic(finalNames.dataCollection),
-                names: finalNames
-            };
-        } else {
-            const openai = createOpenAI({ apiKey: resolvedApiKey });
-            return {
-                primary: openai(finalNames.primary),
-                critical: openai(finalNames.critical),
-                quality: openai(finalNames.quality),
-                dataCollection: openai(finalNames.dataCollection),
-                names: finalNames
-            };
-        }
+        const instantiate = async (selection: InterviewModelSelection) => {
+            let factory = providerCache.get(selection.provider);
+            if (!factory) {
+                const apiKey = await this.getApiKey(bot, selection.provider);
+                if (!apiKey) {
+                    throw new Error(`API key missing for provider: ${selection.provider}`);
+                }
+                factory = this.createProviderFactory(selection.provider, apiKey);
+                providerCache.set(selection.provider, factory);
+            }
+            return factory(selection.name);
+        };
+
+        console.log(
+            `🧠 [MODEL_ROUTING] tier=${qualityTier} primary=${finalSelections.primary.provider}:${finalNames.primary} critical=${finalSelections.critical.provider}:${finalNames.critical} quality=${finalSelections.quality.provider}:${finalNames.quality} dataCollection=${finalSelections.dataCollection.provider}:${finalNames.dataCollection}`
+        );
+
+        return {
+            primary: await instantiate(finalSelections.primary),
+            critical: await instantiate(finalSelections.critical),
+            quality: await instantiate(finalSelections.quality),
+            dataCollection: await instantiate(finalSelections.dataCollection),
+            names: finalNames,
+            providers: {
+                primary: finalSelections.primary.provider,
+                critical: finalSelections.critical.provider,
+                quality: finalSelections.quality.provider,
+                dataCollection: finalSelections.dataCollection.provider
+            }
+        };
     }
 
     static async getModel(bot: Bot, role: InterviewModelRole = 'primary') {

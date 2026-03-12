@@ -7,6 +7,7 @@
 import { BetaAnalyticsDataClient } from '@google-analytics/data';
 import { google } from 'googleapis';
 import { prisma } from '@/lib/prisma';
+import { normalizeGscSiteUrl } from '@/lib/integrations/google/normalization';
 import { decrypt } from '../encryption';
 
 export interface GA4Metrics {
@@ -48,7 +49,153 @@ export interface DailyAnalytics {
   gsc?: GSCMetrics;
 }
 
+type GoogleLogLevel = 'info' | 'warn' | 'error';
+
+function serializeGoogleError(error: unknown): Record<string, unknown> {
+  if (error instanceof Error) {
+    const asRecord = error as Error & {
+      code?: string | number;
+      status?: number;
+      response?: { status?: number; data?: unknown };
+      errors?: unknown;
+    };
+
+    return {
+      name: error.name,
+      message: error.message,
+      code: asRecord.code,
+      status: asRecord.status,
+      responseStatus: asRecord.response?.status,
+      responseData: asRecord.response?.data,
+      errors: asRecord.errors,
+    };
+  }
+
+  return { message: String(error || 'Unknown error') };
+}
+
+function logGoogleEvent(
+  stage: string,
+  details: Record<string, unknown>,
+  level: GoogleLogLevel = 'info'
+): void {
+  const payload = { stage, ...details };
+
+  if (level === 'warn') {
+    console.warn('[GoogleService]', payload);
+    return;
+  }
+
+  if (level === 'error') {
+    console.error('[GoogleService]', payload);
+    return;
+  }
+
+  console.info('[GoogleService]', payload);
+}
+
 class GoogleServiceClass {
+  private async writeIntegrationLog(params: {
+    googleConnectionId: string;
+    action: string;
+    arguments?: Record<string, unknown>;
+    result?: Record<string, unknown>;
+    success: boolean;
+    errorMessage?: string | null;
+    durationMs: number;
+  }): Promise<void> {
+    try {
+      await prisma.integrationLog.create({
+        data: {
+          googleConnectionId: params.googleConnectionId,
+          action: params.action,
+          arguments: params.arguments,
+          result: params.result,
+          success: params.success,
+          errorMessage: params.errorMessage || null,
+          creditsUsed: 0,
+          durationMs: params.durationMs,
+        },
+      });
+    } catch (logError) {
+      logGoogleEvent('integration_log_write_failed', {
+        googleConnectionId: params.googleConnectionId,
+        action: params.action,
+        error: serializeGoogleError(logError),
+      }, 'warn');
+    }
+  }
+
+  private normalizeGa4PropertyId(rawPropertyId: string): { value: string; error?: string } {
+    const trimmed = rawPropertyId.trim();
+    const withoutPrefix = trimmed.replace(/^properties\//i, '');
+
+    if (!withoutPrefix) {
+      return { value: '', error: 'GA4 property ID not configured' };
+    }
+
+    if (/^G-/i.test(withoutPrefix)) {
+      return {
+        value: '',
+        error: 'Property ID GA4 non valido: hai inserito un Measurement ID (G-...). Usa il Property ID numerico.',
+      };
+    }
+
+    if (!/^\d+$/.test(withoutPrefix)) {
+      return {
+        value: '',
+        error: 'Property ID GA4 non valido: usa solo il valore numerico (es. 123456789).',
+      };
+    }
+
+    return { value: withoutPrefix };
+  }
+
+  private formatGa4TestError(rawErrorMessage: string, propertyId: string, serviceAccountEmail: string): string {
+    const normalized = rawErrorMessage.toLowerCase();
+    const baseMessage = rawErrorMessage.trim();
+
+    if (normalized.includes('permission_denied') || normalized.includes('sufficient permissions')) {
+      return `PERMISSION_DENIED su Property ID ${propertyId}. Verifica che ${serviceAccountEmail} sia utente della proprietà GA4 (Viewer o superiore), che il Property ID sia numerico (non G-...) e che Analytics Data API sia attiva nel progetto Google Cloud del Service Account.`;
+    }
+
+    if (normalized.includes('not found')) {
+      return `Property ID ${propertyId} non trovato. Controlla di aver inserito il Property ID GA4 numerico corretto (non Measurement ID G-...).`;
+    }
+
+    return baseMessage || 'Unknown error';
+  }
+
+  private formatGscTestError(rawErrorMessage: string, siteUrl: string, serviceAccountEmail: string): string {
+    const normalized = rawErrorMessage.toLowerCase();
+    const baseMessage = rawErrorMessage.trim();
+
+    if (normalized.includes('permission_denied') || normalized.includes('sufficient permission')) {
+      return `PERMISSION_DENIED su site '${siteUrl}'. Verifica che ${serviceAccountEmail} sia utente della proprietà Search Console corretta e che il formato sia esatto: URL-prefix => https://dominio.tld/ (slash finale), Domain property => sc-domain:dominio.tld.`;
+    }
+
+    if (normalized.includes('not found')) {
+      return `Proprietà Search Console non trovata per '${siteUrl}'. Controlla formato e corrispondenza esatta della proprietà (URL-prefix con slash finale oppure sc-domain:dominio.tld).`;
+    }
+
+    return baseMessage || 'Unknown error';
+  }
+
+  private async listAccessibleGscSites(client: ReturnType<typeof google.searchconsole>): Promise<string[]> {
+    try {
+      const response = await client.sites.list();
+      const entries = Array.isArray(response.data.siteEntry) ? response.data.siteEntry : [];
+      return entries
+        .map((entry: { siteUrl?: string | null }) => String(entry.siteUrl || '').trim())
+        .filter(Boolean);
+    } catch (error) {
+      logGoogleEvent('gsc_sites_list_failure', {
+        error: serializeGoogleError(error),
+      }, 'warn');
+      return [];
+    }
+  }
+
   /**
    * Create GA4 client with Service Account credentials
    */
@@ -73,20 +220,76 @@ class GoogleServiceClass {
    * Test GA4 connection
    */
   async testGA4(connectionId: string): Promise<TestConnectionResult> {
+    const startedAt = Date.now();
     const connection = await prisma.googleConnection.findUnique({
       where: { id: connectionId },
+      select: {
+        id: true,
+        projectId: true,
+        serviceAccountJson: true,
+        serviceAccountEmail: true,
+        ga4PropertyId: true,
+        project: {
+          select: {
+            id: true,
+            name: true,
+          },
+        },
+      },
     });
 
     if (!connection?.ga4PropertyId) {
+      logGoogleEvent('ga4_test_skipped', {
+        connectionId,
+        reason: 'GA4 not configured',
+      }, 'warn');
       return { success: false, error: 'GA4 not configured' };
+    }
+
+    const normalizedProperty = this.normalizeGa4PropertyId(connection.ga4PropertyId);
+    logGoogleEvent('ga4_test_start', {
+      connectionId,
+      projectId: connection.projectId,
+      projectName: connection.project?.name || null,
+      serviceAccountEmail: connection.serviceAccountEmail,
+      rawPropertyId: connection.ga4PropertyId,
+      normalizedPropertyId: normalizedProperty.value || null,
+      normalizationError: normalizedProperty.error || null,
+    });
+    if (normalizedProperty.error) {
+      await prisma.googleConnection.update({
+        where: { id: connectionId },
+        data: {
+          ga4Status: 'ERROR',
+          ga4LastError: normalizedProperty.error,
+        },
+      });
+      await this.writeIntegrationLog({
+        googleConnectionId: connectionId,
+        action: 'google.test_ga4',
+        arguments: {
+          projectId: connection.projectId,
+          projectName: connection.project?.name || null,
+          serviceAccountEmail: connection.serviceAccountEmail,
+          rawPropertyId: connection.ga4PropertyId,
+        },
+        result: {
+          normalizedPropertyId: normalizedProperty.value || null,
+          validationError: normalizedProperty.error,
+        },
+        success: false,
+        errorMessage: normalizedProperty.error,
+        durationMs: Date.now() - startedAt,
+      });
+      return { success: false, error: normalizedProperty.error };
     }
 
     try {
       const client = this.createGA4Client(connection.serviceAccountJson);
 
       // Run a simple query to test the connection
-      const [response] = await client.runReport({
-        property: `properties/${connection.ga4PropertyId}`,
+      await client.runReport({
+        property: `properties/${normalizedProperty.value}`,
         dateRanges: [{ startDate: '7daysAgo', endDate: 'today' }],
         metrics: [{ name: 'sessions' }],
         limit: 1,
@@ -102,12 +305,36 @@ class GoogleServiceClass {
         },
       });
 
+      logGoogleEvent('ga4_test_success', {
+        connectionId,
+        projectId: connection.projectId,
+        projectName: connection.project?.name || null,
+        propertyId: normalizedProperty.value,
+        durationMs: Date.now() - startedAt,
+      });
+      await this.writeIntegrationLog({
+        googleConnectionId: connectionId,
+        action: 'google.test_ga4',
+        arguments: {
+          projectId: connection.projectId,
+          projectName: connection.project?.name || null,
+          serviceAccountEmail: connection.serviceAccountEmail,
+          propertyId: normalizedProperty.value,
+        },
+        result: {
+          propertyName: `Property ${normalizedProperty.value}`,
+        },
+        success: true,
+        durationMs: Date.now() - startedAt,
+      });
+
       return {
         success: true,
-        propertyName: `Property ${connection.ga4PropertyId}`,
+        propertyName: `Property ${normalizedProperty.value}`,
       };
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      const rawErrorMessage = error instanceof Error ? error.message : 'Unknown error';
+      const errorMessage = this.formatGa4TestError(rawErrorMessage, normalizedProperty.value, connection.serviceAccountEmail);
 
       await prisma.googleConnection.update({
         where: { id: connectionId },
@@ -115,6 +342,34 @@ class GoogleServiceClass {
           ga4Status: 'ERROR',
           ga4LastError: errorMessage,
         },
+      });
+
+      logGoogleEvent('ga4_test_failure', {
+        connectionId,
+        projectId: connection.projectId,
+        projectName: connection.project?.name || null,
+        serviceAccountEmail: connection.serviceAccountEmail,
+        propertyId: normalizedProperty.value,
+        formattedError: errorMessage,
+        rawError: serializeGoogleError(error),
+        durationMs: Date.now() - startedAt,
+      }, 'error');
+      await this.writeIntegrationLog({
+        googleConnectionId: connectionId,
+        action: 'google.test_ga4',
+        arguments: {
+          projectId: connection.projectId,
+          projectName: connection.project?.name || null,
+          serviceAccountEmail: connection.serviceAccountEmail,
+          propertyId: normalizedProperty.value,
+        },
+        result: {
+          rawError: serializeGoogleError(error),
+          formattedError: errorMessage,
+        },
+        success: false,
+        errorMessage,
+        durationMs: Date.now() - startedAt,
       });
 
       return { success: false, error: errorMessage };
@@ -125,13 +380,68 @@ class GoogleServiceClass {
    * Test Search Console connection
    */
   async testGSC(connectionId: string): Promise<TestConnectionResult> {
+    const startedAt = Date.now();
     const connection = await prisma.googleConnection.findUnique({
       where: { id: connectionId },
+      select: {
+        id: true,
+        projectId: true,
+        serviceAccountJson: true,
+        serviceAccountEmail: true,
+        gscSiteUrl: true,
+        project: {
+          select: {
+            id: true,
+            name: true,
+          },
+        },
+      },
     });
 
     if (!connection?.gscSiteUrl) {
+      logGoogleEvent('gsc_test_skipped', {
+        connectionId,
+        reason: 'Search Console not configured',
+      }, 'warn');
       return { success: false, error: 'Search Console not configured' };
     }
+
+    const normalizedSite = normalizeGscSiteUrl(connection.gscSiteUrl);
+    logGoogleEvent('gsc_test_site_normalization', {
+      connectionId,
+      projectId: connection.projectId,
+      rawSiteUrl: connection.gscSiteUrl,
+      normalizedSiteUrl: normalizedSite.value || null,
+      normalizationError: normalizedSite.error || null,
+    });
+    if (normalizedSite.error) {
+      await prisma.googleConnection.update({
+        where: { id: connectionId },
+        data: {
+          gscStatus: 'ERROR',
+          gscLastError: normalizedSite.error,
+        },
+      });
+      await this.writeIntegrationLog({
+        googleConnectionId: connectionId,
+        action: 'google.test_gsc',
+        arguments: {
+          projectId: connection.projectId,
+          projectName: connection.project?.name || null,
+          serviceAccountEmail: connection.serviceAccountEmail,
+          siteUrl: connection.gscSiteUrl,
+        },
+        result: {
+          normalizedSiteUrl: normalizedSite.value || null,
+        },
+        success: false,
+        errorMessage: normalizedSite.error,
+        durationMs: Date.now() - startedAt,
+      });
+      return { success: false, error: normalizedSite.error };
+    }
+
+    let accessibleSites: string[] = [];
 
     try {
       const client = this.createGSCClient(connection.serviceAccountJson);
@@ -140,15 +450,95 @@ class GoogleServiceClass {
       const yesterday = new Date();
       yesterday.setDate(yesterday.getDate() - 1);
       const dateStr = yesterday.toISOString().split('T')[0];
+      logGoogleEvent('gsc_test_start', {
+        connectionId,
+        projectId: connection.projectId,
+        projectName: connection.project?.name || null,
+        serviceAccountEmail: connection.serviceAccountEmail,
+        siteUrl: normalizedSite.value,
+        queryDate: dateStr,
+      });
+
+      accessibleSites = await this.listAccessibleGscSites(client);
+      logGoogleEvent('gsc_test_accessible_sites', {
+        connectionId,
+        projectId: connection.projectId,
+        siteUrl: normalizedSite.value,
+        accessibleSitesCount: accessibleSites.length,
+        accessibleSitesSample: accessibleSites.slice(0, 10),
+      });
+
+      if (accessibleSites.length > 0 && !accessibleSites.includes(normalizedSite.value)) {
+        const targetHost = normalizedSite.value.startsWith('http')
+          ? new URL(normalizedSite.value).hostname.replace(/^www\./i, '').toLowerCase()
+          : null;
+        const domainCandidate = targetHost ? `sc-domain:${targetHost}` : null;
+        const hasDomainCandidate = domainCandidate ? accessibleSites.includes(domainCandidate) : false;
+        const visibleSites = accessibleSites.slice(0, 6).join(', ');
+        const mismatchError = hasDomainCandidate
+          ? `Il service account ${connection.serviceAccountEmail} non vede la proprietà '${normalizedSite.value}'. Usa '${domainCandidate}' oppure aggiungi il service account alla property URL-prefix esatta. Proprietà visibili: ${visibleSites}.`
+          : `Il service account ${connection.serviceAccountEmail} non vede la proprietà '${normalizedSite.value}'. Proprietà visibili: ${visibleSites}.`;
+
+        await prisma.googleConnection.update({
+          where: { id: connectionId },
+          data: {
+            gscStatus: 'ERROR',
+            gscLastError: mismatchError,
+          },
+        });
+
+        await this.writeIntegrationLog({
+          googleConnectionId: connectionId,
+          action: 'google.test_gsc',
+          arguments: {
+            projectId: connection.projectId,
+            projectName: connection.project?.name || null,
+            serviceAccountEmail: connection.serviceAccountEmail,
+            siteUrl: normalizedSite.value,
+          },
+          result: {
+            accessibleSites: accessibleSites.slice(0, 20),
+          },
+          success: false,
+          errorMessage: mismatchError,
+          durationMs: Date.now() - startedAt,
+        });
+
+        return { success: false, error: mismatchError };
+      }
 
       await client.searchanalytics.query({
-        siteUrl: connection.gscSiteUrl,
+        siteUrl: normalizedSite.value,
         requestBody: {
           startDate: dateStr,
           endDate: dateStr,
           dimensions: ['query'],
           rowLimit: 1,
         },
+      });
+
+      logGoogleEvent('gsc_test_success', {
+        connectionId,
+        projectId: connection.projectId,
+        projectName: connection.project?.name || null,
+        siteUrl: normalizedSite.value,
+        durationMs: Date.now() - startedAt,
+      });
+      await this.writeIntegrationLog({
+        googleConnectionId: connectionId,
+        action: 'google.test_gsc',
+        arguments: {
+          projectId: connection.projectId,
+          projectName: connection.project?.name || null,
+          serviceAccountEmail: connection.serviceAccountEmail,
+          siteUrl: normalizedSite.value,
+          queryDate: dateStr,
+        },
+        result: {
+          siteUrl: normalizedSite.value,
+        },
+        success: true,
+        durationMs: Date.now() - startedAt,
       });
 
       // Update connection status
@@ -163,10 +553,14 @@ class GoogleServiceClass {
 
       return {
         success: true,
-        siteUrl: connection.gscSiteUrl,
+        siteUrl: normalizedSite.value,
       };
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      const rawErrorMessage = error instanceof Error ? error.message : 'Unknown error';
+      const baseError = this.formatGscTestError(rawErrorMessage, normalizedSite.value, connection.serviceAccountEmail);
+      const errorMessage = accessibleSites.length > 0
+        ? `${baseError} Proprietà visibili per questo service account: ${accessibleSites.slice(0, 6).join(', ')}.`
+        : baseError;
 
       await prisma.googleConnection.update({
         where: { id: connectionId },
@@ -174,6 +568,34 @@ class GoogleServiceClass {
           gscStatus: 'ERROR',
           gscLastError: errorMessage,
         },
+      });
+
+      logGoogleEvent('gsc_test_failure', {
+        connectionId,
+        projectId: connection.projectId,
+        projectName: connection.project?.name || null,
+        serviceAccountEmail: connection.serviceAccountEmail,
+        siteUrl: normalizedSite.value,
+        formattedError: errorMessage,
+        rawError: serializeGoogleError(error),
+        durationMs: Date.now() - startedAt,
+      }, 'error');
+      await this.writeIntegrationLog({
+        googleConnectionId: connectionId,
+        action: 'google.test_gsc',
+        arguments: {
+          projectId: connection.projectId,
+          projectName: connection.project?.name || null,
+          serviceAccountEmail: connection.serviceAccountEmail,
+          siteUrl: normalizedSite.value,
+        },
+        result: {
+          rawError: serializeGoogleError(error),
+          formattedError: errorMessage,
+        },
+        success: false,
+        errorMessage,
+        durationMs: Date.now() - startedAt,
       });
 
       return { success: false, error: errorMessage };
@@ -203,7 +625,11 @@ class GoogleServiceClass {
       try {
         result.ga4 = await this.fetchGA4Metrics(connection, dateStr);
       } catch (error) {
-        console.error('GA4 fetch error:', error);
+        logGoogleEvent('ga4_fetch_failure', {
+          connectionId,
+          date: dateStr,
+          error: serializeGoogleError(error),
+        }, 'error');
       }
     }
 
@@ -212,7 +638,11 @@ class GoogleServiceClass {
       try {
         result.gsc = await this.fetchGSCMetrics(connection, dateStr);
       } catch (error) {
-        console.error('GSC fetch error:', error);
+        logGoogleEvent('gsc_fetch_failure', {
+          connectionId,
+          date: dateStr,
+          error: serializeGoogleError(error),
+        }, 'error');
       }
     }
 
@@ -230,8 +660,13 @@ class GoogleServiceClass {
       throw new Error('GA4 property ID not configured');
     }
 
+    const normalizedProperty = this.normalizeGa4PropertyId(connection.ga4PropertyId);
+    if (normalizedProperty.error) {
+      throw new Error(normalizedProperty.error);
+    }
+
     const client = this.createGA4Client(connection.serviceAccountJson);
-    const property = `properties/${connection.ga4PropertyId}`;
+    const property = `properties/${normalizedProperty.value}`;
 
     // Fetch main metrics
     const [metricsResponse] = await client.runReport({
@@ -286,10 +721,15 @@ class GoogleServiceClass {
       throw new Error('GSC site URL not configured');
     }
 
+    const normalizedSite = normalizeGscSiteUrl(connection.gscSiteUrl);
+    if (normalizedSite.error) {
+      throw new Error(normalizedSite.error);
+    }
+
     const client = this.createGSCClient(connection.serviceAccountJson);
 
     const response = await client.searchanalytics.query({
-      siteUrl: connection.gscSiteUrl,
+      siteUrl: normalizedSite.value,
       requestBody: {
         startDate: dateStr,
         endDate: dateStr,

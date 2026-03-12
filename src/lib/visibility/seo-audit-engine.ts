@@ -145,7 +145,7 @@ function scoreImages(total: number, withAlt: number): { score: number; issues: s
 
     const coverage = total > 0 ? (withAlt / total) * 100 : 100;
     const issues: string[] = [];
-    let score = Math.round(coverage);
+    const score = Math.round(coverage);
 
     const missing = total - withAlt;
     if (missing > 0) {

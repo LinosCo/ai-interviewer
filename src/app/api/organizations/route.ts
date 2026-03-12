@@ -107,6 +107,7 @@ export async function POST(request: Request) {
     if (!session?.user?.id) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
+    const userId = session.user.id;
 
     const body = await request.json().catch(() => ({}));
     const rawName = typeof body?.name === 'string' ? body.name.trim() : '';
@@ -146,7 +147,7 @@ export async function POST(request: Request) {
 
       await tx.membership.create({
         data: {
-          userId: session.user.id!,
+          userId,
           organizationId: createdOrg.id,
           role: 'OWNER',
           status: 'ACTIVE',

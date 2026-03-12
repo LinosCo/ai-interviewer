@@ -1,6 +1,7 @@
 import { prisma } from '@/lib/prisma';
 import { scrapeWebsiteWithSubpages, MultiPageScrapedContent, AdditionalUrl } from '@/lib/scraping';
-import { getSystemLLM } from './llm-providers';
+import { checkProviderConfiguration, getLLMProvider, VISIBILITY_PROVIDERS } from './llm-providers';
+import { ProjectTipService } from '@/lib/projects/project-tip.service';
 import {
     defaultPublicationRouting,
     inferContentKind,
@@ -143,6 +144,15 @@ const FullAnalysisSchema = z.object({
 });
 
 export class WebsiteAnalysisEngine {
+    private static isProviderBillingError(error: unknown): boolean {
+        const message = (error instanceof Error ? error.message : String(error || '')).toLowerCase();
+        return (
+            message.includes('credit balance is too low')
+            || message.includes('plans & billing')
+            || message.includes('purchase credits')
+        );
+    }
+
     private static normalizeAnalysisObject(object: z.infer<typeof FullAnalysisSchema>) {
         if (object.valueProposition.uniqueness === 'moderate') {
             object.valueProposition.uniqueness = 'generic';
@@ -241,7 +251,7 @@ export class WebsiteAnalysisEngine {
             `- Un esempio concreto di applicazione nel contesto del brand.`,
             `- Una CTA finale con passo successivo misurabile.`,
             ``,
-            `## Perche ora`,
+            `## Perché ora`,
             `Questo intervento e prioritario per migliorare copertura prompt AI, comprensione utente e conversione delle visite.`,
             ``,
             `## Pagina target`,
@@ -856,6 +866,11 @@ export class WebsiteAnalysisEngine {
                     promptsAddressed
                 }
             });
+            try {
+                await ProjectTipService.materializeFromWebsiteAnalysis(analysisId);
+            } catch (error) {
+                console.warn('[project-tip-dual-write] website-analysis materialization failed', { analysisId, error });
+            }
 
             console.log(`[website-analysis] Analysis complete. Score: ${overallScore}`);
             return { success: true, analysisId, overallScore };
@@ -884,8 +899,6 @@ export class WebsiteAnalysisEngine {
         strategicContext: StrategicContext,
         language: string
     ) {
-        const { model } = await getSystemLLM({ preferLatestVisibilityModel: true });
-
         // Build pages summary for context
         const pagesSummary = [
             `Homepage: ${content.homepage.title}`,
@@ -918,10 +931,7 @@ export class WebsiteAnalysisEngine {
         };
         const languageInstruction = languageMap[language] || languageMap.it;
 
-        const { object } = await generateObject({
-            model,
-            schema: FullAnalysisSchema,
-            prompt: `Sei un consulente strategico esperto di visibilità AI (LLM come ChatGPT, Claude, Gemini) e SEO.
+        const analysisPrompt = `Sei un consulente strategico esperto di visibilità AI (LLM come ChatGPT, Claude, Gemini) e SEO.
 La tua analisi deve essere STRATEGICA, SPECIFICA e AZIONABILE - non generica.
 
 Hai accesso a dati multi-canale dell'organizzazione che ti permettono di fare raccomandazioni molto più mirate rispetto a una semplice analisi del sito.
@@ -1029,10 +1039,35 @@ La tua analisi deve essere STRATEGICA e BASATA SUI DATI. Non fornire raccomandaz
      • targetEntityId/targetEntitySlug (solo product_content_optimization, se disponibile)
    - Il testo deve essere ottimizzato per LLM: esplicita brand, prodotto/servizio e termini chiave del prompt.
    - Ogni body deve contenere almeno: Obiettivo, Azione concreta, Esempio applicato, CTA operativa.
-   - Non includere claim non verificati; se un dato non è nelle fonti, riformula come ipotesi o suggerisci verifica.`
-        });
+   - Non includere claim non verificati; se un dato non è nelle fonti, riformula come ipotesi o suggerisci verifica.`;
 
-        return this.normalizeAnalysisObject(object);
+        const providerOrder: Array<'openai' | 'anthropic' | 'gemini'> = ['openai', 'anthropic', 'gemini'];
+        let lastError: unknown = null;
+
+        for (const provider of providerOrder) {
+            const configuration = await checkProviderConfiguration(provider);
+            if (!configuration.configured) continue;
+
+            try {
+                const providerFactory = await getLLMProvider(provider);
+                const modelName = VISIBILITY_PROVIDERS[provider].model;
+                const { object } = await generateObject({
+                    model: providerFactory(modelName) as any,
+                    schema: FullAnalysisSchema,
+                    prompt: analysisPrompt
+                });
+                return this.normalizeAnalysisObject(object);
+            } catch (error) {
+                lastError = error;
+                if (provider === 'anthropic' && this.isProviderBillingError(error)) {
+                    console.warn('[website-analysis] Anthropic credit/billing limit reached, trying next provider');
+                } else {
+                    console.warn(`[website-analysis] ${provider} structured analysis failed, trying next provider`);
+                }
+            }
+        }
+
+        throw (lastError || new Error('No configured LLM provider could complete website analysis'));
     }
 
     /**

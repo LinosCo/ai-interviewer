@@ -389,6 +389,32 @@ export function AiRoutingTab({
         </p>
       </div>
 
+      <div className="space-y-3">
+        <p className="text-[10px] font-black uppercase tracking-widest text-gray-400">Ricette guidate</p>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+          <div className="rounded-2xl border border-slate-200 bg-white p-4">
+            <p className="text-sm font-semibold text-slate-900">Bozza articolo SEO su WordPress</p>
+            <p className="mt-1 text-xs text-slate-600">Prerequisiti: WordPress attivo, regola con destinazione WordPress.</p>
+            <p className="mt-1 text-xs text-slate-600">Accetta: SEO on-page, content strategy.</p>
+          </div>
+          <div className="rounded-2xl border border-slate-200 bg-white p-4">
+            <p className="text-sm font-semibold text-slate-900">Intervento schema/GEO verso CMS o MCP</p>
+            <p className="mt-1 text-xs text-slate-600">Prerequisiti: CMS voler.ai o MCP attivo, policy approvazione definita.</p>
+            <p className="mt-1 text-xs text-slate-600">Accetta: llmo_schema, geo_visibility.</p>
+          </div>
+          <div className="rounded-2xl border border-slate-200 bg-white p-4">
+            <p className="text-sm font-semibold text-slate-900">Contenuti social verso n8n</p>
+            <p className="mt-1 text-xs text-slate-600">Prerequisiti: webhook n8n attivo e template downstream pronto.</p>
+            <p className="mt-1 text-xs text-slate-600">Accetta: content strategy, llmo_content.</p>
+          </div>
+          <div className="rounded-2xl border border-slate-200 bg-white p-4">
+            <p className="text-sm font-semibold text-slate-900">Payload monitoraggio/report su webhook</p>
+            <p className="mt-1 text-xs text-slate-600">Prerequisiti: n8n o destinazione webhook configurata.</p>
+            <p className="mt-1 text-xs text-slate-600">Accetta: gsc_performance, seo_technical.</p>
+          </div>
+        </div>
+      </div>
+
       {/* Add/Edit rule form */}
       <AnimatePresence>
         {showForm && (

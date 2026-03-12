@@ -18,6 +18,7 @@ import { z } from 'zod';
 import { generateObject } from 'ai';
 import { prisma } from '@/lib/prisma';
 import { getSystemLLM } from '@/lib/visibility/llm-providers';
+import { ProjectTipService } from '@/lib/projects/project-tip.service';
 import { crawlSite, type SiteCrawlResult } from './site-crawler-engine';
 
 // ─── AI Tips Schema ───────────────────────────────────────────────────────────
@@ -371,6 +372,11 @@ export class BrandReportEngine {
                     generatedAt: new Date(),
                 },
             });
+            try {
+                await ProjectTipService.materializeFromBrandReport(reportId);
+            } catch (error) {
+                console.warn('[project-tip-dual-write] brand-report materialization failed', { reportId, error });
+            }
 
             return reportId;
         } catch (error: unknown) {

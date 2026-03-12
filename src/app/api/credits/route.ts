@@ -64,6 +64,7 @@ export async function GET(req: Request) {
             monthlyRemaining: Number(status.monthlyRemaining),
             packAvailable: Number(status.packCredits),
             totalAvailable: Number(status.totalAvailable),
+            usingPackCredits: Number(status.monthlyRemaining) <= 0 && Number(status.packCredits) > 0,
             percentageUsed: status.usagePercentage,
             resetDate: resetDateFormatted,
             alertLevel: status.warningLevel === 'none' ? null : status.warningLevel,

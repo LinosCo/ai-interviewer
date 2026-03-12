@@ -1,4 +1,3 @@
-// @ts-nocheck – tests skipped (describe.skip); methods were removed in PromptBuilder refactor
 import { beforeAll, describe, expect, it, vi } from 'vitest';
 
 vi.mock('@/lib/memory/memory-manager', () => ({

@@ -4,7 +4,7 @@ import { buildMarketingMetadata } from '@/lib/seo';
 export const metadata: Metadata = buildMarketingMetadata({
   title: 'Programma Partner per Agenzie e Consulenti',
   description:
-    'Modello partner per agenzie, consulenti strategici e business advisor: ascolto stakeholder, Copilot decisionale e operativita tracciabile per clienti PMI e corporate.',
+    'Modello partner per agenzie, consulenti strategici e business advisor: ascolto stakeholder, Copilot decisionale e operatività tracciabile per clienti PMI e corporate.',
   path: '/partner',
   keywords: [
     'programma partner agenzie',

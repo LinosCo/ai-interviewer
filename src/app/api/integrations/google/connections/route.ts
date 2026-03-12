@@ -9,6 +9,7 @@ import { NextResponse } from 'next/server';
 import { auth } from '@/auth';
 import { prisma } from '@/lib/prisma';
 import { encrypt } from '@/lib/integrations/encryption';
+import { normalizeGscSiteUrl } from '@/lib/integrations/google/normalization';
 import { checkIntegrationCreationAllowed } from '@/lib/trial-limits';
 import { WorkspaceError, assertProjectAccess } from '@/lib/domain/workspace';
 
@@ -70,12 +71,23 @@ export async function POST(request: Request) {
 
     const body = await request.json();
     const { projectId, serviceAccountJson, ga4PropertyId, gscSiteUrl } = body;
+    const normalizedGa4PropertyId = typeof ga4PropertyId === 'string' ? ga4PropertyId.trim() : '';
+    const rawGscSiteUrl = typeof gscSiteUrl === 'string' ? gscSiteUrl.trim() : '';
 
     if (!projectId || !serviceAccountJson) {
       return NextResponse.json(
         { error: 'Missing required fields: projectId, serviceAccountJson' },
         { status: 400 }
       );
+    }
+
+    let normalizedGscSiteUrl: string | null = null;
+    if (rawGscSiteUrl) {
+      const normalized = normalizeGscSiteUrl(rawGscSiteUrl);
+      if (normalized.error) {
+        return NextResponse.json({ error: normalized.error }, { status: 400 });
+      }
+      normalizedGscSiteUrl = normalized.value;
     }
 
     await assertProjectAccess(session.user.id, projectId, 'ADMIN');
@@ -129,12 +141,12 @@ export async function POST(request: Request) {
         projectId,
         serviceAccountEmail: serviceAccount.client_email,
         serviceAccountJson: encryptedJson,
-        ga4Enabled: !!ga4PropertyId,
-        ga4PropertyId: ga4PropertyId || null,
-        ga4Status: ga4PropertyId ? 'PENDING' : 'DISABLED',
-        gscEnabled: !!gscSiteUrl,
-        gscSiteUrl: gscSiteUrl || null,
-        gscStatus: gscSiteUrl ? 'PENDING' : 'DISABLED',
+        ga4Enabled: !!normalizedGa4PropertyId,
+        ga4PropertyId: normalizedGa4PropertyId || null,
+        ga4Status: normalizedGa4PropertyId ? 'PENDING' : 'DISABLED',
+        gscEnabled: !!normalizedGscSiteUrl,
+        gscSiteUrl: normalizedGscSiteUrl,
+        gscStatus: normalizedGscSiteUrl ? 'PENDING' : 'DISABLED',
         createdBy: session.user.id
       },
       select: {

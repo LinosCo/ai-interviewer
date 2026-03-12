@@ -177,7 +177,7 @@ function normalizeFinalQuizQuestions(rawQuestions: QuizQuestion[], language = 'i
       : 'Answer aligned with the topic key concepts.'
 
   const normalized = rawQuestions
-    .map((q, index) => {
+    .map((q, index): QuizQuestion | null => {
       const id = (q.id || `q${index + 1}`).trim() || `q${index + 1}`
       const question = (q.question || '').trim()
       if (!question) return null

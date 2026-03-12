@@ -10,6 +10,10 @@ export interface KBEntry {
     keywords: string[];
 }
 
+function escapeRegexLiteral(value: string): string {
+    return String(value || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
 // Platform knowledge base content
 export const PLATFORM_KB: KBEntry[] = [
     // Getting Started
@@ -180,10 +184,10 @@ Risolvere i gap migliora l'esperienza utente e riduce il carico sul supporto.`,
         title: 'Cos\'e il Brand Monitor (Visibility Tracker)',
         content: `Il Brand Monitor (ex Visibility Tracker) monitora come il tuo brand appare nelle risposte degli AI e nei risultati di ricerca Google.
 
-**Monitoraggio Multi-LLM:**
-- OpenAI (GPT-4o-mini)
-- Anthropic (Claude 3.5 Haiku)
-- Google Gemini (Gemini 2.0 Flash)
+**Monitoraggio AI:**
+- Analisi della visibilita del brand sulle principali piattaforme AI
+- Confronto tra risposte e posizione del brand nei prompt monitorati
+- Tracciamento continuo dell'evoluzione nel tempo
 
 **SERP Monitoring:**
 - Traccia le menzioni su Google Search
@@ -221,7 +225,7 @@ Questo ti aiuta a capire quanto sei "visibile" nel nuovo mondo delle ricerche AI
 5. Avvia la prima scansione
 
 **Come funziona la scansione:**
-- Interroga simultaneamente OpenAI, Anthropic e Gemini
+- Interroga automaticamente le piattaforme AI configurate
 - Analizza le risposte per trovare menzioni del brand
 - Calcola posizione e sentiment
 - Genera uno score di visibilita (0-100)
@@ -428,8 +432,8 @@ Per ogni topic block:
 - 31-60: Visibilita media, presente ma non dominante
 - 61-100: Alta visibilita, brand ben posizionato
 
-**2. Risultati per LLM**
-Per ogni provider (OpenAI, Anthropic, Gemini):
+**2. Risultati per piattaforma AI**
+Per ogni piattaforma monitorata:
 - Brand menzionato: Si/No
 - Posizione: dove appare nella lista (1 = primo)
 - Competitor positions: dove appaiono i concorrenti
@@ -548,7 +552,7 @@ Per ogni provider (OpenAI, Anthropic, Gemini):
     {
         id: 'cop-1',
         title: 'Strategy Copilot',
-        content: `Lo Strategy Copilot e un assistente AI avanzato alimentato da Claude 4.5 Opus che ti aiuta a:
+        content: `Lo Strategy Copilot e un assistente AI avanzato che ti aiuta a:
 
 **Per tutti gli utenti:**
 - Rispondere a domande su come usare Business Tuner
@@ -589,7 +593,7 @@ Clicca sull'icona del Copilot nella sidebar o usa la scorciatoia da tastiera.
 **Per ogni tip trovi:**
 - Coerenza strategica con Vision, Value Proposition e Piano Strategico Copilot
 - Evidenze sintetiche (numeri o segnali concreti)
-- Logica del suggerimento (perche e stato proposto)
+- Logica del suggerimento (perché è stato proposto)
 - Canali dati considerati
 
 **Tipologie principali:**
@@ -655,10 +659,11 @@ Clicca sull'icona del Copilot nella sidebar o usa la scorciatoia da tastiera.
 - Vai su Progetto > Integrazioni
 - Verifica che il progetto selezionato sia quello corretto
 
-**Step 2: Collega canali CMS**
-- WordPress MCP: per pagine, blog e news
-- WooCommerce MCP: per descrizioni prodotto e catalogo
-- CMS API: se usi un CMS custom
+**Step 2: Collega WordPress/WooCommerce via MCP (prerequisito plugin)**
+- Installa e attiva un plugin/server MCP compatibile nel sito WordPress
+- Verifica endpoint MCP raggiungibile (es. /wp-json/mcp/v1)
+- WordPress MCP: usa Username + Application Password
+- WooCommerce MCP: usa Consumer Key + Consumer Secret (REST API key read/write)
 
 **Step 3: Collega canali analytics**
 - GA4: comportamento utenti (sessioni, bounce, pagine)
@@ -676,9 +681,19 @@ Clicca sull'icona del Copilot nella sidebar o usa la scorciatoia da tastiera.
 - WordPress o CMS API attivo
 - GA4 attivo
 - GSC attivo
-- (Opzionale) WooCommerce attivo per use case prodotto`,
+- (Opzionale) WooCommerce attivo per use case prodotto
+
+**Documentazione rapida (link ufficiali)**
+- WordPress - installare plugin: https://wordpress.org/support/article/plugins-add-new-screen/
+- WordPress MCP (esempio setup): https://mcp-wp.github.io/docs/mcp-server/installation
+- WordPress Application Passwords: https://developer.wordpress.org/advanced-administration/security/application-passwords/
+- WooCommerce REST API keys: https://woocommerce.com/document/woocommerce-rest-api/
+- Google Service Account: https://cloud.google.com/iam/docs/service-accounts-create
+- Google Service Account JSON key: https://cloud.google.com/iam/docs/keys-create-delete
+- GA4 permessi: https://support.google.com/analytics/answer/9305788?hl=it
+- GSC permessi: https://support.google.com/webmasters/answer/7687615?hl=it`,
         category: 'copilot',
-        keywords: ['setup', 'integrazioni', 'wordpress', 'woocommerce', 'ga4', 'gsc', 'connessione', 'test']
+        keywords: ['setup', 'integrazioni', 'wordpress', 'woocommerce', 'mcp', 'plugin', 'ga4', 'gsc', 'connessione', 'test']
     },
     {
         id: 'cop-6',
@@ -690,7 +705,7 @@ Clicca sull'icona del Copilot nella sidebar o usa la scorciatoia da tastiera.
 2. Attendi AI Tips con logica, evidenze e allineamento strategico
 
 **Fase 2: Revisione**
-1. Apri il tip e leggi \"Perche\" + \"Logica del suggerimento AI\"
+1. Apri il tip e leggi \"Perché\" + \"Logica del suggerimento AI\"
 2. Verifica coerenza con Piano Strategico Copilot
 3. Controlla se il tip e new content o update di contenuto esistente
 
@@ -750,7 +765,7 @@ Clicca sull'icona del Copilot nella sidebar o usa la scorciatoia da tastiera.
         content: `Configurazione consigliata per ottenere insight utili e confrontabili nel tempo.
 
 **Step 1: Definisci obiettivo ricerca**
-1. Scrivi una domanda decisionale concreta (es. \"Perche perdiamo lead?\")
+1. Scrivi una domanda decisionale concreta (es. \"Perché perdiamo lead?\")
 2. Definisci target utenti da intervistare
 3. Imposta metrica di successo (es. temi ricorrenti, sentiment, citazioni)
 
@@ -831,7 +846,7 @@ Clicca sull'icona del Copilot nella sidebar o usa la scorciatoia da tastiera.
 **Step 4: Esegui analisi**
 1. Avvia scan e website analysis
 2. Leggi score, coverage prompt e raccomandazioni
-3. Usa explainability per capire il perche di ogni tip
+3. Usa explainability per capire il perché di ogni tip
 
 **Step 5: Trasforma tip in esecuzione**
 1. Modifica bozza e routing pubblicazione
@@ -854,20 +869,36 @@ Clicca sull'icona del Copilot nella sidebar o usa la scorciatoia da tastiera.
 
 **Lato tool esterno (passo-passo):**
 - WordPress:
-  1) Crea Application Password in Utenti > Profilo
+  1) Installa/attiva plugin MCP compatibile
   2) Verifica endpoint /wp-json/mcp/v1 raggiungibile
-  3) Controlla permessi utente per creazione/modifica contenuti
+  3) Crea Application Password in Utenti > Profilo
+  4) Controlla permessi utente per creazione/modifica contenuti
 - WooCommerce:
-  1) Genera REST API key (read/write)
-  2) Verifica endpoint store e permessi prodotti
+  1) Installa/attiva plugin MCP compatibile su WordPress
+  2) Genera REST API key WooCommerce (read/write)
+  3) Verifica endpoint store e permessi prodotti
 - Google:
-  1) Service Account con accesso a GA4 e GSC
-  2) API abilitate in Google Cloud
-  3) Property ID GA4 e URL proprieta GSC corretti
+  1) Crea Service Account + chiave JSON
+  2) Assegna accesso account a GA4 e GSC
+  3) Abilita Analytics Data API e Search Console API
+  4) Inserisci Property ID GA4 e URL proprieta GSC corretti
 - n8n:
   1) Crea workflow con nodo Webhook
   2) Usa webhook URL pubblico
   3) Esegui test ricezione payload
+
+**Documentazione esterna consigliata**
+- WordPress install plugin: https://wordpress.org/support/article/plugins-add-new-screen/
+- WordPress MCP (esempio setup): https://mcp-wp.github.io/docs/mcp-server/installation
+- WordPress Application Passwords: https://developer.wordpress.org/advanced-administration/security/application-passwords/
+- WooCommerce REST API keys: https://woocommerce.com/document/woocommerce-rest-api/
+- Google Service Account: https://cloud.google.com/iam/docs/service-accounts-create
+- Google JSON key: https://cloud.google.com/iam/docs/keys-create-delete
+- GA4 permessi: https://support.google.com/analytics/answer/9305788?hl=it
+- GSC permessi: https://support.google.com/webmasters/answer/7687615?hl=it
+- Analytics Data API: https://console.cloud.google.com/apis/library/analyticsdata.googleapis.com
+- Search Console API: https://console.cloud.google.com/apis/library/searchconsole.googleapis.com
+- n8n Webhook node: https://docs.n8n.io/integrations/builtin/core-nodes/n8n-nodes-base.webhook/
 
 **Formato risposta consigliato del Copilot:**
 1. "Fatto in BT"
@@ -1202,7 +1233,10 @@ export function keywordSearchPlatformKB(
         }
 
         for (const word of queryWords) {
-            const matches = (entry.content.toLowerCase().match(new RegExp(word, 'g')) || []).length;
+            const safeWord = escapeRegexLiteral(word);
+            const matches = safeWord
+                ? (entry.content.toLowerCase().match(new RegExp(safeWord, 'g')) || []).length
+                : 0;
             score += matches * 2;
         }
 

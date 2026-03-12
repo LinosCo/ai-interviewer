@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { MemoryManager } from '../memory-manager';
-import { ConversationMemoryData, CollectedFact } from '@/types/memory';
+import { ConversationMemoryData } from '@/types/memory';
 
 describe('MemoryManager', () => {
 
@@ -63,6 +63,57 @@ describe('MemoryManager', () => {
             const result = MemoryManager.formatForPrompt(memory, { language: 'it' });
             expect(result).toContain('STILE COMUNICATIVO RILEVATO');
             expect(result).toContain('Mantieni un registro formale');
+        });
+
+        it('should compress prompt output in compact mode', () => {
+            const memory: ConversationMemoryData = {
+                factsCollected: [
+                    { id: '1', content: 'Fatto uno', topic: 'a', extractedAt: new Date().toISOString(), confidence: 0.9, keywords: [] },
+                    { id: '2', content: 'Fatto due', topic: 'a', extractedAt: new Date().toISOString(), confidence: 0.9, keywords: [] },
+                    { id: '3', content: 'Fatto tre', topic: 'a', extractedAt: new Date().toISOString(), confidence: 0.9, keywords: [] },
+                    { id: '4', content: 'Fatto quattro', topic: 'a', extractedAt: new Date().toISOString(), confidence: 0.9, keywords: [] }
+                ],
+                topicsExplored: [],
+                unansweredAreas: [],
+                userFatigueScore: 0.7,
+                detectedTone: 'brief',
+                avgResponseLength: 18,
+                usesEmoji: true
+            };
+
+            const result = MemoryManager.formatForPrompt(memory, { language: 'it', compact: true });
+
+            expect(result).toContain('Fatto uno');
+            expect(result).toContain('Fatto tre');
+            expect(result).not.toContain('Fatto quattro');
+            expect(result).toContain('Non chiedere di nuovo');
+            expect(result).toContain('Accorcia e semplifica');
+            expect(result).not.toContain('emoji');
+        });
+
+        it('should softly compress prompt output in standard compact mode', () => {
+            const memory: ConversationMemoryData = {
+                factsCollected: [
+                    { id: '1', content: 'Fatto uno', topic: 'a', extractedAt: new Date().toISOString(), confidence: 0.9, keywords: [] },
+                    { id: '2', content: 'Fatto due', topic: 'a', extractedAt: new Date().toISOString(), confidence: 0.9, keywords: [] },
+                    { id: '3', content: 'Fatto tre', topic: 'a', extractedAt: new Date().toISOString(), confidence: 0.9, keywords: [] },
+                    { id: '4', content: 'Fatto quattro', topic: 'a', extractedAt: new Date().toISOString(), confidence: 0.9, keywords: [] },
+                    { id: '5', content: 'Fatto cinque', topic: 'a', extractedAt: new Date().toISOString(), confidence: 0.9, keywords: [] },
+                    { id: '6', content: 'Fatto sei', topic: 'a', extractedAt: new Date().toISOString(), confidence: 0.9, keywords: [] }
+                ],
+                topicsExplored: [],
+                unansweredAreas: [],
+                userFatigueScore: 0.2,
+                detectedTone: 'brief',
+                avgResponseLength: 22,
+                usesEmoji: true
+            };
+
+            const result = MemoryManager.formatForPrompt(memory, { language: 'it', compactStyle: 'standard' });
+
+            expect(result).toContain('Fatto cinque');
+            expect(result).not.toContain('Fatto sei');
+            expect(result).toContain('emoji');
         });
     });
 });

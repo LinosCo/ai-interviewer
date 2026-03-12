@@ -1,4 +1,5 @@
 import { auth } from '@/auth';
+import { WorkspaceError, assertProjectAccess } from '@/lib/domain/workspace';
 import { prisma } from '@/lib/prisma';
 import { NextResponse } from 'next/server';
 import { Prisma } from '@prisma/client';
@@ -39,16 +40,12 @@ export async function GET(
 ) {
   try {
     const session = await auth();
-    if (!session?.user?.email) {
+    if (!session?.user?.id) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
     const { projectId } = await params;
-
-    const user = await prisma.user.findUnique({
-      where: { email: session.user.email },
-      include: { memberships: true },
-    });
+    await assertProjectAccess(session.user.id, projectId, 'VIEWER');
     const project = await prisma.project.findUnique({
       where: { id: projectId },
       select: {
@@ -59,14 +56,8 @@ export async function GET(
       },
     });
 
-    if (!project || !user) {
+    if (!project) {
       return NextResponse.json({ error: 'Not found' }, { status: 404 });
-    }
-    if (
-      project.organizationId &&
-      !user.memberships.some((m) => m.organizationId === project.organizationId)
-    ) {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
     const rules = await prisma.tipRoutingRule.findMany({
@@ -138,8 +129,43 @@ export async function GET(
     );
 
     const categoryCounts = buildEmptyCategoryCounts();
+    const canonicalTips = await prisma.projectTip.findMany({
+      where: { projectId },
+      select: {
+        id: true,
+        title: true,
+        category: true,
+        contentKind: true,
+        updatedAt: true,
+        routes: {
+          select: {
+            status: true,
+            createdAt: true,
+            updatedAt: true,
+          },
+        },
+        executions: {
+          select: {
+            id: true,
+            status: true,
+            startedAt: true,
+            completedAt: true,
+          },
+        },
+      },
+    });
+    const hasCanonicalLedger = canonicalTips.some((tip) => tip.routes.length > 0 || tip.executions.length > 0);
 
-    if (configIds.length > 0) {
+    if (hasCanonicalLedger) {
+      for (const tip of canonicalTips) {
+        const mappedCategory = tip.category && tip.category in categoryCounts
+          ? (tip.category as RoutingTipCategory)
+          : mapContentKindToCategory(tip.contentKind || '');
+        if (mappedCategory) {
+          categoryCounts[mappedCategory] += 1;
+        }
+      }
+    } else if (configIds.length > 0) {
       const reports = await prisma.brandReport.findMany({
         where: {
           configId: { in: configIds },
@@ -212,7 +238,59 @@ export async function GET(
       latestAt: string | null;
     }> = [];
 
-    if (connectionIds.length > 0) {
+    if (hasCanonicalLedger) {
+      const buckets = new Map<string, {
+        contentKind: string;
+        category: RoutingTipCategory | null;
+        draftReady: number;
+        sent: number;
+        discarded: number;
+        total: number;
+        latestAt: string | null;
+      }>();
+
+      for (const tip of canonicalTips) {
+        const contentKind = tip.contentKind || 'uncategorized';
+        const existing = buckets.get(contentKind) || {
+          contentKind,
+          category: mapContentKindToCategory(contentKind),
+          draftReady: 0,
+          sent: 0,
+          discarded: 0,
+          total: 0,
+          latestAt: null,
+        };
+
+        existing.total += 1;
+
+        const routeStatuses = new Set(tip.routes.map((route) => route.status));
+        if (tip.executions.length > 0 || routeStatuses.has('SUCCEEDED') || routeStatuses.has('DISPATCHED')) {
+          existing.sent += 1;
+        } else if (routeStatuses.has('FAILED')) {
+          existing.discarded += 1;
+        } else {
+          existing.draftReady += 1;
+        }
+
+        const latestRouteAt = tip.routes
+          .map((route) => route.updatedAt || route.createdAt)
+          .sort((a, b) => b.getTime() - a.getTime())[0];
+        const latestExecutionAt = tip.executions
+          .map((execution) => execution.completedAt || execution.startedAt)
+          .sort((a, b) => b.getTime() - a.getTime())[0];
+        const latestAt = [tip.updatedAt, latestRouteAt, latestExecutionAt]
+          .filter((value): value is Date => Boolean(value))
+          .sort((a, b) => b.getTime() - a.getTime())[0];
+
+        if (latestAt && (!existing.latestAt || latestAt > new Date(existing.latestAt))) {
+          existing.latestAt = latestAt.toISOString();
+        }
+
+        buckets.set(contentKind, existing);
+      }
+
+      historyByContentKind = Array.from(buckets.values()).sort((a, b) => b.total - a.total);
+    } else if (connectionIds.length > 0) {
       const suggestions = await prisma.cMSSuggestion.findMany({
         where: { connectionId: { in: connectionIds } },
         select: {
@@ -263,7 +341,7 @@ export async function GET(
       historyByContentKind = Array.from(buckets.values()).sort((a, b) => b.total - a.total);
     }
 
-    const sentSuggestions = connectionIds.length > 0
+    const sentSuggestions = !hasCanonicalLedger && connectionIds.length > 0
       ? await prisma.cMSSuggestion.findMany({
         where: {
           connectionId: { in: connectionIds },
@@ -286,22 +364,48 @@ export async function GET(
       })
       : [];
 
-    const sentContentHistory = sentSuggestions.map((suggestion) => {
-      const contentKind = getSuggestionContentKind({
-        type: suggestion.type,
-        sourceSignals: suggestion.sourceSignals,
+    const sentContentHistory = hasCanonicalLedger
+      ? (await prisma.projectTipExecution.findMany({
+        where: { tip: { projectId } },
+        include: {
+          tip: {
+            select: {
+              title: true,
+              category: true,
+              contentKind: true,
+            },
+          },
+        },
+        orderBy: { startedAt: 'desc' },
+        take: 30,
+      })).map((execution) => ({
+        id: execution.id,
+        title: execution.tip.title,
+        contentKind: execution.tip.contentKind || 'uncategorized',
+        category: execution.tip.category
+          ? (execution.tip.category as RoutingTipCategory)
+          : mapContentKindToCategory(execution.tip.contentKind || ''),
+        status: execution.status,
+        cmsContentId: null,
+        previewUrl: null,
+        sentAt: (execution.completedAt || execution.startedAt).toISOString(),
+      }))
+      : sentSuggestions.map((suggestion) => {
+        const contentKind = getSuggestionContentKind({
+          type: suggestion.type,
+          sourceSignals: suggestion.sourceSignals,
+        });
+        return {
+          id: suggestion.id,
+          title: suggestion.title,
+          contentKind,
+          category: mapContentKindToCategory(contentKind),
+          status: suggestion.status,
+          cmsContentId: suggestion.cmsContentId,
+          previewUrl: suggestion.cmsPreviewUrl,
+          sentAt: (suggestion.publishedAt || suggestion.pushedAt || suggestion.updatedAt).toISOString(),
+        };
       });
-      return {
-        id: suggestion.id,
-        title: suggestion.title,
-        contentKind,
-        category: mapContentKindToCategory(contentKind),
-        status: suggestion.status,
-        cmsContentId: suggestion.cmsContentId,
-        previewUrl: suggestion.cmsPreviewUrl,
-        sentAt: (suggestion.publishedAt || suggestion.pushedAt || suggestion.updatedAt).toISOString(),
-      };
-    });
 
     const logCandidates = await prisma.integrationLog.findMany({
       where: {
@@ -369,6 +473,9 @@ export async function GET(
       operationalContentKinds: Array.from(operationalKinds.values()),
     });
   } catch (err) {
+    if (err instanceof WorkspaceError) {
+      return NextResponse.json({ error: err.message, code: err.code }, { status: err.status });
+    }
     console.error('tip-routing-overview GET error:', err);
     return NextResponse.json({ error: 'Internal error' }, { status: 500 });
   }

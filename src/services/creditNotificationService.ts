@@ -20,7 +20,7 @@ import {
     sendCreditsExhaustedEmail,
     sendCreditsPurchaseConfirmation
 } from '@/lib/email';
-import { CREDIT_WARNING_THRESHOLDS, formatCredits, getCreditPack } from '@/config/creditPacks';
+import { CREDIT_WARNING_THRESHOLDS, formatCredits, getCreditPack, getEffectiveWarningLevel } from '@/config/creditPacks';
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -126,6 +126,12 @@ export const CreditNotificationService = {
         // Calcola crediti rimanenti
         const monthlyRemaining = Number(organization.monthlyCreditsLimit) - Number(organization.monthlyCreditsUsed);
         const totalRemaining = Math.max(0, monthlyRemaining) + Number(organization.packCreditsAvailable);
+        const warningLevel = getEffectiveWarningLevel({
+            percentage,
+            monthlyRemaining: Math.max(0, monthlyRemaining),
+            packAvailable: Number(organization.packCreditsAvailable),
+            totalAvailable: totalRemaining
+        });
 
         const resetDateFormatted = organization.creditsResetDate
             ? organization.creditsResetDate.toLocaleDateString('it-IT', { day: 'numeric', month: 'long' })
@@ -149,7 +155,7 @@ export const CreditNotificationService = {
         }
 
         // Alert al 100% (exhausted)
-        if (percentage >= 100) {
+        if (warningLevel === 'exhausted') {
             const alreadySent = await hasNotificationBeenSent(organizationId, 'exhausted', currentMonth);
             if (!alreadySent) {
                 await Promise.all(recipients.map(recipient =>

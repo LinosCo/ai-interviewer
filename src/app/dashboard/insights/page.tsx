@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -22,7 +22,6 @@ import {
     Search,
     Lightbulb,
     Save,
-    Folder,
     Target,
     Code,
     FileText,
@@ -37,6 +36,16 @@ import { useOrganization } from '@/contexts/OrganizationContext';
 import { updateInsightStatus } from './actions';
 import { CONTENT_KIND_LABELS, type ContentKind } from '@/lib/cms/content-kinds';
 import { ROUTING_TIP_CATEGORY_LABELS } from '@/lib/cms/tip-routing-taxonomy';
+import type { ProjectTipDetailSnapshot, ProjectTipSnapshot } from '@/lib/projects/project-intelligence-types';
+import { ProjectWorkspaceShell } from '@/components/projects/ProjectWorkspaceShell';
+import { ProjectTipCard } from '@/components/projects/ProjectTipCard';
+import { ProjectTipDetailPanel } from '@/components/projects/ProjectTipDetailPanel';
+import { ProjectTipEditor, type ProjectTipEditDraft } from '@/components/projects/ProjectTipEditor';
+import {
+    buildTipRoutingPayload,
+    getTipOperationalState,
+    parseTipRoutingDraft,
+} from '@/components/projects/project-tip-ui';
 
 interface Action {
     type: string;
@@ -83,6 +92,9 @@ interface Insight {
     isVirtual?: boolean;
 }
 
+type CanonicalTip = ProjectTipSnapshot;
+type CanonicalTipDetail = ProjectTipDetailSnapshot;
+
 interface TipHistoryItem {
     contentKind: string;
     category: string | null;
@@ -96,6 +108,15 @@ interface TipHistoryItem {
 interface RoutingConnectionState {
     hasConnection: boolean;
     loading: boolean;
+}
+
+type InsightWorkspaceView = 'listen' | 'tips' | 'strategy';
+
+function parseWorkspaceView(value: string | null): InsightWorkspaceView {
+    if (value === 'tips' || value === 'strategy' || value === 'listen') {
+        return value;
+    }
+    return 'tips';
 }
 
 // Helper: determine if action can be auto-applied (only if explicitly flagged)
@@ -146,9 +167,26 @@ const getExecutionClassLabel = (executionClass?: string | null): string => {
 
 export default function InsightHubPage() {
     const router = useRouter();
-    const { selectedProject, isAllProjectsSelected } = useProject();
+    const searchParams = useSearchParams();
+    const { selectedProject, setSelectedProject, projects, isAllProjectsSelected } = useProject();
     const { currentOrganization } = useOrganization();
     const [insights, setInsights] = useState<Insight[]>([]);
+    const [canonicalTips, setCanonicalTips] = useState<CanonicalTip[]>([]);
+    const [canonicalTipDetails, setCanonicalTipDetails] = useState<Record<string, CanonicalTipDetail>>({});
+    const [expandedCanonicalTipId, setExpandedCanonicalTipId] = useState<string | null>(null);
+    const [editingCanonicalTipId, setEditingCanonicalTipId] = useState<string | null>(null);
+    const [canonicalEditDraft, setCanonicalEditDraft] = useState<ProjectTipEditDraft>({
+        title: '',
+        summary: '',
+        reasoning: '',
+        strategicAlignment: '',
+        status: 'NEW',
+        starred: false,
+        routing: parseTipRoutingDraft(null),
+    });
+    const [savingCanonicalTipId, setSavingCanonicalTipId] = useState<string | null>(null);
+    const [reviewerNotesDraftByTip, setReviewerNotesDraftByTip] = useState<Record<string, string>>({});
+    const [savingReviewerNotesTipId, setSavingReviewerNotesTipId] = useState<string | null>(null);
     const [healthReport, setHealthReport] = useState<any>(null);
     const [loading, setLoading] = useState(true);
     const [syncing, setSyncing] = useState(false);
@@ -167,6 +205,17 @@ export default function InsightHubPage() {
     const [topSources, setTopSources] = useState<any[]>([]);
     const [tipHistoryByContentKind, setTipHistoryByContentKind] = useState<TipHistoryItem[]>([]);
     const [routingConnectionsByProject, setRoutingConnectionsByProject] = useState<Record<string, RoutingConnectionState>>({});
+
+    // If arriving from a project cockpit link (?projectId=...), force-select that project
+    const cockpitProjectId = searchParams.get('projectId');
+    const workspaceView = parseWorkspaceView(searchParams.get('view'));
+    useEffect(() => {
+        if (!cockpitProjectId || !projects.length) return;
+        const match = projects.find((p) => p.id === cockpitProjectId);
+        if (match && selectedProject?.id !== match.id) {
+            setSelectedProject(match);
+        }
+    }, [cockpitProjectId, projects, selectedProject, setSelectedProject]);
 
     const toArraySize = (value: any): number => (Array.isArray(value) ? value.length : 0);
 
@@ -385,6 +434,42 @@ export default function InsightHubPage() {
         }
     };
 
+    const fetchCanonicalTips = async () => {
+        if (!projectId) {
+            setCanonicalTips([]);
+            setCanonicalTipDetails({});
+            return;
+        }
+
+        try {
+            const res = await fetch(`/api/projects/${projectId}/tips`);
+            if (!res.ok) {
+                setCanonicalTips([]);
+                return;
+            }
+            const data = await res.json();
+            setCanonicalTips(Array.isArray(data.tips) ? data.tips : []);
+        } catch (err) {
+            console.error('Error fetching canonical tips:', err);
+            setCanonicalTips([]);
+        }
+    };
+
+    const loadCanonicalTipDetail = async (tipId: string) => {
+        if (!projectId) return;
+        if (canonicalTipDetails[tipId]) return;
+        try {
+            const res = await fetch(`/api/projects/${projectId}/tips/${tipId}`);
+            if (!res.ok) return;
+            const data = await res.json();
+            if (data.tip?.id) {
+                setCanonicalTipDetails((prev) => ({ ...prev, [tipId]: data.tip }));
+            }
+        } catch (err) {
+            console.error('Error loading canonical tip detail:', err);
+        }
+    };
+
     const fetchStrategy = async () => {
         try {
             // Fetch project-level strategy if a project is selected, otherwise org-level
@@ -495,7 +580,12 @@ export default function InsightHubPage() {
         setWebsiteAnalysis(null);
         setTopSources([]);
         setTipHistoryByContentKind([]);
+        setCanonicalTips([]);
+        setCanonicalTipDetails({});
+        setExpandedCanonicalTipId(null);
+        setEditingCanonicalTipId(null);
         fetchInsights();
+        fetchCanonicalTips();
         fetchStrategy();
         fetchWebsiteAnalysis();
         fetchTopSources();
@@ -568,6 +658,7 @@ export default function InsightHubPage() {
             if (res.ok) {
                 showToast("Insights sincronizzati con successo!");
                 fetchInsights();
+                fetchCanonicalTips();
             } else {
                 showToast("Errore durante la sincronizzazione", "error");
             }
@@ -610,6 +701,112 @@ export default function InsightHubPage() {
         if (normalized === 'actioned') return 'completed';
         if (normalized === 'dismissed') return 'archived';
         return normalized;
+    };
+
+    const normalizeCanonicalStatus = (status: string | null | undefined) => {
+        const normalized = (status || 'NEW').toUpperCase();
+        if (normalized === 'COMPLETED') return 'completed';
+        if (normalized === 'ARCHIVED') return 'archived';
+        return normalized === 'REVIEWED' || normalized === 'APPROVED' || normalized === 'DRAFTED' || normalized === 'ROUTED' || normalized === 'AUTOMATED' || normalized === 'NEW'
+            ? 'active'
+            : 'active';
+    };
+
+    const openCanonicalEdit = async (tip: CanonicalTip) => {
+        setEditingCanonicalTipId(tip.id);
+        setCanonicalEditDraft({
+            title: tip.title || '',
+            summary: tip.summary || '',
+            reasoning: tip.reasoning || '',
+            strategicAlignment: tip.strategicAlignment || '',
+            status: tip.status || 'NEW',
+            starred: Boolean(tip.starred),
+            routing: parseTipRoutingDraft(tip.suggestedRouting),
+        });
+        await loadCanonicalTipDetail(tip.id);
+    };
+
+    const saveCanonicalTipEdit = async (tipId: string) => {
+        if (!projectId) return;
+        setSavingCanonicalTipId(tipId);
+        try {
+            const sourceTip = canonicalTipDetails[tipId] || canonicalTips.find((tip) => tip.id === tipId);
+            const res = await fetch(`/api/projects/${projectId}/tips/${tipId}`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    title: canonicalEditDraft.title,
+                    summary: canonicalEditDraft.summary,
+                    reasoning: canonicalEditDraft.reasoning,
+                    strategicAlignment: canonicalEditDraft.strategicAlignment,
+                    status: canonicalEditDraft.status,
+                    starred: canonicalEditDraft.starred,
+                    suggestedRouting: buildTipRoutingPayload(
+                        canonicalEditDraft.routing,
+                        sourceTip?.suggestedRouting ?? null,
+                    ),
+                })
+            });
+            if (!res.ok) {
+                showToast('Errore durante il salvataggio del tip', 'error');
+                return;
+            }
+            showToast('Tip aggiornato');
+            setEditingCanonicalTipId(null);
+            await fetchCanonicalTips();
+            setCanonicalTipDetails((prev) => {
+                const next = { ...prev };
+                delete next[tipId];
+                return next;
+            });
+            await loadCanonicalTipDetail(tipId);
+        } catch (err) {
+            console.error('Save canonical tip error:', err);
+            showToast('Errore di rete', 'error');
+        } finally {
+            setSavingCanonicalTipId(null);
+        }
+    };
+
+    const saveReviewerNotes = async (tipId: string) => {
+        if (!projectId) return;
+        setSavingReviewerNotesTipId(tipId);
+        try {
+            const notes = reviewerNotesDraftByTip[tipId] ?? '';
+            const res = await fetch(`/api/projects/${projectId}/tips/${tipId}`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ reviewerNotes: notes || null }),
+            });
+            if (!res.ok) { showToast('Errore salvataggio note', 'error'); return; }
+            setCanonicalTipDetails((prev) => ({
+                ...prev,
+                [tipId]: { ...prev[tipId], reviewerNotes: notes || null },
+            }));
+            showToast('Note aggiornate');
+        } catch {
+            showToast('Errore di rete', 'error');
+        } finally {
+            setSavingReviewerNotesTipId(null);
+        }
+    };
+
+    const duplicateCanonicalTip = async (tipId: string) => {
+        if (!projectId) return;
+        try {
+            const res = await fetch(`/api/projects/${projectId}/tips/${tipId}/duplicate`, {
+                method: 'POST',
+            });
+            if (!res.ok) {
+                showToast('Errore durante la duplicazione del tip', 'error');
+                return;
+            }
+            showToast('Tip duplicato');
+            await fetchCanonicalTips();
+        } catch (err) {
+            console.error('Duplicate canonical tip error:', err);
+            showToast('Errore di rete', 'error');
+        }
     };
 
     const handleInsightStatus = async (insightId: string, status: 'new' | 'starred' | 'completed' | 'archived') => {
@@ -716,43 +913,71 @@ export default function InsightHubPage() {
         && !selectedProjectRoutingState.loading
         && !selectedProjectRoutingState.hasConnection
     );
+    const handleUseCopilotPrompt = useCallback((prompt: string) => {
+        if (typeof window === 'undefined') return;
+        window.dispatchEvent(new CustomEvent('bt-copilot-prompt', { detail: { prompt } }));
+    }, []);
+
+    const workspaceTitle = workspaceView === 'listen'
+        ? 'Ascolta i segnali del progetto'
+        : workspaceView === 'strategy'
+            ? 'Leggi il contesto strategico'
+            : 'Rivedi e attiva i tip canonici';
+    const workspaceDescription = workspaceView === 'listen'
+        ? 'Questa vista serve a capire da quali fonti arrivano i segnali, quanto sono coerenti e quali pattern meritano di diventare tip operativi.'
+        : workspaceView === 'strategy'
+            ? 'Qui leggi priorità, metodo e sintesi strategica prima di decidere quali tip spingere in esecuzione.'
+            : 'Questa vista è il centro operativo dei tip: motivazioni, azioni correlate, routing e prossima mossa convivono nello stesso flusso.';
+    const activeSection = workspaceView === 'strategy' ? 'strategy' : workspaceView === 'listen' ? 'listen' : 'tips';
 
     return (
-        <div className="space-y-8 p-6 max-w-7xl mx-auto">
-            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-                <div>
-                    <h2 className="text-3xl font-extrabold tracking-tight bg-gradient-to-r from-amber-600 to-orange-600 bg-clip-text text-transparent">
-                        AI Tips
-                    </h2>
-                    <p className="text-muted-foreground font-medium flex items-center gap-2">
-                        Analisi cross-channel di interviste, chatbot e visibilità online.
-                        {selectedProject && !isAllProjectsSelected && (
-                            <Badge variant="outline" className="ml-2 gap-1 font-medium">
-                                <Folder className="w-3 h-3" />
-                                {selectedProject.name}
-                            </Badge>
-                        )}
-                    </p>
-                </div>
-                <div className="flex items-center gap-2">
-                    <Button
-                        onClick={handleExportCsv}
-                        variant="outline"
-                        className="rounded-full px-6"
+        <div className="max-w-7xl mx-auto p-6">
+            <ProjectWorkspaceShell
+                projectId={projectId}
+                projectName={selectedProject && !isAllProjectsSelected ? selectedProject.name : null}
+                activeSection={activeSection}
+                eyebrow={workspaceView === 'tips' ? 'Tips' : workspaceView === 'listen' ? 'Ascolto' : 'Strategia'}
+                title={workspaceTitle}
+                description={workspaceDescription}
+                metrics={[
+                    { label: 'Tip canonici', value: String(canonicalTips.length), tone: canonicalTips.length > 0 ? 'success' : 'default' },
+                    { label: 'Segnali attivi', value: String(insights.filter((insight) => normalizeInsightStatus(insight.status) === 'active').length), tone: 'accent' },
+                    { label: 'Routing', value: showRoutingConnectionInvite ? 'Da attivare' : projectId ? 'Disponibile' : 'Seleziona progetto', tone: showRoutingConnectionInvite ? 'warning' : 'success' },
+                    { label: 'Focus', value: workspaceView === 'listen' ? 'Fonti' : workspaceView === 'strategy' ? 'Priorità' : 'Azione', tone: 'accent' },
+                ]}
+                action={
+                    <div className="flex w-full flex-col items-stretch gap-2 sm:flex-row sm:items-center sm:justify-end">
+                        <Button
+                            onClick={handleExportCsv}
+                            variant="outline"
+                            className="rounded-full px-6"
+                        >
+                            <Download className="mr-2 h-4 w-4" />
+                            Esporta CSV
+                        </Button>
+                        <Button
+                            onClick={handleSync}
+                            disabled={syncing}
+                            className="bg-amber-600 hover:bg-amber-700 text-white rounded-full px-8 shadow-lg shadow-amber-200 transition-all sm:hover:scale-105 sm:active:scale-95"
+                        >
+                            {syncing ? <RefreshCw className="mr-2 h-4 w-4 animate-spin" /> : <Sparkles className="mr-2 h-4 w-4" />}
+                            {syncing ? 'Analisi in corso...' : 'Aggiorna Analisi'}
+                        </Button>
+                    </div>
+                }
+            >
+            {cockpitProjectId && selectedProject && !isAllProjectsSelected && (
+                <div className="flex items-center gap-2 text-xs text-slate-500">
+                    <button
+                        onClick={() => router.push(`/dashboard/projects/${cockpitProjectId}`)}
+                        className="hover:text-amber-600 transition-colors"
                     >
-                        <Download className="mr-2 h-4 w-4" />
-                        Export CSV
-                    </Button>
-                    <Button
-                        onClick={handleSync}
-                        disabled={syncing}
-                        className="bg-amber-600 hover:bg-amber-700 text-white rounded-full px-8 shadow-lg shadow-amber-200 transition-all hover:scale-105 active:scale-95"
-                    >
-                        {syncing ? <RefreshCw className="mr-2 h-4 w-4 animate-spin" /> : <Sparkles className="mr-2 h-4 w-4" />}
-                        {syncing ? 'Analisi in corso...' : 'Aggiorna Analisi'}
-                    </Button>
+                        ← {selectedProject.name}
+                    </button>
+                    <span>/</span>
+                    <span className="text-slate-700 font-medium">{workspaceView === 'listen' ? 'Ascolto' : workspaceView === 'strategy' ? 'Strategia' : 'Tips'}</span>
                 </div>
-            </div>
+            )}
 
             <Card className="border-blue-100 bg-blue-50/50">
                 <CardContent className="py-4 flex flex-col md:flex-row md:items-center md:justify-between gap-3">
@@ -781,7 +1006,7 @@ export default function InsightHubPage() {
                                 onClick={openRoutingUpgrade}
                                 className="rounded-full bg-amber-600 hover:bg-amber-700 text-white"
                             >
-                                Upgrade Business
+                                Passa a Business
                             </Button>
                         )}
                     </div>
@@ -814,7 +1039,7 @@ export default function InsightHubPage() {
                 <Card className="border-slate-200">
                     <CardHeader className="pb-3">
                         <CardTitle className="text-sm font-bold uppercase tracking-wider text-slate-500">
-                            Storico AI Tips per tipologia
+                            Storico tip AI per tipologia
                         </CardTitle>
                     </CardHeader>
                     <CardContent className="pt-0">
@@ -1328,6 +1553,78 @@ export default function InsightHubPage() {
                         ))}
                     </div>
                 ) : (() => {
+                    const filteredCanonicalTips = canonicalTips
+                        .filter((tip) => {
+                            const status = normalizeCanonicalStatus(tip.status);
+                            if (statusFilter === 'active') return status === 'active';
+                            if (statusFilter === 'starred') return Boolean(tip.starred);
+                            if (statusFilter === 'completed') return status === 'completed';
+                            if (statusFilter === 'archived') return status === 'archived';
+                            return true;
+                        })
+                        .filter((tip) => {
+                            if (tipTypeFilter === 'all') return true;
+                            return tip.contentKind === tipTypeFilter || tip.category === tipTypeFilter;
+                        });
+
+                    if (filteredCanonicalTips.length > 0) {
+                        return (
+                            <div className="grid gap-6">
+                                {filteredCanonicalTips.map((tip) => {
+                                    const detail = canonicalTipDetails[tip.id];
+                                    const isExpanded = expandedCanonicalTipId === tip.id;
+                                    const isEditing = editingCanonicalTipId === tip.id;
+                                    const operationalState = getTipOperationalState(tip, detail);
+                                    return (
+                                        <ProjectTipCard
+                                            key={tip.id}
+                                            tip={tip}
+                                            operationalState={operationalState}
+                                            isExpanded={isExpanded}
+                                            onToggleDetails={async () => {
+                                                const next = isExpanded ? null : tip.id;
+                                                setExpandedCanonicalTipId(next);
+                                                if (next) await loadCanonicalTipDetail(next);
+                                            }}
+                                            onEdit={() => openCanonicalEdit(tip)}
+                                            onDuplicate={() => duplicateCanonicalTip(tip.id)}
+                                        >
+                                            {(isExpanded || isEditing) ? (
+                                                <div className="space-y-4">
+                                                    {isEditing ? (
+                                                        <ProjectTipEditor
+                                                            projectId={projectId as string}
+                                                            draft={canonicalEditDraft}
+                                                            onChange={setCanonicalEditDraft}
+                                                            onCancel={() => setEditingCanonicalTipId(null)}
+                                                            onSave={() => saveCanonicalTipEdit(tip.id)}
+                                                            saving={savingCanonicalTipId === tip.id}
+                                                            hasRoutingConnection={Boolean(selectedProjectRoutingState?.hasConnection)}
+                                                            hasRoutingPremium={hasRoutingPremium}
+                                                        />
+                                                    ) : null}
+
+                                                    {isExpanded && detail ? (
+                                                        <ProjectTipDetailPanel
+                                                            detail={detail}
+                                                            reviewerNotesDraft={reviewerNotesDraftByTip[tip.id] ?? (detail.reviewerNotes || '')}
+                                                            onReviewerNotesChange={(value) =>
+                                                                setReviewerNotesDraftByTip((prev) => ({ ...prev, [tip.id]: value }))
+                                                            }
+                                                            onSaveReviewerNotes={() => saveReviewerNotes(tip.id)}
+                                                            savingReviewerNotes={savingReviewerNotesTipId === tip.id}
+                                                            onUsePrompt={handleUseCopilotPrompt}
+                                                        />
+                                                    ) : null}
+                                                </div>
+                                            ) : null}
+                                        </ProjectTipCard>
+                                    );
+                                })}
+                            </div>
+                        );
+                    }
+
                     const filtered = insights
                         .filter(i => i.topicName !== "Health Report: Brand & Sito")
                         .filter(i => {
@@ -1353,7 +1650,7 @@ export default function InsightHubPage() {
                                     </div>
                                     <h3 className="text-xl font-bold text-slate-900">Suggerimenti in arrivo</h3>
                                     <p className="text-sm text-slate-500 max-w-sm mt-2">
-                                        Nessun tip per i filtri selezionati oppure analisi ancora in corso. Clicca su "Aggiorna Analisi" per rigenerare i suggerimenti.
+                                        Nessun tip per i filtri selezionati oppure analisi ancora in corso. Clicca su &quot;Aggiorna Analisi&quot; per rigenerare i suggerimenti.
                                     </p>
                                 </CardContent>
                             </Card>
@@ -1556,7 +1853,7 @@ export default function InsightHubPage() {
                                                                                             onClick={openRoutingUpgrade}
                                                                                             className="text-[11px] font-semibold text-amber-700 hover:text-amber-800 underline underline-offset-2"
                                                                                         >
-                                                                                            Upgrade Business
+                                                                                            Passa a Business
                                                                                         </button>
                                                                                     </div>
                                                                                 ) : routingConnectionLoading ? (
@@ -1670,6 +1967,7 @@ export default function InsightHubPage() {
                     );
                 })()}
             </div>
+            </ProjectWorkspaceShell>
         </div>
     );
 }

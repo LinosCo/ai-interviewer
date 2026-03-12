@@ -27,7 +27,8 @@ export function handleExplorePhase({
     interviewPlan,
     maxDurationMins,
     effectiveSec,
-    bonusTurnCap = 2
+    bonusTurnCap = 2,
+    advanceAfterUsableFirstAnswer = false
 }: {
     state: InterviewState;
     currentTopic: TopicBlock;
@@ -38,10 +39,13 @@ export function handleExplorePhase({
     maxDurationMins: number;
     effectiveSec: number;
     bonusTurnCap?: number;
+    advanceAfterUsableFirstAnswer?: boolean;
 }): ExploreDeepResult {
     const nextState: Partial<InterviewState> = { ...state };
     let supervisorInsight: SupervisorInsight = { status: 'EXPLORING' };
     let nextTopicId: string | undefined;
+    const maxDurationSec = maxDurationMins * 60;
+    const remainingSec = maxDurationSec - effectiveSec;
 
     // Get topic budget
     const topicBudget = state.topicBudgets[currentTopic.id];
@@ -84,8 +88,20 @@ export function handleExplorePhase({
 
     // Determine budget action
     let action = computeBudgetAction(signal.band, topicBudget.turnsUsed, topicBudget, bonusTurnCap);
+    const wordCount = String(lastUserMessage || '').split(/\s+/).filter(Boolean).length;
+    const looksLikeClarification = /\?\s*$/.test(String(lastUserMessage || '').trim());
+    const hasUsableFirstAnswer = wordCount >= 4 || /\b\d{1,4}\b/.test(lastUserMessage) || signal.score >= 0.12;
+    if (
+        advanceAfterUsableFirstAnswer &&
+        topicBudget.turnsUsed === 0 &&
+        hasUsableFirstAnswer &&
+        !looksLikeClarification &&
+        signal.band !== 'HIGH'
+    ) {
+        action = 'advance';
+    }
 
-    console.log(`📊 [EXPLORE] "${currentTopic.label}" signal=${signal.band} action=${action} turns=${topicBudget.turnsUsed}/${topicBudget.baseTurns}`);
+    console.log(`📊 [EXPLORE] "${currentTopic.label}" signal=${signal.band} action=${action} turns=${topicBudget.turnsUsed}/${topicBudget.baseTurns} remaining=${remainingSec}s`);
 
     if (action === 'continue') {
         // Stay on this topic, increment turn
@@ -131,15 +147,13 @@ export function handleExplorePhase({
             const departingSnippet = (state.topicKeyInsights || {})[currentTopic.id] || '';
             supervisorInsight = {
                 status: 'TRANSITION',
+                transitionMode: 'bridge',
                 ...(departingSnippet && { engagingSnippet: departingSnippet })
             };
             console.log(`  → Transition to "${botTopics[nextState.topicIndex].label}"`);
 
         } else {
             // End of EXPLORE: decide on DEEPEN vs DEEP_OFFER
-            const maxDurationSec = maxDurationMins * 60;
-            const remainingSec = maxDurationSec - effectiveSec;
-
             // Calculate uncovered topics for DEEPEN - ensure ALL topics have budgets initialized
             const updatedBudgets = { ...state.topicBudgets };
 
@@ -213,7 +227,8 @@ export function handleDeepenPhase({
     language,
     maxDurationMins,
     effectiveSec,
-    deepenMaxTurnsPerTopic = 2
+    deepenMaxTurnsPerTopic = 2,
+    deepExtraTurnCap = 10
 }: {
     state: InterviewState;
     currentTopic: TopicBlock;
@@ -222,12 +237,25 @@ export function handleDeepenPhase({
     maxDurationMins: number;
     effectiveSec: number;
     deepenMaxTurnsPerTopic?: number;
+    deepExtraTurnCap?: number;
 }): ExploreDeepResult {
     const nextState: Partial<InterviewState> = { ...state };
     let supervisorInsight: SupervisorInsight = { status: 'DEEPENING' };
     let nextTopicId: string | undefined;
 
     const uncoveredTopics = state.uncoveredTopics || [];
+    const deepBudgetRemaining = state.deepAccepted === true
+        ? Math.max(0, Number(state.deepTurnBudgetRemaining ?? deepExtraTurnCap))
+        : null;
+
+    if (deepBudgetRemaining === 0) {
+        nextState.phase = 'DATA_COLLECTION';
+        nextState.deepTurnBudgetRemaining = 0;
+        supervisorInsight = { status: 'DATA_COLLECTION' };
+        console.log('🧱 [DEEPEN] Extra-turn budget exhausted. Moving to DATA_COLLECTION.');
+        return { nextState, supervisorInsight };
+    }
+
     if (uncoveredTopics.length === 0) {
         // All topics covered, move to DATA_COLLECTION
         nextState.phase = 'DATA_COLLECTION';
@@ -259,6 +287,9 @@ export function handleDeepenPhase({
     } else {
         // Continue on current topic
         nextState.turnInTopic = (state.turnInTopic || 0) + 1;
+        if (deepBudgetRemaining !== null) {
+            nextState.deepTurnBudgetRemaining = Math.max(0, deepBudgetRemaining - 1);
+        }
         const insight = state.topicKeyInsights[currentTopic.id];
         supervisorInsight = { status: 'DEEPENING', engagingSnippet: insight };
         console.log(`📊 [DEEPEN] "${currentTopic.label}" turn ${nextState.turnInTopic}/${maxTurnsForDeepen}`);

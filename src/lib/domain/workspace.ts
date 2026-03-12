@@ -2,6 +2,7 @@ import { Role, Prisma } from '@prisma/client';
 
 import { prisma } from '@/lib/prisma';
 import { getOrCreateDefaultOrganization } from '@/lib/organizations';
+import { syncTransferredProjectIntelligence } from '@/lib/projects/project-transfer-completeness.service';
 
 const ROLE_RANK: Record<Role, number> = {
   VIEWER: 1,
@@ -571,6 +572,11 @@ export async function moveProjectToOrganization(params: {
     await tx.projectMCPConnection.deleteMany({ where: { projectId } });
   });
 
+  const intelligenceTransfer = await syncTransferredProjectIntelligence({
+    projectId,
+    targetOrganizationId,
+  });
+
   await autoFixOrphanToolsForOrganization(sourceOrganizationId);
   await autoFixOrphanToolsForOrganization(targetOrganizationId);
   await syncLegacyProjectAccessForProject(projectId);
@@ -578,6 +584,7 @@ export async function moveProjectToOrganization(params: {
   return {
     moved: true,
     sourceOrganizationId,
-    targetOrganizationId
+    targetOrganizationId,
+    intelligenceTransfer,
   };
 }

@@ -65,7 +65,7 @@ export default async function ProjectSettingsPage({ params }: { params: Promise<
             </div>
 
             <div className="rounded-2xl border border-slate-200 bg-gradient-to-r from-slate-50 to-amber-50 p-5">
-                <p className="text-xs font-bold uppercase tracking-wide text-slate-500">Control Center</p>
+                <p className="text-xs font-bold uppercase tracking-wide text-slate-500">Centro controllo</p>
                 <p className="mt-1 text-sm text-slate-700">
                     Qui gestisci identità progetto, trasferimenti tra organizzazioni, membri, strumenti e monitor.
                     Tutto è allineato al modello organizzazione-first.

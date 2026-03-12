@@ -34,6 +34,7 @@ export async function generateQuestionOnly(params: {
     avoidBridgeStems?: string[];
     requireAcknowledgment?: boolean;
     transitionMode?: 'bridge' | 'clean_pivot';
+    interviewerQuality?: 'standard' | 'avanzato';
     onUsage?: LLMUsageCollector;
 }) {
     const {
@@ -47,7 +48,8 @@ export async function generateQuestionOnly(params: {
         semanticBridgeHint,
         avoidBridgeStems,
         requireAcknowledgment,
-        transitionMode
+        transitionMode,
+        interviewerQuality
     } = params;
     const questionSchema = z.object({
         question: z.string().describe("A single interview question ending with a question mark.")
@@ -80,8 +82,14 @@ export async function generateQuestionOnly(params: {
             : null,
         semanticBridgeHint ? `Bridge hint: ${semanticBridgeHint}` : null,
         `Acknowledgment quality: reference one concrete detail from the user's message (fact, constraint, example, or cause/effect).`,
+        `Keep the visible response lean: max 2 sentences total, short acknowledgment, then one question.`,
+        `Prefer follow-ups about one of these: obstacle, decision, trade-off, concrete example, measurable impact, or next operational step.`,
+        `Choose the single strongest angle and ask only about that; do not stack two different asks in the same turn.`,
         `Avoid stock openers like "molto interessante", "e un punto importante", "grazie per aver condiviso", "very interesting", "that's an important point", "thanks for sharing".`,
         `Prefer concrete follow-ups over broad prompts like "cosa ne pensi?" / "what do you think?" unless no better signal is available.`,
+        interviewerQuality === 'standard'
+            ? `In standard mode, stay conversational but favor diagnostic, comparable questions. After one usable answer, move on rather than widening or philosophizing.`
+            : `In advanced mode, stay specific and insightful, but keep the bridge brief. Prefer one promising thread over broader but vaguer exploration.`,
         diagnosticHint || null,
         structureInstruction,
         transitionInstruction,
@@ -152,7 +160,8 @@ export async function generateDeepOfferOnly(params: {
         previewAreas.length > 0
             ? `3) Propose to continue, naturally mentioning 1-2 specific areas from the context above. Use no quotes, labels, or list formatting.`
             : `3) Propose to continue and mention one concrete starting point connected to what the user shared.`,
-        `4) Ask exactly ONE yes/no question asking availability for a few more deep-dive questions.`,
+        `4) Explicitly say the user can stop whenever they want by telling you so.`,
+        `5) Ask exactly ONE yes/no question asking availability for a few more deep-dive questions.`,
         `Do NOT ask topic questions. Do NOT ask for contacts. Do NOT close the interview.`,
         `Keep it natural and concise. End with exactly one question mark.`
     ].filter(Boolean).join('\n');
@@ -211,9 +220,9 @@ export async function enforceDeepOfferQuestion(params: {
     const hintText = (extensionPreview || []).map(v => String(v || '').trim()).filter(Boolean)[0] || '';
     return language === 'it'
         ? (hintText
-            ? `Grazie per il tempo e per i contributi condivisi fin qui. Il tempo previsto per l'intervista sarebbe terminato: se vuoi, possiamo continuare con qualche domanda in piu, partendo da uno dei punti emersi, ad esempio ${hintText}. Ti va di proseguire ancora per qualche minuto?`
-            : `Grazie per il tempo e per i contributi condivisi fin qui. Il tempo previsto per l'intervista sarebbe terminato: se vuoi, possiamo continuare con qualche domanda in piu su uno dei punti più utili emersi. Ti va di proseguire ancora per qualche minuto?`)
+            ? `Grazie per il tempo e per i contributi condivisi fin qui. Il tempo previsto per l'intervista sarebbe terminato: se vuoi, possiamo continuare con qualche domanda in piu, partendo da uno dei punti emersi, ad esempio ${hintText}. In qualunque momento puoi fermarti dicendolo. Ti va di proseguire ancora per qualche minuto?`
+            : `Grazie per il tempo e per i contributi condivisi fin qui. Il tempo previsto per l'intervista sarebbe terminato: se vuoi, possiamo continuare con qualche domanda in piu su uno dei punti più utili emersi. In qualunque momento puoi fermarti dicendolo. Ti va di proseguire ancora per qualche minuto?`)
         : (hintText
-            ? `Thank you for your time and the insights shared so far. The planned interview time would now be over: if you want, we can continue with a few extra questions, starting from one point that emerged, for example ${hintText}. Would you like to continue for a few more minutes?`
-            : `Thank you for your time and the insights shared so far. The planned interview time would now be over: if you want, we can continue with a few extra questions on one useful point that emerged. Would you like to continue for a few more minutes?`);
+            ? `Thank you for your time and the insights shared so far. The planned interview time would now be over: if you want, we can continue with a few extra questions, starting from one point that emerged, for example ${hintText}. You can stop at any time by saying so. Would you like to continue for a few more minutes?`
+            : `Thank you for your time and the insights shared so far. The planned interview time would now be over: if you want, we can continue with a few extra questions on one useful point that emerged. You can stop at any time by saying so. Would you like to continue for a few more minutes?`);
 }

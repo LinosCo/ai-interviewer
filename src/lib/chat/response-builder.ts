@@ -139,7 +139,6 @@ export function buildRuntimeSemanticContextPrompt(params: {
     const previousQuestion = extractLastAssistantQuestion(params.previousAssistantMessage);
     const responseDepth = getUserResponseDepth(lastUserMessage);
     const transitionMode: TransitionMode | undefined = params.supervisorInsight?.transitionMode;
-    const phase = params.phase;
     const clarificationRequested = isClarificationSignal(lastUserMessage, language);
 
     const depthHintIt: Record<'brief' | 'balanced' | 'rich', string> = {
@@ -175,46 +174,36 @@ export function buildRuntimeSemanticContextPrompt(params: {
     if ((language || '').toLowerCase().startsWith('it')) {
         return `
 ## RUNTIME SEMANTIC CONTEXT
-- Fase attiva: ${phase}
-- Topic target: "${params.targetTopicLabel}"
-- Segnale utente da valorizzare (parafrasi, non citazione): "${userSignal || 'N/A'}"
-- Ultima domanda assistente da NON ripetere: "${previousQuestion || 'N/A'}"
-- Profondità risposta utente: ${responseDepth}
+- Segnale utente: "${userSignal || 'N/A'}"
+- Ultima domanda da non ripetere: "${previousQuestion || 'N/A'}"
+- Profondità risposta: ${responseDepth}
 
-Istruzioni di coerenza:
-1. Inizia con una frase breve che riconosce genuinamente il contenuto della risposta utente (non una formula).
-2. Mantieni la nuova domanda semanticamente diversa dalla precedente.
-3. ${depthHintIt[responseDepth]}
-4. ${transitionHintIt}
-5. Evita formule rigide ("ora passiamo a", "cambio argomento") e chiusure premature.
-6. Evita aperture generiche/retoriche ("molto interessante", "e un punto importante", "grazie per aver condiviso"): reagisci al merito con un dettaglio concreto.
-7. Se naturale, preferisci una lente diagnostica (esempio, impatto, priorita o azione) con un vincolo leggero (tempo, segmento, canale o metrica). Se risulta forzato o fuori tema, resta su una domanda semplice.
+Regole:
+1. Apri con una frase breve sul merito, non con una formula.
+2. ${depthHintIt[responseDepth]}
+3. ${transitionHintIt}
+4. Preferisci una sola lente utile: esempio, impatto, priorita o azione concreta.
 ${stemsHintIt}
 ${clarificationRequested
-                ? '9. L\'utente sta chiedendo un chiarimento/disambiguazione: chiarisci prima in modo diretto la domanda precedente e poi fai una sola domanda di follow-up coerente.'
+                ? '5. Se l\'utente sta chiedendo un chiarimento, chiarisci prima in modo diretto e poi fai una sola domanda coerente.'
                 : ''}
 `.trim();
     }
 
     return `
 ## RUNTIME SEMANTIC CONTEXT
-- Active phase: ${phase}
-- Target topic: "${params.targetTopicLabel}"
-- User signal to leverage (paraphrase, no literal quote): "${userSignal || 'N/A'}"
-- Previous assistant question to avoid repeating: "${previousQuestion || 'N/A'}"
-- User response depth: ${responseDepth}
+- User signal: "${userSignal || 'N/A'}"
+- Previous question to avoid: "${previousQuestion || 'N/A'}"
+- Response depth: ${responseDepth}
 
-Coherence instructions:
-1. Open with one short sentence that genuinely acknowledges the content of the user's response (not a formula).
-2. Keep the new question semantically distinct from the previous one.
-3. ${depthHintEn[responseDepth]}
-4. ${transitionHintEn}
-5. Avoid rigid templates ("now let's move to") and premature closure cues.
-6. Avoid generic/ceremonial openers ("very interesting", "that's an important point", "thanks for sharing"): respond to the substance using one concrete detail.
-7. If natural, prefer a diagnostic lens (example, impact, priority, or action) with one light constraint (timeframe, segment, channel, or metric). If this feels forced or off-topic, keep a simple focused question.
+Rules:
+1. Open with one short substance-based sentence, not a formula.
+2. ${depthHintEn[responseDepth]}
+3. ${transitionHintEn}
+4. Prefer one useful lens only: example, impact, priority, or concrete action.
 ${stemsHintEn}
 ${clarificationRequested
-            ? '9. The user is asking for clarification/disambiguation: first clarify your previous question directly, then ask one coherent follow-up question.'
+            ? '5. If the user is asking for clarification, clarify first directly, then ask one coherent follow-up question.'
             : ''}
 `.trim();
 }

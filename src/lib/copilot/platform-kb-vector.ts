@@ -26,6 +26,39 @@ export interface PlatformKBSearchResult {
     score: number;
 }
 
+let platformKBEmbeddingColumnAvailable: boolean | null = null;
+let loggedMissingPlatformKBEmbeddingColumn = false;
+
+async function hasPlatformKBEmbeddingColumn(): Promise<boolean> {
+    if (platformKBEmbeddingColumnAvailable !== null) {
+        return platformKBEmbeddingColumnAvailable;
+    }
+
+    try {
+        const rows = await prisma.$queryRaw<Array<{ exists: boolean }>>`
+            SELECT EXISTS (
+                SELECT 1
+                FROM information_schema.columns
+                WHERE table_schema = 'public'
+                  AND table_name = 'PlatformKBEntry'
+                  AND column_name = 'embedding'
+            ) AS "exists"
+        `;
+
+        platformKBEmbeddingColumnAvailable = Boolean(rows[0]?.exists);
+    } catch {
+        platformKBEmbeddingColumnAvailable = false;
+    }
+
+    return platformKBEmbeddingColumnAvailable;
+}
+
+function logMissingEmbeddingColumnOnce(): void {
+    if (loggedMissingPlatformKBEmbeddingColumn) return;
+    loggedMissingPlatformKBEmbeddingColumn = true;
+    console.warn('[platform-kb-vector] Skipping pgvector operations: PlatformKBEntry.embedding column is missing');
+}
+
 /** Semantic search over PlatformKBEntry using pgvector cosine similarity */
 export async function searchPlatformKBSemantic(
     query: string,
@@ -33,6 +66,11 @@ export async function searchPlatformKBSemantic(
     topK = 5,
     minScore = 0.3
 ): Promise<PlatformKBSearchResult[]> {
+    if (!(await hasPlatformKBEmbeddingColumn())) {
+        logMissingEmbeddingColumnOnce();
+        return [];
+    }
+
     const embedding = await generateEmbedding(query);
     if (!embedding) return [];
 
@@ -86,6 +124,11 @@ export async function indexPlatformKBEntry(entry: {
     category: string;
     keywords: string[];
 }): Promise<boolean> {
+    if (!(await hasPlatformKBEmbeddingColumn())) {
+        logMissingEmbeddingColumnOnce();
+        return false;
+    }
+
     // 1. Upsert metadata row
     await prisma.platformKBEntry.upsert({
         where: { id: entry.id },
@@ -122,6 +165,11 @@ export async function indexAllPlatformKBEntries(
     entries: Array<{ id: string; title: string; content: string; category: string; keywords: string[] }>,
     force = false
 ): Promise<{ total: number; indexed: number; failed: number; skipped: number }> {
+    if (!(await hasPlatformKBEmbeddingColumn())) {
+        logMissingEmbeddingColumnOnce();
+        return { total: entries.length, indexed: 0, failed: 0, skipped: entries.length };
+    }
+
     let indexed = 0;
     let failed = 0;
     let skipped = 0;

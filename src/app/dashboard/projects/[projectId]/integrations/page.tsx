@@ -1,14 +1,15 @@
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
-import { useParams, useRouter } from 'next/navigation';
+import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { AnimatePresence } from 'framer-motion';
 import { ConnectionsTab } from '@/components/integrations/ConnectionsTab';
 import { AiRoutingTab } from '@/components/integrations/AiRoutingTab';
+import { ProjectWorkspaceShell } from '@/components/projects/ProjectWorkspaceShell';
 
 interface MCPConnection {
   id: string;
-  type: 'WORDPRESS' | 'WOOCOMMERCE';
+  type: 'WORDPRESS' | 'WOOCOMMERCE' | 'BREVO';
   name: string;
   status: 'PENDING' | 'TESTING' | 'ACTIVE' | 'ERROR' | 'DISABLED';
   lastSyncAt?: string | null;
@@ -105,6 +106,15 @@ interface OrganizationsResponse {
   organizations?: Organization[];
 }
 
+type IntegrationsTab = 'connections' | 'routing' | 'settings';
+
+function parseTab(value: string | null): IntegrationsTab {
+  if (value === 'routing' || value === 'settings' || value === 'connections') {
+    return value;
+  }
+  return 'connections';
+}
+
 async function readJsonSafely<T>(response: Response): Promise<T | null> {
   const contentType = response.headers.get('content-type') || '';
   if (!contentType.includes('application/json')) return null;
@@ -118,6 +128,7 @@ async function readJsonSafely<T>(response: Response): Promise<T | null> {
 export default function IntegrationsPage() {
   const params = useParams();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const projectId = params.projectId as string;
 
   const [loading, setLoading] = useState(true);
@@ -131,12 +142,19 @@ export default function IntegrationsPage() {
   const [currentOrgName, setCurrentOrgName] = useState<string>('');
   const [userPlan, setUserPlan] = useState<UserPlan>('FREE');
   const [notification, setNotification] = useState<{ type: 'error' | 'success'; message: string } | null>(null);
-  const [activeTab, setActiveTab] = useState<'connections' | 'routing' | 'settings'>('connections');
+  const [activeTab, setActiveTab] = useState<IntegrationsTab>(() => parseTab(searchParams.get('tab')));
 
   const showNotification = useCallback((type: 'error' | 'success', message: string) => {
     setNotification({ type, message });
     setTimeout(() => setNotification(null), 4000);
   }, []);
+
+  const handleTabChange = useCallback((tab: IntegrationsTab) => {
+    setActiveTab(tab);
+    const nextParams = new URLSearchParams(searchParams.toString());
+    nextParams.set('tab', tab);
+    router.replace(`/dashboard/projects/${projectId}/integrations?${nextParams.toString()}`, { scroll: false });
+  }, [projectId, router, searchParams]);
 
   // Fetch all integrations data
   const fetchData = useCallback(async () => {
@@ -233,6 +251,11 @@ export default function IntegrationsPage() {
     fetchData();
   }, [fetchData]);
 
+  useEffect(() => {
+    const nextTab = parseTab(searchParams.get('tab'));
+    setActiveTab((prev) => (prev === nextTab ? prev : nextTab));
+  }, [searchParams]);
+
   // Handlers
   const handleTestMCP = async (id: string) => {
     const res = await fetch(`/api/integrations/mcp/connections/${id}/test`, {
@@ -252,7 +275,7 @@ export default function IntegrationsPage() {
     }
   };
 
-  const handleConfigureMCP = (type: 'WORDPRESS' | 'WOOCOMMERCE') => {
+  const handleConfigureMCP = (type: 'WORDPRESS' | 'WOOCOMMERCE' | 'BREVO') => {
     router.push(`/dashboard/projects/${projectId}/integrations/connect/${type.toLowerCase()}`);
   };
 
@@ -394,6 +417,7 @@ export default function IntegrationsPage() {
     { id: 'settings' as const, label: 'Impostazioni' },
   ] as const;
   const hasBusinessTier = ['BUSINESS', 'PARTNER', 'ENTERPRISE', 'ADMIN'].includes(userPlan);
+  const currentProjectName = projects.find((project) => project.id === projectId)?.name || 'Progetto';
 
   // Compute number of active connections for the tab badge
   const activeCount = [
@@ -407,11 +431,30 @@ export default function IntegrationsPage() {
     ...(cmsConnection?.status === 'ACTIVE' ? [cmsConnection] : []),
     ...(n8nConnection?.status === 'ACTIVE' ? [n8nConnection] : []),
   ].length;
+  const activeSection = activeTab === 'routing' ? 'execute' : 'connections';
 
   return (
-    <div className="flex flex-col h-[calc(100vh-80px)] overflow-hidden">
-      {/* Page header + tab bar */}
-      <div className="px-8 pt-8 pb-0 flex-shrink-0">
+    <div className="max-w-7xl mx-auto p-6">
+      <ProjectWorkspaceShell
+        projectId={projectId}
+        projectName={currentProjectName}
+        activeSection={activeSection}
+        eyebrow={activeTab === 'routing' ? 'Esecuzione' : 'Connessioni'}
+        title={activeTab === 'routing' ? 'Routing e messa in azione' : 'Connessioni e setup esterno'}
+        description={
+          activeTab === 'routing'
+            ? 'Configura dove devono andare i tip, con quali policy e quali blocchi correggere prima di eseguire.'
+            : 'Collega i sistemi esterni del progetto e verifica se le destinazioni sono davvero pronte per entrare nel loop operativo.'
+        }
+        metrics={[
+          { label: 'Connessioni attive', value: String(activeCount), tone: activeCount > 0 ? 'success' : 'warning' },
+          { label: 'Routing AI', value: hasBusinessTier ? 'Disponibile' : 'Upgrade richiesto', tone: hasBusinessTier ? 'accent' : 'warning' },
+          { label: 'Progetto', value: currentOrgName || 'Workspace', tone: 'default' },
+          { label: 'Tab attiva', value: activeTab === 'routing' ? 'Esecuzione' : 'Connessioni', tone: 'accent' },
+        ]}
+      >
+        <div className="mt-8 flex min-h-[70vh] flex-col overflow-hidden rounded-[2rem] border border-slate-200 bg-white shadow-sm">
+          <div className="px-8 pt-8 pb-0 flex-shrink-0">
         {/* Inline notification */}
         {notification && (
           <div
@@ -446,6 +489,9 @@ export default function IntegrationsPage() {
             <p className="text-xs text-blue-800/90 mt-1">
               Usa il Copilot (icona con scintille in basso a destra) per impostare connessioni, testarle e preparare AI Tips instradabili.
             </p>
+            <p className="text-[11px] text-blue-900/90 mt-2 font-semibold">
+              Sequenza consigliata: 1) collega una connessione 2) testa lo stato 3) attiva una regola in AI Routing.
+            </p>
           </div>
           {!hasBusinessTier && (
             <button
@@ -463,7 +509,7 @@ export default function IntegrationsPage() {
           {TABS.map(tab => (
             <button
               key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
+              onClick={() => handleTabChange(tab.id)}
               className={`
                 relative px-4 py-3 text-sm font-semibold transition-colors
                 ${activeTab === tab.id
@@ -486,10 +532,10 @@ export default function IntegrationsPage() {
             </button>
           ))}
         </div>
-      </div>
+          </div>
 
       {/* Tab content area */}
-      <div className="flex-1 overflow-y-auto px-8">
+          <div className="flex-1 overflow-y-auto px-8">
         <AnimatePresence mode="wait">
           {activeTab === 'connections' && (
             <ConnectionsTab
@@ -553,7 +599,9 @@ export default function IntegrationsPage() {
             </div>
           )}
         </AnimatePresence>
-      </div>
+          </div>
+        </div>
+      </ProjectWorkspaceShell>
     </div>
   );
 }

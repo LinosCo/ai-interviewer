@@ -1,9 +1,9 @@
 // Main integrations exports
 
-// MCP (WordPress, WooCommerce)
+// MCP (WordPress, WooCommerce, Brevo)
 export { MCPGatewayService } from './mcp';
-export { WordPressAdapter, WooCommerceAdapter } from './mcp';
-export { WORDPRESS_TOOLS, WOOCOMMERCE_TOOLS } from './mcp';
+export { WordPressAdapter, WooCommerceAdapter, BrevoAdapter } from './mcp';
+export { WORDPRESS_TOOLS, WOOCOMMERCE_TOOLS, BREVO_TOOLS } from './mcp';
 
 // Google (GA4, Search Console)
 export { GoogleService } from './google';
@@ -19,6 +19,7 @@ export type {
   MCPCallResult,
   WordPressCredentials,
   WooCommerceCredentials,
+  BrevoCredentials,
   TestConnectionResult as MCPTestConnectionResult,
   CallToolResult,
   DiscoverToolsResult,

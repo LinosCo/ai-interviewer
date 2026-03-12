@@ -78,6 +78,7 @@ import {
     enforceDeepOfferQuestion,
 } from '@/lib/interview/question-generator';
 import { completeInterview } from '@/lib/interview/interview-completion';
+import { alignStateWithCompletionGuard } from '@/lib/interview/completion-guard-alignment';
 import { ToneAnalyzer } from '@/lib/tone/tone-analyzer';
 import { buildToneAdaptationPrompt } from '@/lib/tone/tone-prompt-adapter';
 import { getTierConfig } from '@/config/interview-tiers';
@@ -140,6 +141,7 @@ export interface InterviewState {
     extensionReturnTopicIndex?: number | null;
     extensionReturnTurnInTopic?: number | null;
     extensionOfferAttempts?: number;
+    deepTurnBudgetRemaining?: number | null;
     runtimeInterviewKnowledge?: RuntimeInterviewKnowledge | null;
     runtimeInterviewKnowledgeSignature?: string | null;
     cilState?: CILState | null;
@@ -598,6 +600,7 @@ export async function POST(req: Request) {
             extensionReturnTopicIndex: rawMetadata.extensionReturnTopicIndex ?? null,
             extensionReturnTurnInTopic: rawMetadata.extensionReturnTurnInTopic ?? null,
             extensionOfferAttempts: rawMetadata.extensionOfferAttempts ?? 0,
+            deepTurnBudgetRemaining: rawMetadata.deepTurnBudgetRemaining ?? null,
             runtimeInterviewKnowledge: rawMetadata.runtimeInterviewKnowledge ?? null,
             runtimeInterviewKnowledgeSignature: rawMetadata.runtimeInterviewKnowledgeSignature ?? null,
             cilState: rawMetadata.cilState ?? null,
@@ -779,7 +782,8 @@ export async function POST(req: Request) {
                     interviewPlan,
                     maxDurationMins,
                     effectiveSec,
-                    bonusTurnCap: tierConfig.budgets.bonusTurnCap
+                    bonusTurnCap: tierConfig.budgets.bonusTurnCap,
+                    advanceAfterUsableFirstAnswer: interviewerQuality === 'standard'
                 });
 
                 // Merge explore result into nextState
@@ -804,6 +808,7 @@ export async function POST(req: Request) {
                     shouldCollectData,
                     maxDurationMins,
                     effectiveSec,
+                    deepExtraTurnCap: tierConfig.budgets.deepExtraTurnCap,
                     deps: {
                         checkUserIntent: async (userMessage: string, context: 'deep_offer') =>
                             checkUserIntent(userMessage, openAIKey, language, context, { onUsage: collectLlmUsage }),
@@ -852,7 +857,8 @@ export async function POST(req: Request) {
                     language,
                     maxDurationMins,
                     effectiveSec,
-                    deepenMaxTurnsPerTopic: tierConfig.budgets.deepenMaxTurnsPerTopic
+                    deepenMaxTurnsPerTopic: tierConfig.budgets.deepenMaxTurnsPerTopic,
+                    deepExtraTurnCap: tierConfig.budgets.deepExtraTurnCap
                 });
 
                 // Merge deepen result into nextState
@@ -1277,10 +1283,24 @@ export async function POST(req: Request) {
             nextState.runtimeInterviewKnowledgeSignature = null;
         }
 
-        // --- CIL PRE-PASS (avanzato only, parallel with remaining sync work) ---
-        const AVANZATO_CIL_RECENT_TURNS = 6;
+        const userTurnSignal: UserTurnSignal = lastMessage?.role === 'user'
+            ? detectUserTurnSignal({
+                userMessage: lastMessage.content,
+                language,
+                phase: nextState.phase,
+                currentTopic,
+                targetTopic,
+                interviewObjective
+            })
+            : 'none';
+        // --- CIL PRE-PASS (avanzato only, but not every turn) ---
+        const AVANZATO_CIL_RECENT_TURNS = 5;
+        const shouldRunCIL = isAvanzato && (
+            nextState.phase === 'DEEPEN'
+            || userTurnSignal !== 'none'
+        );
 
-        const cilPromise: Promise<CILAnalysis | null> = isAvanzato
+        const cilPromise: Promise<CILAnalysis | null> = shouldRunCIL
             ? (async () => {
                 const topicKnowledge = runtimeInterviewKnowledge?.topics.find(
                     t => t.topicId === currentTopic.id
@@ -1299,16 +1319,6 @@ export async function POST(req: Request) {
             })()
             : Promise.resolve(null);
 
-        const userTurnSignal: UserTurnSignal = lastMessage?.role === 'user'
-            ? detectUserTurnSignal({
-                userMessage: lastMessage.content,
-                language,
-                phase: nextState.phase,
-                currentTopic,
-                targetTopic,
-                interviewObjective
-            })
-            : 'none';
         const previousAssistantQuestion = extractLastAssistantQuestion(previousAssistantMessage);
         const recentBridgeStems = collectRecentBridgeStems(canonicalMessages, 14);
         const plannerTopic = targetTopic || currentTopic;
@@ -1491,7 +1501,8 @@ hard_rules:
                 language,
                 phase: nextState.phase,
                 topicLabel: plannerTopic?.label || currentTopic.label,
-                decision: microPlannerDecision
+                decision: microPlannerDecision,
+                interviewerQuality
             });
             if (microPlannerPrompt) {
                 systemPrompt += `\n\n${microPlannerPrompt}`;
@@ -1538,6 +1549,20 @@ hard_rules:
                 ? `\n\n## OBBLIGATORIO: La risposta deve terminare con un punto interrogativo (?).`
                 : `\n\n## MANDATORY: Your response MUST end with a question mark (?).`;
         }
+        if (nextState.phase === 'EXPLORE' || nextState.phase === 'DEEPEN') {
+            systemPrompt += (language || '').toLowerCase().startsWith('it')
+                ? `\n\n## STILE RISPOSTA\nMantieni la risposta visibile breve: massimo 2 frasi. Se fai un aggancio, fallo in una frase corta e concreta, poi fai una sola domanda specifica. Evita formule ripetitive come "è interessante" o "è un punto importante" se non aggiungono informazione.`
+                : `\n\n## RESPONSE STYLE\nKeep the visible response short: at most 2 sentences. If you bridge, do it in one short concrete sentence, then ask one specific question. Avoid repetitive fillers like "that's interesting" or "that's an important point" unless they add information.`;
+            if (interviewerQuality === 'standard') {
+                systemPrompt += (language || '').toLowerCase().startsWith('it')
+                    ? `\n\n## MODALITA STANDARD\nResta naturale e conversazionale, ma lavora come un'intervista diagnostica leggera.\n- Dopo una risposta gia utile, passa al topic successivo invece di fare follow-up opzionali.\n- Preferisci domande concrete e confrontabili: pratica attuale, frequenza, ostacolo, chi decide, canale, metrica, esempio recente o prossimo passo.\n- Evita allargamenti filosofici o troppo esplorativi se non servono.`
+                    : `\n\n## STANDARD MODE\nStay natural and conversational, but act like a lightweight diagnostic interview.\n- Once the user has given a usable answer, move to the next topic instead of asking optional follow-ups.\n- Prefer concrete, comparable questions: current practice, frequency, blocker, owner, channel, metric, recent example, or next step.\n- Avoid philosophical or overly exploratory broadening unless clearly useful.`;
+            } else {
+                systemPrompt += (language || '').toLowerCase().startsWith('it')
+                    ? `\n\n## MODALITA AVANZATA\nScegli il filo piu promettente emerso dall'ultima risposta e resta su quello. Meglio una domanda precisa e distintiva che due piste insieme.`
+                    : `\n\n## ADVANCED MODE\nChoose the most promising thread from the last answer and stay on it. One distinctive, precise question is better than two broader angles in the same turn.`;
+            }
+        }
 
         // ====================================================================
         // 5. GENERATE RESPONSE
@@ -1553,7 +1578,11 @@ hard_rules:
             messagesForAI = canonicalMessages.slice(-6).map((m: any) => ({ role: m.role, content: m.content }));
         } else if (supervisorInsight?.status === 'DEEP_OFFER_ASK') {
             // Bigger context: the AI needs interview history to craft a genuine, contextualised offer
-            messagesForAI = canonicalMessages.slice(-20).map((m: any) => ({ role: m.role, content: m.content }));
+            const deepOfferWindow = interviewerQuality === 'avanzato' ? 12 : 10;
+            messagesForAI = canonicalMessages.slice(-deepOfferWindow).map((m: any) => ({ role: m.role, content: m.content }));
+        } else if (nextState.phase === 'EXPLORE' || nextState.phase === 'DEEPEN') {
+            const topicWindow = interviewerQuality === 'avanzato' ? 10 : 6;
+            messagesForAI = canonicalMessages.slice(-topicWindow).map((m: any) => ({ role: m.role, content: m.content }));
         }
 
         const criticalTurnRouting = shouldUseCriticalModelForTopicTurn({
@@ -1796,8 +1825,9 @@ hard_rules:
                         previousAssistantQuestion: duplicateMatch.matchedQuestion || previousAssistantQuestion,
                         semanticBridgeHint: userBridgeHint,
                         avoidBridgeStems: recentBridgeStems,
-                        requireAcknowledgment: true,
+                        requireAcknowledgment: interviewerQuality === 'avanzato',
                         transitionMode: supervisorInsight?.transitionMode,
+                        interviewerQuality,
                         onUsage: collectLlmUsage
                     });
                     qualityTelemetry.regenerated = true;
@@ -2047,7 +2077,8 @@ hard_rules:
                             previousAssistantQuestion,
                             semanticBridgeHint: userBridgeHint,
                             avoidBridgeStems: recentBridgeStems,
-                            requireAcknowledgment: true,
+                            requireAcknowledgment: interviewerQuality === 'avanzato',
+                            interviewerQuality,
                             onUsage: collectLlmUsage
                         });
                         if (process.env.NODE_ENV === 'development') console.log("🧭 [SUPERVISOR] Question-only response:", responseText.slice(0, 300));
@@ -2253,6 +2284,10 @@ hard_rules:
             if (completionGuardAction === 'ask_consent') {
                 flowTelemetry.completionGuardIntercepted = true;
                 flowTelemetry.completionBlockedForConsent = true;
+                supervisorInsight = alignStateWithCompletionGuard({
+                    action: 'ask_consent',
+                    nextState
+                });
                 // Guardrail: never allow completion before an explicit contact-consent step.
                 console.log(`⚠️ [SUPERVISOR] Bot said INTERVIEW_COMPLETED before consent resolution. OVERRIDING with consent question.`);
                 const enforcedSystem = `Write one short linking sentence acknowledging interview closure, then ask a single yes/no question asking permission to collect contact details.`;
@@ -2265,6 +2300,11 @@ hard_rules:
             } else if (completionGuardAction === 'ask_missing_field' && missingFieldForCompletion) {
                 flowTelemetry.completionGuardIntercepted = true;
                 flowTelemetry.completionBlockedForMissingField = true;
+                supervisorInsight = alignStateWithCompletionGuard({
+                    action: 'ask_missing_field',
+                    nextState,
+                    missingField: missingFieldForCompletion
+                });
                 // Guardrail: consent granted but fields still missing -> ask the specific field, not completion.
                 const fieldLabel = getFieldLabel(missingFieldForCompletion, language);
                 console.log(`⚠️ [SUPERVISOR] Bot said INTERVIEW_COMPLETED but "${missingFieldForCompletion}" is still missing. OVERRIDING with field question.`);

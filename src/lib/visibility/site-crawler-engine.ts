@@ -131,7 +131,7 @@ function extractSitemapEntries(xml: string): { pageUrls: string[]; sitemapUrls: 
             if (normalized) sitemapUrls.add(normalized);
         });
     } catch {
-        // Fallback handled below
+        // Fallback handled below.
     }
 
     // Fallback for malformed XML or unconventional sitemap structures.
@@ -236,7 +236,7 @@ export async function parseSitemap(baseUrl: string): Promise<{ urls: string[]; s
         const parsed = new URL(trimmed);
         originBase = `${parsed.protocol}//${parsed.host}`;
     } catch {
-        // keep null; below we fallback to raw input-based candidates
+        // Keep null; below we fall back to raw input-based candidates.
     }
 
     const candidates = new Set<string>();

@@ -14,8 +14,9 @@ import { prisma } from '@/lib/prisma';
 import { MCPGatewayService } from '@/lib/integrations/mcp/gateway.service';
 import { N8NDispatcher, type TipPayload } from '@/lib/integrations/n8n/dispatcher';
 import type { TipRoutingRule } from '@prisma/client';
+import { type CMSSuggestionType, type TipRouteDestinationType } from '@prisma/client';
 import { CMSConnectionService } from '@/lib/cms/connection.service';
-import { type CMSSuggestionType } from '@prisma/client';
+import { ProjectTipService } from '@/lib/projects/project-tip.service';
 
 interface TipInput {
   id: string;
@@ -44,6 +45,99 @@ type RuleWithConnections = TipRoutingRule & {
 };
 
 export class TipRoutingExecutor {
+  private static toCanonicalDestinationType(destination: RoutingDestination): TipRouteDestinationType {
+    if (destination === 'mcp') return 'MCP';
+    if (destination === 'cms') return 'CMS';
+    return 'N8N';
+  }
+
+  private static getDestinationRefId(rule: RuleWithConnections, destination: RoutingDestination): string | null {
+    if (destination === 'mcp') return rule.mcpConnectionId ?? null;
+    if (destination === 'cms') return rule.cmsConnectionId ?? null;
+    return rule.n8nConnectionId ?? null;
+  }
+
+  /**
+   * For canonical ProjectTip records, write route+execution rows alongside the integrationLog.
+   * Non-blocking: failures are logged but do not abort dispatch.
+   */
+  private static async writeCanonicalRoutingStart(
+    tips: TipInput[],
+    rule: RuleWithConnections,
+    destination: RoutingDestination,
+    source: 'cron' | 'manual_test'
+  ): Promise<Map<string, { routeId: string; executionId: string }>> {
+    const canonicalMap = new Map<string, { routeId: string; executionId: string }>();
+    const destinationType = this.toCanonicalDestinationType(destination);
+    const destinationRefId = this.getDestinationRefId(rule, destination);
+    const runType = source === 'manual_test' ? 'MANUAL' : 'AUTOMATIC';
+
+    for (const tip of tips) {
+      // Only write canonical rows if this tip is a real ProjectTip record
+      const canonicalTip = await prisma.projectTip.findUnique({
+        where: { id: tip.id },
+        select: { id: true },
+      });
+      if (!canonicalTip) continue;
+
+      try {
+        const routeId = await ProjectTipService.upsertRoute({
+          tipId: tip.id,
+          destinationType,
+          destinationRefId,
+          policyMode: 'AUTO_EXECUTE',
+          payloadPreview: { ruleId: rule.id, contentKind: tip.contentKind, title: tip.title },
+        });
+        const executionId = await ProjectTipService.openExecution({
+          tipId: tip.id,
+          routeId,
+          runType,
+          requestPayload: { ruleId: rule.id, destination, contentKind: tip.contentKind },
+        });
+        canonicalMap.set(tip.id, { routeId, executionId });
+      } catch (err) {
+        console.warn(`[TipRoutingExecutor] canonical write start failed for tip ${tip.id}:`, err);
+      }
+    }
+
+    return canonicalMap;
+  }
+
+  private static async writeCanonicalRoutingSuccess(
+    canonicalMap: Map<string, { routeId: string; executionId: string }>,
+    durationMs: number,
+    destination: RoutingDestination
+  ): Promise<void> {
+    for (const [, { routeId, executionId }] of canonicalMap) {
+      try {
+        await ProjectTipService.markExecutionSuccess({
+          executionId,
+          routeId,
+          responsePayload: { destination, durationMs },
+        });
+      } catch (err) {
+        console.warn(`[TipRoutingExecutor] canonical write success failed for execution ${executionId}:`, err);
+      }
+    }
+  }
+
+  private static async writeCanonicalRoutingFailure(
+    canonicalMap: Map<string, { routeId: string; executionId: string }>,
+    error: string
+  ): Promise<void> {
+    for (const [, { routeId, executionId }] of canonicalMap) {
+      try {
+        await ProjectTipService.markExecutionFailure({
+          executionId,
+          routeId,
+          errorMessage: error,
+        });
+      } catch (err) {
+        console.warn(`[TipRoutingExecutor] canonical write failure failed for execution ${executionId}:`, err);
+      }
+    }
+  }
+
   private static mapContentKindToSuggestionType(contentKind: string): CMSSuggestionType {
     const kind = String(contentKind || '').toUpperCase();
     if (kind === 'NEW_FAQ') return 'CREATE_FAQ';
@@ -120,6 +214,7 @@ export class TipRoutingExecutor {
   ): Promise<ExecutionResult> {
     const destination = this.getDestination(rule);
     const startedAt = Date.now();
+    const canonicalMap = await this.writeCanonicalRoutingStart(tips, rule, destination, source);
 
     try {
       if (destination === 'mcp') {
@@ -204,6 +299,7 @@ export class TipRoutingExecutor {
         durationMs,
         source,
       });
+      await this.writeCanonicalRoutingSuccess(canonicalMap, durationMs, destination);
 
       return {
         ruleId: rule.id,
@@ -224,6 +320,7 @@ export class TipRoutingExecutor {
         error,
         source,
       });
+      await this.writeCanonicalRoutingFailure(canonicalMap, error);
       return {
         ruleId: rule.id,
         contentKind: rule.contentKind,

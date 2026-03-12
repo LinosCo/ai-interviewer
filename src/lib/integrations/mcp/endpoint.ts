@@ -6,7 +6,7 @@ const DEFAULT_MCP_PATH: Partial<Record<MCPConnectionType, string>> = {
 };
 
 export function normalizeMcpEndpoint(
-  type: MCPConnectionType | 'WORDPRESS' | 'WOOCOMMERCE',
+  type: MCPConnectionType | 'WORDPRESS' | 'WOOCOMMERCE' | 'BREVO',
   endpoint: string
 ): string {
   const trimmed = endpoint.trim();
@@ -37,7 +37,7 @@ export function normalizeMcpEndpoint(
 }
 
 export function getMcpEndpointCandidates(
-  type: MCPConnectionType | 'WORDPRESS' | 'WOOCOMMERCE',
+  type: MCPConnectionType | 'WORDPRESS' | 'WOOCOMMERCE' | 'BREVO',
   endpoint: string
 ): string[] {
   const normalized = normalizeMcpEndpoint(type, endpoint);

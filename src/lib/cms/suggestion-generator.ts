@@ -321,7 +321,7 @@ ${signalsSummary}
 2. Lo slug deve essere breve, descrittivo e SEO-friendly (usa trattini, no spazi).
 3. Il body deve essere in Markdown con H2/H3, paragrafi brevi, liste e CTA.
 4. La meta description deve essere <=160 caratteri.
-5. Il reasoning deve spiegare perche questo contenuto e importante citando i segnali reali.
+5. Il reasoning deve spiegare perché questo contenuto è importante citando i segnali reali.
 6. Compila strategyAlignment con una frase chiara di coerenza con vision/value proposition/piano strategico.
 7. Compila evidencePoints con 2-4 evidenze sintetiche.
 8. Se il contenuto e per social, aggiungi mediaBrief (descrizione immagine/video).

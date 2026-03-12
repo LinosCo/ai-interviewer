@@ -2,7 +2,11 @@ import type { Metadata } from 'next';
 
 export const SITE_NAME = 'Business Tuner';
 export const SITE_URL =
-  (process.env.NEXT_PUBLIC_APP_URL || 'https://businesstuner.it').replace(/\/+$/, '');
+  (
+    process.env.SITE_URL ||
+    process.env.NEXT_PUBLIC_SITE_URL ||
+    'https://businesstuner.voler.ai'
+  ).replace(/\/+$/, '');
 export const SITE_TWITTER_HANDLE = '@businesstuner';
 export const DEFAULT_LOCALE = 'it_IT';
 

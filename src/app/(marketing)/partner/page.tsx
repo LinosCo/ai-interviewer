@@ -17,48 +17,49 @@ import {
 } from 'lucide-react';
 import { PARTNER_PLAN } from '@/config/landingPricing';
 import { FluidBackground } from '@/components/landing/FluidBackground';
+import { SITE_URL } from '@/lib/seo';
 
-const siteUrl = (process.env.NEXT_PUBLIC_APP_URL || 'https://businesstuner.it').replace(/\/+$/, '');
+const siteUrl = SITE_URL;
 const PARTNER_FAQS = [
     {
-        q: 'Cos\'e il Programma Partner in termini pratici?',
-        a: 'E un modello per erogare consulenza e servizi con una regia unica: ascolti stakeholder, raccogli segnali di mercato, definisci priorita e trasformi le decisioni in azioni operative tracciabili.'
+        q: 'Cos\'è il Programma Partner in termini pratici?',
+        a: 'È un modello per erogare consulenza e servizi con una regia unica: ascolti stakeholder, raccogli segnali di mercato, definisci priorità e trasformi le decisioni in azioni operative tracciabili.'
     },
     {
-        q: 'Per quali profili e pensato?',
+        q: 'Per quali profili è pensato?',
         a: 'Per agenzie, consulenti strategici, business advisor e team che seguono PMI o aziende strutturate. Funziona sia quando fai delivery digitale diretta sia quando coordini partner esterni.'
     },
     {
-        q: 'Qual e la logica di lavoro consigliata con ogni cliente?',
-        a: 'Parti con un perimetro chiaro, attivi ascolto e monitoraggio, usi il Copilot per ordinare le priorita e chiudi ogni ciclo con un piano operativo. In questo modo il cliente vede un metodo continuativo, non attivita isolate.'
+        q: 'Qual è la logica di lavoro consigliata con ogni cliente?',
+        a: 'Parti con un perimetro chiaro, attivi ascolto e monitoraggio, usi il Copilot per ordinare le priorità e chiudi ogni ciclo con un piano operativo. In questo modo il cliente vede un metodo continuativo, non attività isolate.'
     },
     {
         q: 'Che ruolo ha il Copilot nel rapporto consulente-cliente?',
-        a: 'Il Copilot aiuta a sintetizzare insight, evidenziare priorita e proporre prossime azioni. Tu resti la guida strategica: il Copilot accelera analisi e decisioni, non sostituisce il giudizio consulenziale.'
+        a: 'Il Copilot aiuta a sintetizzare insight, evidenziare priorità e proporre prossime azioni. Tu resti la guida strategica: il Copilot accelera analisi e decisioni, non sostituisce il giudizio consulenziale.'
     },
     {
         q: 'Come aumenta il valore percepito del servizio?',
-        a: 'Perche il cliente vede una catena completa: dati raccolti, decisioni motivate, piano d\'azione e avanzamento monitorato. Questo rende la consulenza piu concreta, misurabile e facile da difendere in fase di rinnovo.'
+        a: 'Perché il cliente vede una catena completa: dati raccolti, decisioni motivate, piano d\'azione e avanzamento monitorato. Questo rende la consulenza più concreta, misurabile e facile da difendere in fase di rinnovo.'
     },
     {
-        q: 'Se non gestisco l\'operativita digitale, posso comunque usarlo con efficacia?',
+        q: 'Se non gestisco l\'operatività digitale, posso comunque usarlo con efficacia?',
         a: 'Sì. Puoi gestire discovery, strategia, governance e controllo risultati, mentre l\'execution resta al team del cliente o a una seconda agenzia. In pratica diventi il centro di coordinamento decisionale.'
     },
     {
         q: 'Come collaborano consulente, cliente e team operativo?',
-        a: 'Il partner definisce obiettivi e priorita, il cliente valida direzione e timing, il team operativo esegue. Tutti lavorano su un contesto condiviso, riducendo incomprensioni e dispersione.'
+        a: 'Il partner definisce obiettivi e priorità, il cliente valida direzione e timing, il team operativo esegue. Tutti lavorano su un contesto condiviso, riducendo incomprensioni e dispersione.'
     },
     {
-        q: 'Qual e il primo use case da attivare per creare fiducia velocemente?',
-        a: 'Di solito funziona partire da ascolto stakeholder + monitoraggio brand su un tema specifico. In poche settimane ottieni segnali utili, una priorita chiara e un piano azionabile da presentare al cliente.'
+        q: 'Qual è il primo use case da attivare per creare fiducia velocemente?',
+        a: 'Di solito funziona partire da ascolto stakeholder + monitoraggio brand su un tema specifico. In poche settimane ottieni segnali utili, una priorità chiara e un piano azionabile da presentare al cliente.'
     },
     {
         q: 'Come supporta meeting periodici e report direzionali?',
-        a: 'Ti aiuta a portare ai meeting una narrativa ordinata: cosa e successo, cosa conta davvero, cosa fare adesso. Questo migliora la qualita delle decisioni e la percezione di controllo del cliente.'
+        a: 'Ti aiuta a portare ai meeting una narrativa ordinata: cosa è successo, cosa conta davvero, cosa fare adesso. Questo migliora la qualità delle decisioni e la percezione di controllo del cliente.'
     },
     {
         q: 'Cosa si intende per "cliente attivo"?',
-        a: 'Un cliente attivo e un utente a cui hai trasferito almeno un progetto e che ha un abbonamento pagante (Starter, Pro o Business). I clienti in trial o con piano Free non contano per le soglie.'
+        a: 'Un cliente attivo è un utente a cui hai trasferito almeno un progetto e che ha un abbonamento pagante (Starter, Pro o Business). I clienti in trial o con piano Free non contano per le soglie.'
     },
     {
         q: 'Cosa succede se perdo clienti e scendo sotto la soglia?',
@@ -92,7 +93,7 @@ const partnerJsonLd = {
                 audienceType: 'Agenzie, consulenti strategici, business advisor',
             },
             description:
-                'Modello partner per gestire clienti con ascolto stakeholder, Copilot strategico e operativita tracciabile.',
+                'Modello partner per gestire clienti con ascolto stakeholder, Copilot strategico e operatività tracciabile.',
             url: `${siteUrl}/partner`,
         },
         {
@@ -139,7 +140,7 @@ export default function PartnerPage() {
                         </h1>
                         <p className="text-xl text-[hsl(var(--muted-foreground))] mb-8 max-w-2xl mx-auto">
                             Offri ai tuoi clienti uno strumento operativo di ascolto, raccolta dati e decisione strategica.
-                            Ideale per PMI, agenzie, consulenti strategici e business advisor, anche quando l&apos;operativita digitale
+                            Ideale per PMI, agenzie, consulenti strategici e business advisor, anche quando l&apos;operatività digitale
                             viene gestita dal team del cliente o da partner esterni.
                         </p>
                         <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
@@ -252,7 +253,7 @@ export default function PartnerPage() {
                                 step: 1,
                                 icon: Users,
                                 title: 'Attiva il Piano Partner',
-                                description: 'Inizia il trial gratuito con tutte le funzionalita PRO e configura il tuo workspace.'
+                                description: 'Inizia il trial gratuito con tutte le funzionalità PRO e configura il tuo workspace.'
                             },
                             {
                                 step: 2,
@@ -264,13 +265,13 @@ export default function PartnerPage() {
                                 step: 3,
                                 icon: Send,
                                 title: 'Condividi con Cliente e Team Operativo',
-                                description: 'Trasferisci i progetti al cliente o collabora con team interni e agenzie esterne che gestiscono l\'operativita.'
+                                description: 'Trasferisci i progetti al cliente o collabora con team interni e agenzie esterne che gestiscono l\'operatività.'
                             },
                             {
                                 step: 4,
                                 icon: BarChart3,
                                 title: 'Guida le Decisioni dai Dati',
-                                description: 'Usa dashboard e Copilot per allineare priorita, report e prossime azioni con maggiore autorevolezza.'
+                                description: 'Usa dashboard e Copilot per allineare priorità, report e prossime azioni con maggiore autorevolezza.'
                             }
                         ].map((item, index) => (
                             <motion.div
@@ -313,10 +314,10 @@ export default function PartnerPage() {
                             viewport={{ once: true }}
                         >
                             <h2 className="font-display text-3xl md:text-4xl font-bold mb-6">
-                                Tutto cio che ti serve per <span className="gradient-text">scalare servizi e advisory</span>
+                                Tutto ciò che ti serve per <span className="gradient-text">scalare servizi e advisory</span>
                             </h2>
                             <p className="text-lg text-[hsl(var(--muted-foreground))] mb-8">
-                                Il piano Partner include tutte le funzionalita PRO piu strumenti esclusivi
+                                Il piano Partner include tutte le funzionalità PRO più strumenti esclusivi
                                 per la gestione multi-cliente di agenzie, consulenti strategici e business advisor su clienti PMI e corporate.
                             </p>
 
@@ -444,7 +445,7 @@ export default function PartnerPage() {
                         </h2>
                         <p className="text-xl text-white/90 mb-8 max-w-2xl mx-auto">
                             Attiva oggi il trial: ideale per agenzie, consulenti strategici e business advisor
-                            che vogliono piu efficacia operativa e piu valore percepito su clienti PMI e corporate.
+                            che vogliono più efficacia operativa e più valore percepito su clienti PMI e corporate.
                         </p>
                         <Link
                             href="/register?plan=partner"

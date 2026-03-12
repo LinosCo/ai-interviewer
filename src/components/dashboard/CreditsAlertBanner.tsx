@@ -15,6 +15,7 @@ interface CreditsData {
     percentageUsed: number;
     alertLevel: 'warning' | 'danger' | 'critical' | 'exhausted' | null;
     isUnlimited: boolean;
+    usingPackCredits: boolean;
     formatted: {
         totalAvailable: string;
     };
@@ -95,6 +96,11 @@ export function CreditsAlertBanner() {
     if (!config) return null;
 
     const Icon = config.icon;
+    const isUsingPackCredits = credits.usingPackCredits;
+    const title = isUsingPackCredits ? 'Stai usando il Pack Extra' : config.title;
+    const message = isUsingPackCredits
+        ? 'I crediti mensili sono terminati, ma le funzionalità AI restano attive e ora consumano il Pack Extra disponibile.'
+        : config.message;
 
     // Don't allow dismissing exhausted alert
     const canDismiss = credits.alertLevel !== 'exhausted';
@@ -104,10 +110,10 @@ export function CreditsAlertBanner() {
             <div className="flex items-start gap-3">
                 <Icon className={`w-5 h-5 ${config.iconColor} flex-shrink-0 mt-0.5`} />
                 <div className="flex-1">
-                    <h4 className="font-medium text-stone-900">{config.title}</h4>
+                    <h4 className="font-medium text-stone-900">{title}</h4>
                     <p className="text-sm text-stone-600 mt-1">
-                        {config.message}
-                        {credits.alertLevel !== 'exhausted' && (
+                        {message}
+                        {!isUsingPackCredits && credits.alertLevel !== 'exhausted' && (
                             <span className="ml-1">
                                 ({credits.percentageUsed}% utilizzato)
                             </span>

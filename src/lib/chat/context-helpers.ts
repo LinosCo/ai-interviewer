@@ -71,7 +71,7 @@ export function shouldUseCriticalModelForTopicTurn(params: {
     userTurnSignal: 'none' | 'clarification' | 'off_topic_question';
     userMessage?: string | null;
     language: string;
-    criticalEscalation?: 'selective' | 'aggressive';
+    criticalEscalation?: 'minimal' | 'focused' | 'selective' | 'aggressive';
 }): { useCritical: boolean; reason: string } {
     if (params.phase !== 'EXPLORE' && params.phase !== 'DEEPEN') {
         return { useCritical: false, reason: 'not_topic_phase' };
@@ -82,7 +82,6 @@ export function shouldUseCriticalModelForTopicTurn(params: {
         return { useCritical: true, reason: 'aggressive_escalation' };
     }
 
-    // Selective mode (standard): critical only for high-value turns (~25-30%)
     if (params.userTurnSignal === 'clarification') {
         return { useCritical: true, reason: 'clarification_turn' };
     }
@@ -90,15 +89,28 @@ export function shouldUseCriticalModelForTopicTurn(params: {
         return { useCritical: true, reason: 'scope_recovery_turn' };
     }
 
-    const supervisorStatus = String(params.supervisorStatus || '');
-    if (supervisorStatus === 'TRANSITION' || supervisorStatus === 'START_DEEP' || supervisorStatus === 'START_DEEP_BRIEF') {
-        return { useCritical: true, reason: 'topic_transition_turn' };
+    if (params.criticalEscalation === 'minimal') {
+        return { useCritical: false, reason: 'minimal_standard_turn' };
     }
 
     const userMessage = String(params.userMessage || '').trim();
     const userWords = userMessage.split(/\s+/).filter(Boolean).length;
     const signalScore = userMessage ? computeEngagementScore(userMessage, params.language) : 0;
     const highSignalAnswer = userWords >= 35 || signalScore >= 0.28;
+    const veryHighSignalAnswer = userWords >= 55 || signalScore >= 0.45;
+    const supervisorStatus = String(params.supervisorStatus || '');
+
+    if (params.criticalEscalation === 'focused') {
+        if (params.phase === 'DEEPEN' && supervisorStatus === 'DEEPENING' && veryHighSignalAnswer) {
+            return { useCritical: true, reason: 'focused_high_signal_deepening' };
+        }
+        return { useCritical: false, reason: 'focused_primary_turn' };
+    }
+
+    if (supervisorStatus === 'TRANSITION' || supervisorStatus === 'START_DEEP' || supervisorStatus === 'START_DEEP_BRIEF') {
+        return { useCritical: true, reason: 'topic_transition_turn' };
+    }
+
     if (supervisorStatus === 'DEEPENING' && highSignalAnswer) {
         return { useCritical: true, reason: 'high_signal_deepening' };
     }

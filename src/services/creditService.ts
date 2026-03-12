@@ -10,7 +10,7 @@
 
 import { prisma } from '@/lib/prisma';
 import { CreditAction, getCreditCost } from '@/config/creditCosts';
-import { calculateUsagePercentage, getWarningLevel } from '@/config/creditPacks';
+import { calculateUsagePercentage, getEffectiveWarningLevel } from '@/config/creditPacks';
 import { PLANS, PlanType } from '@/config/plans';
 
 // Import dinamico per evitare circular dependency
@@ -222,7 +222,12 @@ export const CreditService = {
             Number(updatedOrg.monthlyCreditsUsed),
             Number(updatedOrg.monthlyCreditsLimit)
         );
-        const warningLevel = getWarningLevel(usagePercentage);
+        const warningLevel = getEffectiveWarningLevel({
+            percentage: usagePercentage,
+            monthlyRemaining: Number(newMonthlyRemaining > BigInt(0) ? newMonthlyRemaining : BigInt(0)),
+            packAvailable: Number(updatedOrg.packCreditsAvailable),
+            totalAvailable: Number(newTotalRemaining > BigInt(0) ? newTotalRemaining : BigInt(0))
+        });
 
         // Trigger notifications asynchronously for active org members with alerts enabled.
         if (warningLevel === 'danger' || warningLevel === 'critical' || warningLevel === 'exhausted') {
@@ -375,7 +380,12 @@ export const CreditService = {
             packCredits: org.packCreditsAvailable,
             totalAvailable: isUnlimitedCredits ? BigInt(-1) : (totalAvailable > BigInt(0) ? totalAvailable : BigInt(0)),
             usagePercentage,
-            warningLevel: getWarningLevel(usagePercentage),
+            warningLevel: getEffectiveWarningLevel({
+                percentage: usagePercentage,
+                monthlyRemaining: Number(monthlyRemaining > BigInt(0) ? monthlyRemaining : BigInt(0)),
+                packAvailable: Number(org.packCreditsAvailable),
+                totalAvailable: Number(totalAvailable > BigInt(0) ? totalAvailable : BigInt(0))
+            }),
             resetDate: effectiveResetDate,
             isUnlimited: isUnlimitedCredits
         };

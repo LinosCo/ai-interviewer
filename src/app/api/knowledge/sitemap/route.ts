@@ -21,7 +21,7 @@ function getMainLanguageUrls(urls: string[]): string[] {
             } else {
                 buckets.root.push(url);
             }
-        } catch (e) {
+        } catch {
             buckets.root.push(url);
         }
     }
@@ -76,8 +76,8 @@ export async function POST(req: Request) {
             return new Response('Unauthorized', { status: 404 });
         }
 
-        // Fetch Sitemap via the same parser used by Brand Monitor so nested indexes
-        // like Rank Math / Yoast are handled consistently.
+        // Fetch Sitemap via the same parser used by Brand Monitor so nested
+        // sitemap indexes like Rank Math / Yoast are handled consistently.
         const { urls: sites } = await parseProvidedSitemap(url);
 
         if (!sites || sites.length === 0) {

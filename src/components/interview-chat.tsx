@@ -190,6 +190,7 @@ export default function InterviewChat({
     const [footerHeight, setFooterHeight] = useState(isEmbedded ? 96 : 148);
     const chatViewportRef = useRef<HTMLDivElement>(null);
     const questionCardRef = useRef<HTMLDivElement>(null);
+    const dockedQuestionContentRef = useRef<HTMLDivElement>(null);
     const footerRef = useRef<HTMLDivElement>(null);
 
     // Warm-up State
@@ -577,6 +578,10 @@ export default function InterviewChat({
     const questionScrollMarginBottomPx = footerHeight + (isMobileKeyboardOpen ? 20 : 28);
     const showDockedQuestion = isMobileKeyboardOpen && Boolean(currentQuestion) && !isLoading && !isCompleted;
     const dockedQuestionBottomPx = footerBottomOffsetPx + footerHeight + 8;
+    const dockedQuestionMaxHeightPx = effectiveViewportHeight
+        ? Math.max(120, Math.min(280, Math.round(effectiveViewportHeight * 0.32)))
+        : 220;
+    const dockedQuestionCompactText = dockedQuestionMaxHeightPx <= 170;
 
     useEffect(() => {
         if (!isMobileKeyboardOpen) return;
@@ -593,6 +598,16 @@ export default function InterviewChat({
         }, 80);
         return () => window.clearTimeout(timer);
     }, [footerHeight, isMobileKeyboardOpen]);
+
+    useEffect(() => {
+        if (!showDockedQuestion) return;
+        const timer = window.setTimeout(() => {
+            const contentEl = dockedQuestionContentRef.current;
+            if (!contentEl) return;
+            contentEl.scrollTop = contentEl.scrollHeight;
+        }, 50);
+        return () => window.clearTimeout(timer);
+    }, [currentQuestionId, dockedQuestionMaxHeightPx, showDockedQuestion]);
 
     const renderQuestionCard = (docked = false) => {
         if (!currentQuestion) return null;
@@ -620,7 +635,11 @@ export default function InterviewChat({
                             <div className="h-px w-12" style={{ background: brandColor, opacity: 0.4 }} />
                         </div>
 
-                        <div className={`prose max-w-none prose-headings:font-bold prose-p:text-gray-900 prose-p:font-medium prose-a:font-semibold ${docked ? 'prose-base' : 'prose-lg'}`}>
+                        <div
+                            ref={docked ? dockedQuestionContentRef : undefined}
+                            className={`prose max-w-none prose-headings:font-bold prose-p:text-gray-900 prose-p:font-medium prose-a:font-semibold ${docked ? 'prose-base overflow-y-auto overscroll-contain pr-1' : 'prose-lg'}`}
+                            style={docked ? { maxHeight: `${dockedQuestionMaxHeightPx}px` } : undefined}
+                        >
                             <ReactMarkdown
                                 components={{
                                     blockquote: ({ children }) => (
@@ -635,9 +654,9 @@ export default function InterviewChat({
 
                                         return (
                                             <p className={`
-                                                ${isShort ? 'text-lg md:text-xl font-semibold text-gray-900' : ''}
-                                                ${!isShort && !isLong ? 'text-base md:text-lg font-medium text-gray-800' : ''}
-                                                ${isLong ? 'text-base md:text-lg text-gray-700' : ''}
+                                                ${isShort ? (docked && dockedQuestionCompactText ? 'text-base font-semibold text-gray-900' : 'text-lg md:text-xl font-semibold text-gray-900') : ''}
+                                                ${!isShort && !isLong ? (docked && dockedQuestionCompactText ? 'text-sm font-medium text-gray-800' : 'text-base md:text-lg font-medium text-gray-800') : ''}
+                                                ${isLong ? (docked && dockedQuestionCompactText ? 'text-sm text-gray-700' : 'text-base md:text-lg text-gray-700') : ''}
                                                 ${docked ? 'leading-relaxed mb-4' : 'leading-relaxed mb-6'}
                                             `} style={{ textShadow: 'none' }}>
                                                 {children}

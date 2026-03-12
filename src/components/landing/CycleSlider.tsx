@@ -165,12 +165,12 @@ const slideVariants = {
 
 function ScenarioCard({ scenario }: { scenario: Scenario }): React.JSX.Element {
   return (
-    <div className="bg-[hsl(var(--card)/0.92)] rounded-[28px] p-7 border border-[hsl(var(--border)/0.55)] shadow-soft">
-      <div className="flex items-center gap-3 mb-6">
-        <div className="w-11 h-11 rounded-2xl bg-[hsl(var(--secondary))] flex items-center justify-center shrink-0">
+    <div className="bg-[hsl(var(--card)/0.92)] rounded-[28px] border border-[hsl(var(--border)/0.55)] p-5 shadow-soft sm:p-7">
+      <div className="mb-5 flex items-center gap-3 sm:mb-6">
+        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-[hsl(var(--secondary))] sm:h-11 sm:w-11">
           <scenario.icon className={`w-5 h-5 ${scenario.accentClass}`} />
         </div>
-        <h3 className="font-display text-lg md:text-xl font-bold text-[hsl(var(--foreground))] leading-snug">
+        <h3 className="font-display text-base font-bold leading-snug text-[hsl(var(--foreground))] sm:text-lg md:text-xl">
           {scenario.title}
         </h3>
       </div>
@@ -179,7 +179,7 @@ function ScenarioCard({ scenario }: { scenario: Scenario }): React.JSX.Element {
         {scenario.phases.map((phase) => (
           <div
             key={phase.label}
-            className="flex flex-col gap-2 rounded-2xl bg-[hsl(var(--background)/0.6)] border border-[hsl(var(--border)/0.35)] p-4"
+            className="flex flex-col gap-2 rounded-2xl border border-[hsl(var(--border)/0.35)] bg-[hsl(var(--background)/0.6)] p-3.5 sm:p-4"
           >
             <div className="flex items-center gap-2">
               <phase.icon className="w-4 h-4 text-[hsl(var(--muted-foreground))]" />
@@ -201,10 +201,8 @@ export function CycleSlider(): React.JSX.Element {
   const [activeIndex, setActiveIndex] = useState(0);
   const [direction, setDirection] = useState(1);
   const [isPaused, setIsPaused] = useState(false);
-  const [mobileActiveIndex, setMobileActiveIndex] = useState(0);
+  const [isDesktop, setIsDesktop] = useState(false);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const mobileContainerRef = useRef<HTMLDivElement | null>(null);
-  const mobileCardRefs = useRef<Array<HTMLDivElement | null>>([]);
 
   const goTo = useCallback((index: number, dir: number) => {
     setDirection(dir);
@@ -222,77 +220,89 @@ export function CycleSlider(): React.JSX.Element {
   }, [activeIndex, goTo]);
 
   useEffect(() => {
-    if (isPaused) return;
+    if (typeof window === 'undefined') return;
+
+    const media = window.matchMedia('(min-width: 768px)');
+    const sync = () => setIsDesktop(media.matches);
+    sync();
+
+    if (typeof media.addEventListener === 'function') {
+      media.addEventListener('change', sync);
+      return () => media.removeEventListener('change', sync);
+    }
+
+    media.addListener(sync);
+    return () => media.removeListener(sync);
+  }, []);
+
+  useEffect(() => {
+    if (!isDesktop || isPaused) return;
 
     timerRef.current = setInterval(goNext, AUTOPLAY_MS);
     return () => {
       if (timerRef.current) clearInterval(timerRef.current);
     };
-  }, [goNext, isPaused]);
-
-  const handleMobileScroll = useCallback(() => {
-    const container = mobileContainerRef.current;
-    if (!container) return;
-
-    const scrollTop = container.scrollTop;
-    let closestIndex = 0;
-    let closestDistance = Number.POSITIVE_INFINITY;
-
-    mobileCardRefs.current.forEach((card, index) => {
-      if (!card) return;
-      const distance = Math.abs(card.offsetTop - scrollTop);
-      if (distance < closestDistance) {
-        closestDistance = distance;
-        closestIndex = index;
-      }
-    });
-
-    setMobileActiveIndex((current) => (current === closestIndex ? current : closestIndex));
-  }, []);
-
-  const scrollMobileTo = useCallback((index: number) => {
-    const container = mobileContainerRef.current;
-    const card = mobileCardRefs.current[index];
-    if (!container || !card) return;
-
-    container.scrollTo({
-      top: card.offsetTop,
-      behavior: 'smooth',
-    });
-  }, []);
+  }, [goNext, isDesktop, isPaused]);
 
   const scenario = scenarios[activeIndex];
 
   return (
     <>
       <div className="md:hidden">
-        <div
-          ref={mobileContainerRef}
-          className="max-h-[76svh] overflow-y-auto snap-y snap-mandatory space-y-4 pr-1"
-          onScroll={handleMobileScroll}
-        >
-          {scenarios.map((mobileScenario, index) => (
-            <div
-              key={mobileScenario.title}
-              ref={(node) => {
-                mobileCardRefs.current[index] = node;
-              }}
-              className="snap-start"
-            >
-              <ScenarioCard scenario={mobileScenario} />
-            </div>
-          ))}
+        <div className="mb-4 flex items-center justify-between gap-3">
+          <button
+            type="button"
+            onClick={goPrev}
+            aria-label="Scenario precedente"
+            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-[hsl(var(--border)/0.55)] bg-[hsl(var(--card))] shadow-soft"
+          >
+            <ChevronLeft className="h-5 w-5 text-[hsl(var(--foreground))]" />
+          </button>
+
+          <div className="min-w-0 text-center">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[hsl(var(--muted-foreground))]">
+              Scenario
+            </p>
+            <p className="text-sm font-semibold text-[hsl(var(--foreground))]">
+              {activeIndex + 1} di {scenarios.length}
+            </p>
+          </div>
+
+          <button
+            type="button"
+            onClick={goNext}
+            aria-label="Scenario successivo"
+            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-[hsl(var(--border)/0.55)] bg-[hsl(var(--card))] shadow-soft"
+          >
+            <ChevronRight className="h-5 w-5 text-[hsl(var(--foreground))]" />
+          </button>
         </div>
 
-        <div className="flex items-center justify-center gap-2.5 mt-6">
+        <div className="overflow-hidden">
+          <AnimatePresence mode="wait" custom={direction}>
+            <motion.div
+              key={activeIndex}
+              custom={direction}
+              variants={slideVariants}
+              initial="enter"
+              animate="center"
+              exit="exit"
+              transition={{ duration: 0.35, ease: 'easeInOut' }}
+            >
+              <ScenarioCard scenario={scenario} />
+            </motion.div>
+          </AnimatePresence>
+        </div>
+
+        <div className="mt-5 flex items-center justify-center gap-2.5">
           {scenarios.map((item, index) => (
             <button
               key={item.title}
               type="button"
-              onClick={() => scrollMobileTo(index)}
+              onClick={() => goTo(index, index > activeIndex ? 1 : -1)}
               aria-label={`Vai allo scenario ${index + 1}`}
               className={`rounded-full transition-all duration-300 ${
-                index === mobileActiveIndex
+                index === activeIndex
                   ? 'w-8 h-2.5 bg-[hsl(var(--foreground))]'
                   : 'w-2.5 h-2.5 bg-[hsl(var(--border))]'
               }`}

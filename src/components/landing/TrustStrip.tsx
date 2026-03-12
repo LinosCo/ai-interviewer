@@ -26,13 +26,16 @@ export function TrustStrip() {
       className="bg-[hsl(var(--secondary)/0.5)] border-y border-[hsl(var(--border))]"
     >
       <div className="max-w-7xl mx-auto px-6 py-4">
-        <div className="flex flex-wrap justify-center items-center gap-x-3 gap-y-2 text-sm text-[hsl(var(--muted-foreground))]">
+        <div className="grid gap-2.5 text-sm text-[hsl(var(--muted-foreground))] sm:grid-cols-2 lg:flex lg:flex-wrap lg:items-center lg:justify-center lg:gap-x-3 lg:gap-y-2">
           {TRUST_ITEMS.map((item, index) => {
             const Icon = item.icon;
             const isLast = index === TRUST_ITEMS.length - 1;
 
             return (
-              <div key={item.label} className="flex items-center gap-3">
+              <div
+                key={item.label}
+                className="flex items-center justify-center gap-3 rounded-2xl bg-white/45 px-3 py-2.5 text-center sm:justify-start sm:text-left lg:rounded-none lg:bg-transparent lg:px-0 lg:py-0"
+              >
                 <span className="flex items-center gap-1.5">
                   <Icon className="w-4 h-4 text-[hsl(var(--coral))]" />
                   {item.label}

@@ -21,9 +21,12 @@ function TrustBadgesView() {
   ];
 
   return (
-    <div className="flex flex-wrap justify-center gap-4 md:gap-6 text-[hsl(var(--muted-foreground))] text-sm">
+    <div className="grid gap-2.5 text-[hsl(var(--muted-foreground))] text-sm sm:grid-cols-2 md:flex md:flex-wrap md:justify-center md:gap-6">
       {badges.map((label) => (
-        <span key={label} className="flex items-center gap-2">
+        <span
+          key={label}
+          className="flex items-center justify-center gap-2 rounded-full border border-[hsl(var(--border)/0.8)] bg-white/55 px-4 py-2 text-center md:border-none md:bg-transparent md:px-0 md:py-0"
+        >
           <svg
             className="w-4 h-4 text-[hsl(var(--coral))]"
             fill="currentColor"

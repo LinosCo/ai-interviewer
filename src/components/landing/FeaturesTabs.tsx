@@ -345,11 +345,11 @@ export function FeaturesTabs(): React.JSX.Element {
         whileInView={{ opacity: 1, y: 0 }}
         viewport={{ once: true }}
         transition={{ duration: 0.4, delay: 0.1 }}
-        className="mb-6 md:mb-10 overflow-x-auto scrollbar-hide -mx-6 px-6 sticky md:static top-20 z-20 bg-[hsl(var(--background)/0.92)] md:bg-transparent backdrop-blur-sm md:backdrop-blur-none pb-2"
+        className="mb-6 md:mb-10"
         onMouseEnter={() => setIsAutoPaused(true)}
         onMouseLeave={() => setIsAutoPaused(false)}
       >
-        <div className="flex gap-3 min-w-max md:mx-auto md:w-fit">
+        <div className="grid grid-cols-2 gap-3 md:hidden">
           {TABS.map((tab, index) => {
             const isActive = tab.id === activeTabId;
             const TabIcon = tab.icon;
@@ -363,30 +363,72 @@ export function FeaturesTabs(): React.JSX.Element {
                   setOpenCardIndex(0);
                   pauseAutoOnTap();
                 }}
-                onTouchStart={pauseAutoOnTap}
-                className={`flex items-center gap-2.5 px-6 md:px-7 py-3.5 rounded-2xl text-base font-semibold border transition-all duration-200 whitespace-nowrap cursor-pointer ${
+                className={`flex min-h-[96px] flex-col items-start justify-between gap-3 rounded-2xl border px-4 py-4 text-left transition-all duration-200 ${
                   isActive
                     ? 'gradient-bg text-white shadow-glow border-transparent'
                     : 'bg-[hsl(var(--card)/0.85)] border-[hsl(var(--border))] text-[hsl(var(--muted-foreground))] hover:border-[hsl(var(--coral)/0.35)]'
                 }`}
               >
-                <span
-                  className={`w-6 h-6 rounded-full border text-xs font-bold flex items-center justify-center ${
-                    isActive
-                      ? 'bg-white/20 border-white/30 text-white'
-                      : 'bg-[hsl(var(--secondary))] border-[hsl(var(--border))] text-[hsl(var(--muted-foreground))]'
-                  }`}
-                >
-                  {index + 1}
+                <div className="flex items-center gap-2.5">
+                  <span
+                    className={`flex h-7 w-7 items-center justify-center rounded-full border text-xs font-bold ${
+                      isActive
+                        ? 'border-white/30 bg-white/20 text-white'
+                        : 'border-[hsl(var(--border))] bg-[hsl(var(--secondary))] text-[hsl(var(--muted-foreground))]'
+                    }`}
+                  >
+                    {index + 1}
+                  </span>
+                  <TabIcon className="h-4 w-4" />
+                </div>
+                <span className="font-display text-base font-bold tracking-[0.04em]">
+                  {tab.label}
                 </span>
-                <TabIcon className="w-4 h-4" />
-                {tab.label}
               </button>
             );
           })}
         </div>
 
-        <div className="mt-4 text-center">
+        <div className="hidden md:block overflow-x-auto scrollbar-hide pb-2">
+          <div className="flex gap-3 min-w-max md:mx-auto md:w-fit">
+            {TABS.map((tab, index) => {
+              const isActive = tab.id === activeTabId;
+              const TabIcon = tab.icon;
+
+              return (
+                <button
+                  key={tab.id}
+                  type="button"
+                  onClick={() => {
+                    setActiveTabId(tab.id);
+                    setOpenCardIndex(0);
+                    pauseAutoOnTap();
+                  }}
+                  onTouchStart={pauseAutoOnTap}
+                  className={`flex items-center gap-2.5 rounded-2xl border px-6 py-3.5 text-base font-semibold whitespace-nowrap transition-all duration-200 cursor-pointer ${
+                    isActive
+                      ? 'gradient-bg text-white shadow-glow border-transparent'
+                      : 'bg-[hsl(var(--card)/0.85)] border-[hsl(var(--border))] text-[hsl(var(--muted-foreground))] hover:border-[hsl(var(--coral)/0.35)]'
+                  }`}
+                >
+                  <span
+                    className={`flex h-6 w-6 items-center justify-center rounded-full border text-xs font-bold ${
+                      isActive
+                        ? 'bg-white/20 border-white/30 text-white'
+                        : 'bg-[hsl(var(--secondary))] border-[hsl(var(--border))] text-[hsl(var(--muted-foreground))]'
+                    }`}
+                  >
+                    {index + 1}
+                  </span>
+                  <TabIcon className="h-4 w-4" />
+                  {tab.label}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        <div className="mt-4 rounded-2xl border border-[hsl(var(--border)/0.55)] bg-[hsl(var(--background)/0.88)] px-4 py-3.5 text-center shadow-soft md:rounded-none md:border-none md:bg-transparent md:px-0 md:py-0 md:shadow-none">
           <p className="text-sm md:text-base text-[hsl(var(--muted-foreground))]">
             <span className="font-semibold text-[hsl(var(--foreground))]">
               Fase {activeTabIndex + 1} di {TABS.length}:

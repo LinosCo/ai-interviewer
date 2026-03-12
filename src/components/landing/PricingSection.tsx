@@ -13,7 +13,7 @@ import {
 } from '@/config/landingPricing';
 
 export function PricingSection() {
-    const [isYearly, setIsYearly] = useState(false);
+    const [isYearly, setIsYearly] = useState(true);
     const [creditsOpen, setCreditsOpen] = useState(false);
     const yearlyDiscount = getYearlyDiscount();
 
@@ -61,6 +61,7 @@ export function PricingSection() {
                         </span>
                         <button
                             onClick={() => setIsYearly(!isYearly)}
+                            aria-pressed={isYearly}
                             className="relative w-14 h-7 rounded-full bg-[hsl(var(--secondary))] border border-[hsl(var(--border))] transition-colors"
                         >
                             <motion.div
@@ -189,22 +190,35 @@ export function PricingSection() {
                     whileInView={{ opacity: 1, y: 0 }}
                     viewport={{ once: true }}
                     transition={{ duration: 0.5, delay: 0.3 }}
-                    className="mt-16"
+                    className="mt-12"
                 >
-                    <div className="text-center">
+                    <div className="max-w-4xl mx-auto">
                         <button
                             onClick={() => setCreditsOpen(!creditsOpen)}
-                            className="inline-flex items-center gap-2 px-6 py-3 rounded-full border border-[hsl(var(--border))] bg-[hsl(var(--card))] text-[hsl(var(--foreground))] text-sm font-medium shadow-soft hover:shadow-medium transition-all"
+                            className="w-full rounded-[24px] border border-[hsl(var(--border)/0.7)] bg-[hsl(var(--card))] px-5 py-4 text-left shadow-soft transition-all hover:shadow-medium"
                         >
-                            <Zap className="w-4 h-4 text-[hsl(var(--amber))]" />
-                            Hai bisogno di più crediti?
-                            <motion.span
-                                animate={{ rotate: creditsOpen ? 180 : 0 }}
-                                transition={{ duration: 0.2 }}
-                                className="inline-flex"
-                            >
-                                <ChevronDown className="w-4 h-4" />
-                            </motion.span>
+                            <div className="flex items-center justify-between gap-4">
+                                <div className="flex items-start gap-4">
+                                    <div className="w-11 h-11 rounded-2xl bg-[hsl(var(--amber)/0.12)] flex items-center justify-center shrink-0">
+                                        <Zap className="w-5 h-5 text-[hsl(var(--amber))]" />
+                                    </div>
+                                    <div>
+                                        <p className="font-display text-lg font-bold text-[hsl(var(--foreground))]">
+                                            Hai bisogno di piu crediti?
+                                        </p>
+                                        <p className="text-sm text-[hsl(var(--muted-foreground))] mt-1">
+                                            Apri i pack extra che non scadono mai e tieni margine sui mesi ad alta attivita.
+                                        </p>
+                                    </div>
+                                </div>
+                                <motion.span
+                                    animate={{ rotate: creditsOpen ? 180 : 0 }}
+                                    transition={{ duration: 0.2 }}
+                                    className="inline-flex shrink-0 rounded-full border border-[hsl(var(--border))] p-2"
+                                >
+                                    <ChevronDown className="w-4 h-4" />
+                                </motion.span>
+                            </div>
                         </button>
                     </div>
 
@@ -268,40 +282,74 @@ export function PricingSection() {
                     whileInView={{ opacity: 1, y: 0 }}
                     viewport={{ once: true }}
                     transition={{ duration: 0.5, delay: 0.4 }}
-                    className="mt-16"
+                    className="mt-8"
                 >
-                    <div className="bg-gradient-to-r from-amber-50 via-orange-50 to-amber-50 rounded-2xl border border-amber-200 p-8 md:p-10">
-                        <div className="inline-flex items-center gap-2 px-4 py-2 bg-amber-500 rounded-full text-white text-sm font-medium mb-4">
-                            <Users className="w-4 h-4" />
-                            Programma Partner
+                    <div className="rounded-[28px] border border-amber-200 bg-gradient-to-br from-amber-50 via-orange-50 to-white p-6 md:p-8 lg:p-10">
+                        <div className="grid gap-8 lg:grid-cols-[minmax(0,1.15fr)_minmax(0,0.95fr)] lg:items-center">
+                            <div>
+                                <div className="inline-flex items-center gap-2 rounded-full bg-amber-500 px-4 py-2 text-sm font-medium text-white shadow-glow mb-5">
+                                    <Users className="w-4 h-4" />
+                                    Programma Partner
+                                </div>
+
+                                <h3 className="font-display text-2xl md:text-3xl font-bold mb-4 leading-tight">
+                                    Sei un&apos;agenzia o un consulente?{' '}
+                                    <span className="gradient-text">Scopri il Programma Partner</span>
+                                </h3>
+
+                                <p className="text-base text-[hsl(var(--muted-foreground))] leading-relaxed max-w-2xl mb-6">
+                                    Un pacchetto pensato per chi gestisce piu clienti: trial esteso, accesso gratuito al raggiungimento della soglia e white label quando il programma scala.
+                                </p>
+
+                                <div className="flex flex-wrap gap-3 mb-7">
+                                    <span className="rounded-full border border-amber-200 bg-white/80 px-4 py-2 text-sm font-medium text-[hsl(var(--foreground))]">
+                                        Trial {PARTNER_PLAN.trialDays} giorni
+                                    </span>
+                                    <span className="rounded-full border border-amber-200 bg-white/80 px-4 py-2 text-sm font-medium text-[hsl(var(--foreground))]">
+                                        Gratis con {PARTNER_PLAN.freeThreshold}+ clienti
+                                    </span>
+                                    <span className="rounded-full border border-amber-200 bg-white/80 px-4 py-2 text-sm font-medium text-[hsl(var(--foreground))]">
+                                        White label con {PARTNER_PLAN.whiteLabelThreshold}+ clienti
+                                    </span>
+                                </div>
+
+                                <div className="flex flex-col sm:flex-row gap-3 sm:items-center">
+                                    <Link
+                                        href="/partner"
+                                        className="inline-flex items-center justify-center gap-2 px-6 py-3 gradient-bg text-white font-semibold rounded-xl shadow-glow hover:opacity-90 transition-all"
+                                    >
+                                        Scopri di piu
+                                        <span aria-hidden="true">&rarr;</span>
+                                    </Link>
+                                    <p className="text-sm text-[hsl(var(--muted-foreground))]">
+                                        Dashboard multi-cliente, trasferimento progetti e supporto dedicato partner.
+                                    </p>
+                                </div>
+                            </div>
+
+                            <div className="grid gap-3 sm:grid-cols-2">
+                                {PARTNER_PLAN.benefits.map((benefit) => (
+                                    <div
+                                        key={benefit.title}
+                                        className="rounded-2xl border border-amber-200/80 bg-white/80 p-4 shadow-soft"
+                                    >
+                                        <div className="flex items-start gap-3">
+                                            <div className="w-8 h-8 rounded-full gradient-bg flex items-center justify-center shrink-0 mt-0.5">
+                                                <Check className="w-4 h-4 text-white" />
+                                            </div>
+                                            <div>
+                                                <p className="font-semibold text-[hsl(var(--foreground))]">
+                                                    {benefit.title}
+                                                </p>
+                                                <p className="text-sm text-[hsl(var(--muted-foreground))] leading-relaxed mt-1">
+                                                    {benefit.description}
+                                                </p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
                         </div>
-
-                        <h3 className="font-display text-xl md:text-2xl font-bold mb-3">
-                            Sei un&apos;agenzia o un consulente?{' '}
-                            <span className="gradient-text">Scopri il Programma Partner</span>
-                        </h3>
-
-                        <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-sm text-[hsl(var(--muted-foreground))] mb-6">
-                            <span>Trial {PARTNER_PLAN.trialDays} giorni</span>
-                            <span className="hidden sm:inline" aria-hidden="true">
-                                ·
-                            </span>
-                            <span>Gratis con {PARTNER_PLAN.freeThreshold}+ clienti</span>
-                            <span className="hidden sm:inline" aria-hidden="true">
-                                ·
-                            </span>
-                            <span>
-                                White label con {PARTNER_PLAN.whiteLabelThreshold}+
-                            </span>
-                        </div>
-
-                        <Link
-                            href="/partner"
-                            className="inline-flex items-center gap-2 px-6 py-3 gradient-bg text-white font-semibold rounded-xl shadow-glow hover:opacity-90 transition-all"
-                        >
-                            Scopri di più
-                            <span aria-hidden="true">&rarr;</span>
-                        </Link>
                     </div>
                 </motion.div>
             </div>

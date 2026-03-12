@@ -618,8 +618,6 @@ export default function InterviewChat({
         : footerHeight + (isMobileKeyboardOpen ? 18 : 34);
     const questionScrollMarginBottomPx = footerHeight + (isMobileKeyboardOpen ? 20 : 28);
     const showDockedQuestion = isMobileViewport && isInputFocused && Boolean(currentQuestion) && !isLoading && !isCompleted;
-    const dockedComposerOffsetPx = Math.max(84, Math.min(footerHeight, 118));
-    const dockedQuestionBottomPx = footerBottomOffsetPx + dockedComposerOffsetPx;
     const dockedQuestionMaxHeightPx = effectiveViewportHeight
         ? Math.max(120, Math.min(280, Math.round(effectiveViewportHeight * 0.32)))
         : 220;
@@ -1103,17 +1101,6 @@ export default function InterviewChat({
                 </AnimatePresence>
             </div>
 
-            {showDockedQuestion && (
-                <div
-                    className="fixed left-0 right-0 z-40 px-4 pointer-events-none"
-                    style={{ bottom: `${dockedQuestionBottomPx}px` }}
-                >
-                    <div className="max-w-2xl mx-auto">
-                        {renderQuestionCard(true)}
-                    </div>
-                </div>
-            )}
-
             {/* Input Area or Completion Screen */}
             <div
                 ref={footerRef}
@@ -1121,6 +1108,12 @@ export default function InterviewChat({
                 style={isEmbedded ? undefined : { bottom: `${footerBottomOffsetPx}px` }}
             >
                 <div className="max-w-3xl mx-auto w-full relative">
+                    {showDockedQuestion && !isCompleted && (
+                        <div className="mb-3 pointer-events-auto">
+                            {renderQuestionCard(true)}
+                        </div>
+                    )}
+
                     {isCompleted ? (
                         <div className="bg-white rounded-[18px] shadow-2xl p-8 text-center border ring-1 ring-black/5 animate-in slide-in-from-bottom-5 fade-in duration-500">
                             <div className="w-16 h-16 rounded-full bg-green-100 text-green-600 flex items-center justify-center mx-auto mb-4">

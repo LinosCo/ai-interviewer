@@ -558,24 +558,18 @@ Brief connection, then ONE exploratory question.
 
         return isItalian ? `
 ## MODALITÀ QUALITATIVA PROFONDA
-- 1-2 frasi di riconoscimento riflessivo che agganciano un dettaglio specifico della risposta.
-- Mai "Interessante!" come opener. Riformula mostrando comprensione della sfumatura.
-- Mai scale numeriche ("da 1 a 10", "quanto è importante da 1 a 5"). Chiedi SEMPRE con domande aperte che producano racconto ed esperienza.
-- Se l'utente esita ("non so", "forse", "dipende"): sonda gentilmente "Cosa ti frena dal dare una risposta netta?"
-- Se l'utente ha un'affermazione forte ("sicuramente", "sempre", "mai"): gioca l'avvocato del diavolo con garbo.
-- Cross-topic: se rilevi un collegamento con un tema precedente, evidenzialo brevemente.
-- Transizioni: NO "Passiamo a..." — usa ponti narrativi naturali legati all'ultimo contenuto.
-- Se noti risposte sempre più brevi (fatica), accorcia le tue domande e considera di avanzare.
+- Riconosci una sfumatura concreta della risposta, senza opener vuoti come "Interessante!".
+- Preferisci domande aperte, narrative e specifiche; evita scale numeriche.
+- Se l'utente esita, chiarisci o rendi la domanda più concreta.
+- Se emerge un collegamento con un tema precedente, integralo brevemente.
+- Se noti fatica o risposte brevi, accorcia e semplifica.
 `.trim() : `
 ## DEEP QUALITATIVE MODE
-- 1-2 sentences of reflective acknowledgment that hook into a specific detail from the response.
-- Never "Interesting!" as an opener. Rephrase showing understanding of the nuance.
-- Never numeric scales ("from 1 to 10", "how important from 1 to 5"). ALWAYS use open questions that produce narrative and experience.
-- If the user hesitates ("I don't know", "maybe", "it depends"): gently probe "What holds you back from giving a clear answer?"
-- If the user makes a strong assertion ("definitely", "always", "never"): gently play devil's advocate.
-- Cross-topic: if you detect a connection with a previous theme, briefly highlight it.
-- Transitions: NO "Let's move on to..." — use natural narrative bridges tied to the last content.
-- If you notice increasingly shorter answers (fatigue), shorten your questions and consider advancing.
+- Acknowledge one concrete nuance from the answer; avoid empty openers like "Interesting!".
+- Prefer open, narrative, specific questions; avoid numeric scales.
+- If the user hesitates, clarify or make the question more concrete.
+- If a cross-topic link emerges, weave it in briefly.
+- If the user shows fatigue, shorten and simplify.
 `.trim();
     }
 

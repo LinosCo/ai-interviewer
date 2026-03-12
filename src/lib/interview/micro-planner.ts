@@ -281,8 +281,7 @@ function detectHesitation(text: string, language: string): boolean {
 function detectCrossTopicOverlap(
     userMessage: string,
     currentTopicId: string,
-    topicKeyInsights: Record<string, string>,
-    language: string
+    topicKeyInsights: Record<string, string>
 ): string | null {
     const msg = normalizeText(userMessage);
     if (msg.length < 20) return null;
@@ -303,8 +302,7 @@ function detectCrossTopicOverlap(
 
 function reorderSubGoalsByRelevance(
     remaining: string[],
-    userMessage: string,
-    language: string
+    userMessage: string
 ): string[] {
     if (remaining.length <= 1) return remaining;
     const msgNorm = normalizeText(userMessage).toLowerCase();
@@ -382,7 +380,7 @@ export function buildMicroPlannerDecision(input: MicroPlannerInput, thresholds?:
 
     // Naturalness: context-driven sub-goal reordering
     if (input.naturalness?.contextDrivenReordering && remaining.length > 1 && userMessage) {
-        remaining = reorderSubGoalsByRelevance(remaining, userMessage, input.language);
+        remaining = reorderSubGoalsByRelevance(remaining, userMessage);
     }
 
     const focusSubGoal = remaining[0] || subGoals[0] || input.topicLabel;
@@ -407,7 +405,7 @@ export function buildMicroPlannerDecision(input: MicroPlannerInput, thresholds?:
 
     // Naturalness hints (avanzato only)
     const crossTopicHint = input.naturalness?.crossTopicSynthesis && input.topicKeyInsights
-        ? detectCrossTopicOverlap(userMessage, input.topicId, input.topicKeyInsights, input.language)
+        ? detectCrossTopicOverlap(userMessage, input.topicId, input.topicKeyInsights)
         : null;
     const hesitationHint = input.naturalness?.hesitationDetection && userMessage
         ? (detectHesitation(userMessage, input.language) ? 'detected' : null)
@@ -459,7 +457,24 @@ export function buildMicroPlannerPromptBlock(params: {
         const hints = naturalnessHintsIT.length > 0 ? '\n' + naturalnessHintsIT.join('\n') + '\n' : '';
         const tierHint = params.interviewerQuality === 'standard'
             ? `7) Modalita standard: resta conversazionale, ma privilegia domande snelle e confrontabili. Dopo una risposta gia utile, passa al topic successivo invece di scavare ancora.\n8) Preferisci angoli diagnostici concreti: pratica attuale, frequenza, ostacolo, responsabilita, canale, metrica o prossimo passo. Evita domande troppo ampie o speculative.`
-            : `7) Se c'è spazio qualitativo, puoi approfondire il punto più promettente invece di coprire solo il minimo.`;
+            : `7) Se c'è spazio qualitativo, approfondisci solo il punto più promettente.`;
+        if (params.interviewerQuality === 'avanzato') {
+            return `
+## MICRO-PLANNER
+- Topic: "${params.topicLabel}"
+- Strategia: ${decision.mode}
+- Apertura: ${decision.commentStyle}
+- Focus: "${decision.focusSubGoal}"
+- Hint: ${decision.followupHint}
+${hints}
+Regole:
+1) Una sola domanda, senza liste o chiusure.
+2) Se chiarisci, fallo in una frase breve.
+3) Se approfondisci, scegli un solo filo promettente.
+4) Evita aperture generiche; usa un dettaglio concreto.
+${tierHint}
+`.trim();
+        }
         return `
 ## MICRO-PLANNER PRE-TURN (NO FALLBACK REWRITE)
 - Topic attivo: "${params.topicLabel}"
@@ -484,7 +499,24 @@ ${tierHint}
     const hints = naturalnessHintsEN.length > 0 ? '\n' + naturalnessHintsEN.join('\n') + '\n' : '';
     const tierHint = params.interviewerQuality === 'standard'
         ? `7) Standard mode: stay conversational, but prefer lean comparable questions. Once the user has given a usable answer, move on instead of digging further.\n8) Prefer concrete diagnostic angles: current practice, frequency, blocker, owner, channel, metric, or next step. Avoid overly broad or speculative prompts.`
-        : `7) If qualitative value is emerging, you may deepen the most promising thread instead of covering only the minimum.`;
+        : `7) If qualitative value is emerging, deepen only the most promising thread.`;
+    if (params.interviewerQuality === 'avanzato') {
+        return `
+## MICRO-PLANNER
+- Topic: "${params.topicLabel}"
+- Strategy: ${decision.mode}
+- Opening: ${decision.commentStyle}
+- Focus: "${decision.focusSubGoal}"
+- Hint: ${decision.followupHint}
+${hints}
+Rules:
+1) One question only, no lists or closure cues.
+2) If clarifying, do it in one short sentence.
+3) If deepening, choose one promising thread only.
+4) Avoid generic openers; use one concrete detail.
+${tierHint}
+`.trim();
+    }
     return `
 ## MICRO-PLANNER PRE-TURN (NO FALLBACK REWRITE)
 - Active topic: "${params.topicLabel}"

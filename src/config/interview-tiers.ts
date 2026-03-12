@@ -70,7 +70,7 @@ const STANDARD: TierConfig = {
     probeImpactExploreThreshold: 0.58,
     probeImpactDeepenThreshold: 0.44,
   },
-  knowledge: { runtimeKnowledgeTimeoutMs: 900, expandedCues: false },
+  knowledge: { runtimeKnowledgeTimeoutMs: 650, expandedCues: false },
   tone: { useLlm: false },
   naturalness: {
     reflectiveTurns: false,

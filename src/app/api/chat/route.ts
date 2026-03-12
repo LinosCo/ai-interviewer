@@ -1578,10 +1578,10 @@ hard_rules:
             messagesForAI = canonicalMessages.slice(-6).map((m: any) => ({ role: m.role, content: m.content }));
         } else if (supervisorInsight?.status === 'DEEP_OFFER_ASK') {
             // Bigger context: the AI needs interview history to craft a genuine, contextualised offer
-            const deepOfferWindow = interviewerQuality === 'avanzato' ? 12 : 12;
+            const deepOfferWindow = interviewerQuality === 'avanzato' ? 12 : 10;
             messagesForAI = canonicalMessages.slice(-deepOfferWindow).map((m: any) => ({ role: m.role, content: m.content }));
         } else if (nextState.phase === 'EXPLORE' || nextState.phase === 'DEEPEN') {
-            const topicWindow = interviewerQuality === 'avanzato' ? 10 : 8;
+            const topicWindow = interviewerQuality === 'avanzato' ? 10 : 6;
             messagesForAI = canonicalMessages.slice(-topicWindow).map((m: any) => ({ role: m.role, content: m.content }));
         }
 

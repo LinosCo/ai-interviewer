@@ -158,6 +158,7 @@ export class MemoryManager {
     static formatForPrompt(memory: ConversationMemoryData, options?: {
         language?: string;
         compact?: boolean;
+        compactStyle?: 'standard' | 'avanzato';
         topicMemories?: Array<{
             label: string;
             engagementScore: number;
@@ -168,13 +169,19 @@ export class MemoryManager {
     }): string {
         const sections: string[] = [];
         const isItalian = (options?.language || 'en').toLowerCase().startsWith('it');
-        const compact = options?.compact === true;
+        const compactStyle = options?.compact === true
+            ? 'avanzato'
+            : options?.compactStyle;
+        const compact = compactStyle === 'standard' || compactStyle === 'avanzato';
+        const maxFacts = compactStyle === 'avanzato' ? 3 : compactStyle === 'standard' ? 5 : 8;
+        const maxTopics = compactStyle === 'avanzato' ? 3 : compactStyle === 'standard' ? 4 : 8;
+        const shouldHideEmojiHint = compactStyle === 'avanzato';
 
         // Fatti raccolti
         if (memory.factsCollected.length > 0) {
             const factsText = memory.factsCollected
                 .filter(f => f.confidence >= 0.6)
-                .slice(0, compact ? 3 : 8)
+                .slice(0, maxFacts)
                 .map(f => `• ${f.content}`)
                 .join('\n');
 
@@ -195,7 +202,7 @@ ${compact
         if (memory.topicsExplored.length > 0 || options?.topicMemories) {
             const topicMemories = options?.topicMemories || [];
             const topicsText = memory.topicsExplored
-                .slice(0, compact ? 3 : 8)
+                .slice(0, maxTopics)
                 .map((t) => {
                     const memData = topicMemories.find(m => m.label === t.topicLabel);
                     const engagementLabel = memData?.engagementScore ? (memData.engagementScore > 0.6 ? 'HIGH' : memData.engagementScore > 0.3 ? 'MEDIUM' : 'LOW') : '';
@@ -248,9 +255,9 @@ ${compact
 
             sections.push(isItalian ? `## STILE COMUNICATIVO RILEVATO
 ${toneInstructions[memory.detectedTone] || ''}
-${compact ? '' : memory.usesEmoji ? 'L\'utente usa emoji, puoi usarle occasionalmente.' : ''}` : `## DETECTED COMMUNICATION STYLE
+${shouldHideEmojiHint ? '' : memory.usesEmoji ? 'L\'utente usa emoji, puoi usarle occasionalmente.' : ''}` : `## DETECTED COMMUNICATION STYLE
 ${toneInstructions[memory.detectedTone] || ''}
-${compact ? '' : memory.usesEmoji ? 'User uses emoji, you can use them occasionally.' : ''}`);
+${shouldHideEmojiHint ? '' : memory.usesEmoji ? 'User uses emoji, you can use them occasionally.' : ''}`);
         }
 
         return sections.join('\n\n');

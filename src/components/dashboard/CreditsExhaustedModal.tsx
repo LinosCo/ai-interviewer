@@ -16,6 +16,7 @@ interface CreditsData {
     alertLevel: 'warning' | 'danger' | 'critical' | 'exhausted' | null;
     isUnlimited: boolean;
     resetDate: string | null;
+    usingPackCredits: boolean;
 }
 
 interface CreditsExhaustedModalProps {
@@ -37,7 +38,7 @@ export function CreditsExhaustedModal({ onContinueWithoutAI }: CreditsExhaustedM
             if (!res.ok) throw new Error('Error fetching credits');
             const data = await res.json();
             setCredits(data);
-            setIsOpen(data.alertLevel === 'exhausted' && !data.isUnlimited);
+            setIsOpen(data.alertLevel === 'exhausted' && !data.isUnlimited && !data.usingPackCredits);
         } catch (err) {
             console.error('Error fetching credits for modal:', err);
         } finally {

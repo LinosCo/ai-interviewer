@@ -85,3 +85,20 @@ export function getWarningLevel(percentage: number): 'none' | 'warning' | 'dange
     if (percentage >= CREDIT_WARNING_THRESHOLDS.warning) return 'warning';
     return 'none';
 }
+
+export function getEffectiveWarningLevel(params: {
+    percentage: number;
+    monthlyRemaining: number;
+    packAvailable: number;
+    totalAvailable: number;
+}): 'none' | 'warning' | 'danger' | 'critical' | 'exhausted' {
+    const { percentage, monthlyRemaining, packAvailable, totalAvailable } = params;
+
+    if (totalAvailable <= 0) return 'exhausted';
+
+    // Quando i crediti mensili sono finiti ma restano pack disponibili,
+    // l'AI continua a funzionare: serve un warning forte, non uno stato bloccante.
+    if (monthlyRemaining <= 0 && packAvailable > 0) return 'critical';
+
+    return getWarningLevel(percentage);
+}

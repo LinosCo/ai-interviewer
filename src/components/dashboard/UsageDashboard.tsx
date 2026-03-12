@@ -34,6 +34,7 @@ interface CreditsData {
     monthlyRemaining: number;
     packAvailable: number;
     totalAvailable: number;
+    usingPackCredits: boolean;
     percentageUsed: number;
     resetDate: string | null;
     alertLevel: 'warning' | 'danger' | 'critical' | 'exhausted' | null;
@@ -221,32 +222,49 @@ export function UsageDashboard() {
 
     if (!credits) return null;
 
+    const isUsingPackCredits = credits.usingPackCredits;
+    const usageBannerTone = isUsingPackCredits
+        ? {
+            container: 'bg-amber-50 border-amber-200',
+            icon: 'text-amber-500',
+            title: 'text-amber-900',
+            body: 'text-amber-700',
+            cta: 'bg-amber-600 hover:bg-amber-700'
+        }
+        : {
+            container: credits.alertLevel === 'exhausted' ? 'bg-red-100 border-red-300' :
+                credits.alertLevel === 'critical' ? 'bg-red-50 border-red-200' :
+                    'bg-orange-50 border-orange-200',
+            icon: credits.alertLevel === 'exhausted' ? 'text-red-600' :
+                credits.alertLevel === 'critical' ? 'text-red-500' :
+                    'text-orange-500',
+            title: credits.alertLevel === 'exhausted' ? 'text-red-900' :
+                credits.alertLevel === 'critical' ? 'text-red-900' :
+                    'text-orange-900',
+            body: credits.alertLevel === 'exhausted' ? 'text-red-700' :
+                credits.alertLevel === 'critical' ? 'text-red-700' :
+                    'text-orange-700',
+            cta: credits.alertLevel === 'exhausted' ? 'bg-red-600 hover:bg-red-700' :
+                'bg-amber-600 hover:bg-amber-700'
+        };
+
     return (
         <Card className="p-6 space-y-6 border-slate-100 shadow-sm">
             {/* Warning Banner for low credits */}
             {credits.alertLevel && credits.alertLevel !== 'warning' && (
-                <div className={`rounded-xl p-4 flex items-start gap-3 border ${credits.alertLevel === 'exhausted' ? 'bg-red-100 border-red-300' :
-                    credits.alertLevel === 'critical' ? 'bg-red-50 border-red-200' :
-                        'bg-orange-50 border-orange-200'
-                    }`}>
-                    <AlertCircle className={`w-5 h-5 mt-0.5 ${credits.alertLevel === 'exhausted' ? 'text-red-600' :
-                        credits.alertLevel === 'critical' ? 'text-red-500' :
-                            'text-orange-500'
-                        }`} />
+                <div className={`rounded-xl p-4 flex items-start gap-3 border ${usageBannerTone.container}`}>
+                    <AlertCircle className={`w-5 h-5 mt-0.5 ${usageBannerTone.icon}`} />
                     <div className="flex-1">
-                        <p className={`text-sm font-bold ${credits.alertLevel === 'exhausted' ? 'text-red-900' :
-                            credits.alertLevel === 'critical' ? 'text-red-900' :
-                                'text-orange-900'
-                            }`}>
-                            {credits.alertLevel === 'exhausted' ? 'Crediti esauriti' :
+                        <p className={`text-sm font-bold ${usageBannerTone.title}`}>
+                            {isUsingPackCredits ? 'Stai usando il Pack Extra' :
+                                credits.alertLevel === 'exhausted' ? 'Crediti esauriti' :
                                 credits.alertLevel === 'critical' ? 'Crediti in esaurimento critico' :
                                     'Crediti quasi esauriti'}
                         </p>
-                        <p className={`text-xs mt-1 ${credits.alertLevel === 'exhausted' ? 'text-red-700' :
-                            credits.alertLevel === 'critical' ? 'text-red-700' :
-                                'text-orange-700'
-                            }`}>
-                            {credits.alertLevel === 'exhausted'
+                        <p className={`text-xs mt-1 ${usageBannerTone.body}`}>
+                            {isUsingPackCredits
+                                ? 'I crediti mensili sono terminati. Le funzionalità AI restano attive e ora consumano il Pack Extra disponibile.'
+                                : credits.alertLevel === 'exhausted'
                                 ? 'Le funzionalità AI sono temporaneamente sospese. Acquista un pack o fai upgrade.'
                                 : `Hai usato il ${credits.percentageUsed}% dei crediti mensili.`}
                         </p>
@@ -257,9 +275,7 @@ export function UsageDashboard() {
                                 </Button>
                             </Link>
                             <Link href="/dashboard/billing/plans">
-                                <Button size="sm" className={`rounded-lg font-bold text-xs h-8 ${credits.alertLevel === 'exhausted' ? 'bg-red-600 hover:bg-red-700' :
-                                    'bg-amber-600 hover:bg-amber-700'
-                                    }`}>
+                                <Button size="sm" className={`rounded-lg font-bold text-xs h-8 ${usageBannerTone.cta}`}>
                                     Upgrade piano
                                 </Button>
                             </Link>

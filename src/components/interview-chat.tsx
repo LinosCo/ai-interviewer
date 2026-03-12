@@ -192,6 +192,7 @@ export default function InterviewChat({
     const questionCardRef = useRef<HTMLDivElement>(null);
     const dockedQuestionContentRef = useRef<HTMLDivElement>(null);
     const footerRef = useRef<HTMLDivElement>(null);
+    const visualViewportRestHeightRef = useRef<number | null>(null);
 
     // Warm-up State
     const [showWarmup, setShowWarmup] = useState(false);
@@ -210,6 +211,7 @@ export default function InterviewChat({
     const [isCompleted, setIsCompleted] = useState(false);
     const [showCompletionActions, setShowCompletionActions] = useState(false);
     const inFlightRequestRef = useRef(false);
+    const keyboardAnchorTimersRef = useRef<number[]>([]);
 
     useEffect(() => {
         messagesRef.current = messages;
@@ -241,9 +243,24 @@ export default function InterviewChat({
         if (!viewport) return;
 
         const handleViewportChange = () => {
+            const viewportHeight = Math.round(viewport.height);
             const inset = Math.max(0, Math.round(window.innerHeight - viewport.height - viewport.offsetTop));
-            setMobileKeyboardInset(inset > 96 ? inset : 0);
-            setVisualViewportHeight(Math.round(viewport.height));
+            const normalizedInset = inset > 96 ? inset : 0;
+
+            if (!isInputFocused && normalizedInset === 0) {
+                visualViewportRestHeightRef.current = viewportHeight;
+            }
+
+            setMobileKeyboardInset(normalizedInset);
+            setVisualViewportHeight(viewportHeight);
+
+            const restHeight = visualViewportRestHeightRef.current;
+            const heightDrop = restHeight ? Math.max(0, restHeight - viewportHeight) : 0;
+            const keyboardLikelyOpen = isInputFocused && (normalizedInset > 0 || heightDrop > 120);
+
+            if (keyboardLikelyOpen) {
+                requestAnimationFrame(() => scheduleKeyboardAnchoring());
+            }
         };
 
         handleViewportChange();
@@ -366,6 +383,9 @@ export default function InterviewChat({
             const nextHeight = Math.min(el.scrollHeight, INPUT_MAX_HEIGHT_PX);
             el.style.height = `${nextHeight}px`;
             lastTextareaHeightRef.current = nextHeight;
+            if (isInputFocused) {
+                requestAnimationFrame(() => scheduleKeyboardAnchoring());
+            }
         });
     };
 
@@ -538,28 +558,43 @@ export default function InterviewChat({
     const progress = Math.min((elapsedMinutes / estimatedMinutes) * 100, 95);
     const supportsVisualViewport = typeof window !== 'undefined' && Boolean(window.visualViewport);
     const effectiveViewportHeight = !isEmbedded && visualViewportHeight ? Math.round(visualViewportHeight) : null;
+    const visualViewportHeightDrop = visualViewportHeight && visualViewportRestHeightRef.current
+        ? Math.max(0, visualViewportRestHeightRef.current - visualViewportHeight)
+        : 0;
+    const keyboardHeightGuess = Math.max(mobileKeyboardInset, visualViewportHeightDrop);
+    const anchorQuestionNearComposer = (behavior: ScrollBehavior = 'auto') => {
+        const viewportEl = chatViewportRef.current;
+        const cardEl = questionCardRef.current;
+        if (!viewportEl || !cardEl) return;
+        const questionAnchorOffsetPx = footerHeight + 20;
+        const targetTop = Math.max(
+            0,
+            cardEl.offsetTop + cardEl.offsetHeight - viewportEl.clientHeight + questionAnchorOffsetPx
+        );
+        viewportEl.scrollTo({ top: targetTop, behavior });
+    };
+
+    const scheduleKeyboardAnchoring = () => {
+        keyboardAnchorTimersRef.current.forEach((timerId) => window.clearTimeout(timerId));
+        anchorQuestionNearComposer('auto');
+        keyboardAnchorTimersRef.current = [60, 180, 340, 560].map((delay, index) =>
+            window.setTimeout(() => anchorQuestionNearComposer(index === 0 ? 'auto' : 'smooth'), delay)
+        );
+    };
 
     useEffect(() => {
         if (!currentQuestionId || !chatViewportRef.current || !questionCardRef.current) return;
-        if (!isInputFocused || (!mobileKeyboardInset && supportsVisualViewport)) return;
+        if (!isInputFocused || (!keyboardHeightGuess && supportsVisualViewport)) return;
         const timer = window.setTimeout(() => {
-            const viewportEl = chatViewportRef.current;
-            const cardEl = questionCardRef.current;
-            if (!viewportEl || !cardEl) return;
-            const questionAnchorOffsetPx = footerHeight + 20;
-            const targetTop = Math.max(
-                0,
-                cardEl.offsetTop + cardEl.offsetHeight - viewportEl.clientHeight + questionAnchorOffsetPx
-            );
-            viewportEl.scrollTo({ top: targetTop, behavior: 'smooth' });
+            scheduleKeyboardAnchoring();
         }, 120);
         return () => window.clearTimeout(timer);
-    }, [currentQuestionId, footerHeight, isInputFocused, mobileKeyboardInset, supportsVisualViewport]);
+    }, [currentQuestionId, footerHeight, isInputFocused, supportsVisualViewport, keyboardHeightGuess]);
 
     // Dynamic Background logic
     const brandColor = primaryColor || colors.amber;
     const mainBackground = backgroundColor || gradients.mesh;
-    const isMobileKeyboardOpen = !isEmbedded && isInputFocused && (mobileKeyboardInset > 0 || !supportsVisualViewport);
+    const isMobileKeyboardOpen = !isEmbedded && isInputFocused && (keyboardHeightGuess > 120 || !supportsVisualViewport);
     const chatVerticalAlignClass = isMobileKeyboardOpen ? 'justify-end md:justify-center' : 'justify-center';
     const chatTopPaddingClass = isEmbedded
         ? 'pt-16'
@@ -571,7 +606,7 @@ export default function InterviewChat({
         : isMobileKeyboardOpen
             ? 'pt-2 md:pt-12'
             : 'pt-8 md:pt-12';
-    const footerBottomOffsetPx = isEmbedded ? 0 : mobileKeyboardInset;
+    const footerBottomOffsetPx = isEmbedded ? 0 : keyboardHeightGuess;
     const chatBottomPaddingPx = isEmbedded
         ? footerHeight
         : footerHeight + (isMobileKeyboardOpen ? 18 : 34);
@@ -586,18 +621,17 @@ export default function InterviewChat({
     useEffect(() => {
         if (!isMobileKeyboardOpen) return;
         const timer = window.setTimeout(() => {
-            const viewportEl = chatViewportRef.current;
-            const cardEl = questionCardRef.current;
-            if (!viewportEl || !cardEl) return;
-            const questionAnchorOffsetPx = footerHeight + 20;
-            const targetTop = Math.max(
-                0,
-                cardEl.offsetTop + cardEl.offsetHeight - viewportEl.clientHeight + questionAnchorOffsetPx
-            );
-            viewportEl.scrollTo({ top: targetTop, behavior: 'smooth' });
+            scheduleKeyboardAnchoring();
         }, 80);
         return () => window.clearTimeout(timer);
     }, [footerHeight, isMobileKeyboardOpen]);
+
+    useEffect(() => {
+        return () => {
+            keyboardAnchorTimersRef.current.forEach((timerId) => window.clearTimeout(timerId));
+            keyboardAnchorTimersRef.current = [];
+        };
+    }, []);
 
     useEffect(() => {
         if (!showDockedQuestion) return;
@@ -1150,8 +1184,15 @@ export default function InterviewChat({
                                         autoResizeTextarea();
                                     }}
                                     onKeyDown={handleKeyDown}
-                                    onFocus={() => setIsInputFocused(true)}
-                                    onBlur={() => setIsInputFocused(false)}
+                                    onFocus={() => {
+                                        setIsInputFocused(true);
+                                        requestAnimationFrame(() => scheduleKeyboardAnchoring());
+                                    }}
+                                    onBlur={() => {
+                                        setIsInputFocused(false);
+                                        keyboardAnchorTimersRef.current.forEach((timerId) => window.clearTimeout(timerId));
+                                        keyboardAnchorTimersRef.current = [];
+                                    }}
                                     disabled={isLoading}
                                     placeholder={t.typePlaceholder}
                                     rows={1}

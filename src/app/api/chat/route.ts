@@ -1283,10 +1283,25 @@ export async function POST(req: Request) {
             nextState.runtimeInterviewKnowledgeSignature = null;
         }
 
-        // --- CIL PRE-PASS (avanzato only, parallel with remaining sync work) ---
+        const userTurnSignal: UserTurnSignal = lastMessage?.role === 'user'
+            ? detectUserTurnSignal({
+                userMessage: lastMessage.content,
+                language,
+                phase: nextState.phase,
+                currentTopic,
+                targetTopic,
+                interviewObjective
+            })
+            : 'none';
+        // --- CIL PRE-PASS (avanzato only, but not every turn) ---
         const AVANZATO_CIL_RECENT_TURNS = 6;
+        const shouldRunCIL = isAvanzato && (
+            nextState.phase === 'DEEPEN'
+            || nextState.turnInTopic === 0
+            || userTurnSignal !== 'none'
+        );
 
-        const cilPromise: Promise<CILAnalysis | null> = isAvanzato
+        const cilPromise: Promise<CILAnalysis | null> = shouldRunCIL
             ? (async () => {
                 const topicKnowledge = runtimeInterviewKnowledge?.topics.find(
                     t => t.topicId === currentTopic.id
@@ -1305,16 +1320,6 @@ export async function POST(req: Request) {
             })()
             : Promise.resolve(null);
 
-        const userTurnSignal: UserTurnSignal = lastMessage?.role === 'user'
-            ? detectUserTurnSignal({
-                userMessage: lastMessage.content,
-                language,
-                phase: nextState.phase,
-                currentTopic,
-                targetTopic,
-                interviewObjective
-            })
-            : 'none';
         const previousAssistantQuestion = extractLastAssistantQuestion(previousAssistantMessage);
         const recentBridgeStems = collectRecentBridgeStems(canonicalMessages, 14);
         const plannerTopic = targetTopic || currentTopic;

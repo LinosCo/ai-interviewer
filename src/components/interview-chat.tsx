@@ -185,6 +185,8 @@ export default function InterviewChat({
     const [showLanding, setShowLanding] = useState(initialMessages.length === 0 && !skipWelcome);
     const [consentGiven, setConsentGiven] = useState(false);
     const [isInputFocused, setIsInputFocused] = useState(false);
+    const [mobileKeyboardInset, setMobileKeyboardInset] = useState(0);
+    const questionCardRef = useRef<HTMLDivElement>(null);
 
     // Warm-up State
     const [showWarmup, setShowWarmup] = useState(false);
@@ -227,6 +229,26 @@ export default function InterviewChat({
         }
         return () => clearInterval(interval);
     }, [isTyping, isLoading, hasStarted]);
+
+    useEffect(() => {
+        if (typeof window === 'undefined' || isEmbedded) return;
+        const viewport = window.visualViewport;
+        if (!viewport) return;
+
+        const handleViewportChange = () => {
+            const inset = Math.max(0, Math.round(window.innerHeight - viewport.height - viewport.offsetTop));
+            setMobileKeyboardInset(inset > 96 ? inset : 0);
+        };
+
+        handleViewportChange();
+        viewport.addEventListener('resize', handleViewportChange);
+        viewport.addEventListener('scroll', handleViewportChange);
+
+        return () => {
+            viewport.removeEventListener('resize', handleViewportChange);
+            viewport.removeEventListener('scroll', handleViewportChange);
+        };
+    }, [isEmbedded]);
 
     const handleStart = async () => {
         setShowLanding(false);
@@ -476,26 +498,35 @@ export default function InterviewChat({
     // Get current question (last assistant message)
     const assistantMessages = messages.filter(m => m.role === 'assistant');
     const currentQuestion = assistantMessages[assistantMessages.length - 1];
+    const currentQuestionId = currentQuestion?.id || null;
     const totalQuestions = assistantMessages.length;
     const elapsedMinutes = Math.floor(effectiveSeconds / 60);
     const estimatedMinutes = parseInt(estimatedDuration?.replace(/\D/g, '') || '10');
     const progress = Math.min((elapsedMinutes / estimatedMinutes) * 100, 95);
+    const supportsVisualViewport = typeof window !== 'undefined' && Boolean(window.visualViewport);
+
+    useEffect(() => {
+        if (!currentQuestionId || !isInputFocused || (!mobileKeyboardInset && supportsVisualViewport)) return;
+        const timer = window.setTimeout(() => {
+            questionCardRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
+        }, 120);
+        return () => window.clearTimeout(timer);
+    }, [currentQuestionId, isInputFocused, mobileKeyboardInset, supportsVisualViewport]);
 
     // Dynamic Background logic
     const brandColor = primaryColor || colors.amber;
     const mainBackground = backgroundColor || gradients.mesh;
-    const isMobileKeyboardOpen = isInputFocused && !isEmbedded;
-    const chatVerticalAlignClass = isMobileKeyboardOpen ? 'justify-start md:justify-center' : 'justify-center';
-    const chatBottomPaddingClass = isEmbedded
-        ? 'pb-24'
-        : isMobileKeyboardOpen
-            ? 'pb-28 md:pb-56'
-            : 'pb-48 md:pb-56';
+    const isMobileKeyboardOpen = !isEmbedded && isInputFocused && (mobileKeyboardInset > 0 || !supportsVisualViewport);
+    const chatVerticalAlignClass = isMobileKeyboardOpen ? 'justify-end md:justify-center' : 'justify-center';
     const inputTopPaddingClass = isEmbedded
         ? 'pt-4'
         : isMobileKeyboardOpen
-            ? 'pt-2 md:pt-12'
+            ? 'pt-1 md:pt-12'
             : 'pt-8 md:pt-12';
+    const footerBottomOffsetPx = isEmbedded ? 0 : mobileKeyboardInset;
+    const chatBottomPaddingPx = isEmbedded
+        ? 96
+        : (isMobileKeyboardOpen ? 160 : 224) + footerBottomOffsetPx;
 
 
 
@@ -768,11 +799,14 @@ export default function InterviewChat({
             </header>
 
             {/* Chat Area */}
-            <div className={`flex-1 flex flex-col items-center ${chatVerticalAlignClass} px-4 ${isEmbedded ? 'pt-16' : 'pt-32 md:pt-40'} ${chatBottomPaddingClass} w-full max-w-4xl mx-auto relative z-10`}>
+            <div
+                className={`flex-1 flex flex-col items-center ${chatVerticalAlignClass} px-4 ${isEmbedded ? 'pt-16' : 'pt-32 md:pt-40'} w-full max-w-4xl mx-auto relative z-10`}
+                style={{ paddingBottom: `${chatBottomPaddingPx}px` }}
+            >
 
                 {/* Previous Answer Context - Moved outside keyed motion.div to prevent duplication */}
                 {messages.length > 1 && messages[messages.length - 2]?.role === 'user' && !isLoading && (
-                    <div className="w-full max-w-2xl mb-4">
+                    <div className={`w-full max-w-2xl ${isMobileKeyboardOpen ? 'mb-2' : 'mb-4'}`}>
                         <motion.div
                             key={`answer-${messages[messages.length - 2].id}`}
                             initial={{ opacity: 0, x: 20 }}
@@ -822,7 +856,7 @@ export default function InterviewChat({
                             />
                             {/* Inner circle with logo */}
                             <motion.div
-                                className="relative flex items-center justify-center rounded-2xl bg-white shadow-lg"
+                                className="relative flex items-center justify-center rounded-full bg-white shadow-lg"
                                 style={{
                                     width: 80,
                                     height: 80,
@@ -838,7 +872,9 @@ export default function InterviewChat({
                                 }}
                             >
                                 {logoUrl ? (
-                                    <img src={logoUrl} alt={botName} className="w-12 h-12 object-contain" />
+                                    <div className="flex h-11 w-11 items-center justify-center">
+                                        <img src={logoUrl} alt={botName} className="max-h-full max-w-full object-contain" />
+                                    </div>
                                 ) : (
                                     <Icons.Logo size={36} style={{ color: brandColor }} />
                                 )}
@@ -856,6 +892,7 @@ export default function InterviewChat({
                             exit={{ opacity: 0, y: -10, scale: 0.99 }}
                             transition={{ duration: 0.3, ease: [0.23, 1, 0.32, 1] }}
                             className="w-full max-w-2xl"
+                            ref={questionCardRef}
                         >
                             {/* Bot Question Card */}
                             <div className="relative">
@@ -922,8 +959,14 @@ export default function InterviewChat({
                             <div className="relative w-16 h-16">
                                 <div className="absolute inset-0 rounded-full border-4" style={{ borderColor: `${brandColor}20` }}></div>
                                 <div className="absolute inset-0 rounded-full border-4 border-t-transparent animate-spin" style={{ borderColor: brandColor, borderTopColor: 'transparent' }}></div>
-                                <div className="absolute inset-0 flex items-center justify-center">
-                                    <Icons.Logo size={24} />
+                                <div className="absolute inset-[10px] rounded-full bg-white shadow-sm flex items-center justify-center">
+                                    {logoUrl ? (
+                                        <div className="flex h-7 w-7 items-center justify-center">
+                                            <img src={logoUrl} alt={botName} className="max-h-full max-w-full object-contain" />
+                                        </div>
+                                    ) : (
+                                        <Icons.Logo size={22} style={{ color: brandColor }} />
+                                    )}
                                 </div>
                             </div>
                             <p className="text-gray-400 font-medium tracking-wide text-sm uppercase animate-pulse">{t.loading}</p>
@@ -933,7 +976,10 @@ export default function InterviewChat({
             </div>
 
             {/* Input Area or Completion Screen */}
-            <div className={`${isEmbedded ? 'absolute' : 'fixed'} bottom-0 left-0 right-0 z-50 p-3 md:p-6 ${isEmbedded ? 'pb-4' : 'pb-4 md:pb-8'} bg-gradient-to-t from-white via-white/95 to-transparent ${inputTopPaddingClass}`}>
+            <div
+                className={`${isEmbedded ? 'absolute' : 'fixed'} bottom-0 left-0 right-0 z-50 p-3 md:p-6 ${isEmbedded ? 'pb-4' : 'pb-4 md:pb-8'} bg-gradient-to-t from-white via-white/95 to-transparent ${inputTopPaddingClass}`}
+                style={isEmbedded ? undefined : { bottom: `${footerBottomOffsetPx}px` }}
+            >
                 <div className="max-w-3xl mx-auto w-full relative">
                     {isCompleted ? (
                         <div className="bg-white rounded-[18px] shadow-2xl p-8 text-center border ring-1 ring-black/5 animate-in slide-in-from-bottom-5 fade-in duration-500">

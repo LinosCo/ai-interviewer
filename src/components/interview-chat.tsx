@@ -617,7 +617,7 @@ export default function InterviewChat({
         ? footerHeight
         : footerHeight + (isMobileKeyboardOpen ? 18 : 34);
     const questionScrollMarginBottomPx = footerHeight + (isMobileKeyboardOpen ? 20 : 28);
-    const showDockedQuestion = isMobileViewport && isInputFocused && Boolean(currentQuestion) && !isLoading && !isCompleted;
+    const showDockedQuestion = isMobileViewport && isInputFocused && Boolean(currentQuestion) && !isCompleted;
     const dockedQuestionMaxHeightPx = effectiveViewportHeight
         ? Math.max(120, Math.min(280, Math.round(effectiveViewportHeight * 0.32)))
         : 220;

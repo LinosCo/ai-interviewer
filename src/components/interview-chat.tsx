@@ -560,6 +560,11 @@ export default function InterviewChat({
     const mainBackground = backgroundColor || gradients.mesh;
     const isMobileKeyboardOpen = !isEmbedded && isInputFocused && (mobileKeyboardInset > 0 || !supportsVisualViewport);
     const chatVerticalAlignClass = isMobileKeyboardOpen ? 'justify-end md:justify-center' : 'justify-center';
+    const chatTopPaddingClass = isEmbedded
+        ? 'pt-16'
+        : isMobileKeyboardOpen
+            ? 'pt-14 md:pt-40'
+            : 'pt-32 md:pt-40';
     const inputTopPaddingClass = isEmbedded
         ? 'pt-4'
         : isMobileKeyboardOpen
@@ -570,6 +575,22 @@ export default function InterviewChat({
         ? footerHeight
         : footerHeight + (isMobileKeyboardOpen ? 18 : 34);
     const questionScrollMarginBottomPx = footerHeight + (isMobileKeyboardOpen ? 20 : 28);
+
+    useEffect(() => {
+        if (!isMobileKeyboardOpen) return;
+        const timer = window.setTimeout(() => {
+            const viewportEl = chatViewportRef.current;
+            const cardEl = questionCardRef.current;
+            if (!viewportEl || !cardEl) return;
+            const questionAnchorOffsetPx = footerHeight + 20;
+            const targetTop = Math.max(
+                0,
+                cardEl.offsetTop + cardEl.offsetHeight - viewportEl.clientHeight + questionAnchorOffsetPx
+            );
+            viewportEl.scrollTo({ top: targetTop, behavior: 'smooth' });
+        }, 80);
+        return () => window.clearTimeout(timer);
+    }, [footerHeight, isMobileKeyboardOpen]);
 
 
 
@@ -846,7 +867,7 @@ export default function InterviewChat({
             {/* Chat Area */}
             <div
                 ref={chatViewportRef}
-                className={`flex-1 min-h-0 overflow-y-auto overscroll-contain flex flex-col items-center ${chatVerticalAlignClass} px-4 ${isEmbedded ? 'pt-16' : 'pt-32 md:pt-40'} w-full max-w-4xl mx-auto relative z-10`}
+                className={`flex-1 min-h-0 overflow-y-auto overscroll-contain flex flex-col items-center ${chatVerticalAlignClass} px-4 ${chatTopPaddingClass} w-full max-w-4xl mx-auto relative z-10`}
                 style={{ paddingBottom: `${chatBottomPaddingPx}px` }}
             >
 
@@ -937,7 +958,7 @@ export default function InterviewChat({
                             animate={{ opacity: 1, y: 0, scale: 1 }}
                             exit={{ opacity: 0, y: -10, scale: 0.99 }}
                             transition={{ duration: 0.3, ease: [0.23, 1, 0.32, 1] }}
-                            className="w-full max-w-2xl"
+                            className={`w-full max-w-2xl ${isMobileKeyboardOpen ? 'mt-auto' : ''}`}
                             style={{ scrollMarginBottom: `${questionScrollMarginBottomPx}px` }}
                             ref={questionCardRef}
                         >

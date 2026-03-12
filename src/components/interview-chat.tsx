@@ -612,13 +612,14 @@ export default function InterviewChat({
         : isMobileKeyboardOpen
             ? 'pt-2 md:pt-12'
             : 'pt-8 md:pt-12';
-    const footerBottomOffsetPx = isEmbedded ? 0 : keyboardHeightGuess;
+    const footerBottomOffsetPx = isEmbedded ? 0 : (supportsVisualViewport ? 0 : keyboardHeightGuess);
     const chatBottomPaddingPx = isEmbedded
         ? footerHeight
         : footerHeight + (isMobileKeyboardOpen ? 18 : 34);
     const questionScrollMarginBottomPx = footerHeight + (isMobileKeyboardOpen ? 20 : 28);
     const showDockedQuestion = isMobileViewport && isInputFocused && Boolean(currentQuestion) && !isLoading && !isCompleted;
-    const dockedQuestionBottomPx = footerBottomOffsetPx + footerHeight + 8;
+    const dockedComposerOffsetPx = Math.max(84, Math.min(footerHeight, 118));
+    const dockedQuestionBottomPx = footerBottomOffsetPx + dockedComposerOffsetPx;
     const dockedQuestionMaxHeightPx = effectiveViewportHeight
         ? Math.max(120, Math.min(280, Math.round(effectiveViewportHeight * 0.32)))
         : 220;

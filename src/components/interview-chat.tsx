@@ -715,6 +715,99 @@ export default function InterviewChat({
         );
     };
 
+    const renderLoadingIndicator = (docked = false) => {
+        if (!currentQuestion) return null;
+
+        if (docked) {
+            return (
+                <motion.div
+                    initial={{ opacity: 0, y: 8 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -6 }}
+                    className="mb-2 flex items-center justify-center"
+                >
+                    <div className="inline-flex items-center gap-2 rounded-full bg-white/92 px-3 py-2 shadow-lg ring-1 ring-black/5 backdrop-blur-md">
+                        <motion.div
+                            className="relative flex h-9 w-9 items-center justify-center rounded-full bg-white"
+                            style={{ border: `2px solid ${brandColor}30` }}
+                            animate={{ scale: [1, 1.04, 1] }}
+                            transition={{ duration: 1.2, repeat: Infinity, ease: 'easeInOut' }}
+                        >
+                            <motion.div
+                                className="absolute inset-0 rounded-full"
+                                style={{ border: `2px solid ${brandColor}22` }}
+                                animate={{ scale: [1, 1.18, 1], opacity: [0.55, 0.2, 0.55] }}
+                                transition={{ duration: 1.2, repeat: Infinity, ease: 'easeInOut' }}
+                            />
+                            {logoUrl ? (
+                                <div className="flex h-5 w-5 items-center justify-center">
+                                    <img src={logoUrl} alt={botName} className="max-h-full max-w-full object-contain" />
+                                </div>
+                            ) : (
+                                <Icons.Logo size={16} style={{ color: brandColor }} />
+                            )}
+                        </motion.div>
+                        <span className="text-xs font-semibold uppercase tracking-wide text-gray-500">{t.loading}</span>
+                    </div>
+                </motion.div>
+            );
+        }
+
+        return (
+            <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                className={`${isEmbedded ? 'absolute' : 'fixed'} inset-0 z-40 flex items-center justify-center`}
+            >
+                <div className="absolute inset-0 bg-gradient-to-b from-white/60 to-white/40 backdrop-blur-[2px]" />
+                <div className="relative flex items-center justify-center">
+                    <motion.div
+                        className="absolute rounded-full"
+                        style={{
+                            width: 96,
+                            height: 96,
+                            border: `3px solid ${brandColor}30`,
+                        }}
+                        animate={{
+                            scale: [1, 1.15, 1],
+                            opacity: [0.6, 0.2, 0.6],
+                        }}
+                        transition={{
+                            duration: 1.5,
+                            repeat: Infinity,
+                            ease: 'easeInOut',
+                        }}
+                    />
+                    <motion.div
+                        className="relative flex items-center justify-center rounded-full bg-white shadow-lg"
+                        style={{
+                            width: 80,
+                            height: 80,
+                            border: `2px solid ${brandColor}40`,
+                        }}
+                        animate={{
+                            scale: [1, 1.03, 1],
+                        }}
+                        transition={{
+                            duration: 1.5,
+                            repeat: Infinity,
+                            ease: 'easeInOut',
+                        }}
+                    >
+                        {logoUrl ? (
+                            <div className="flex h-11 w-11 items-center justify-center">
+                                <img src={logoUrl} alt={botName} className="max-h-full max-w-full object-contain" />
+                            </div>
+                        ) : (
+                            <Icons.Logo size={36} style={{ color: brandColor }} />
+                        )}
+                    </motion.div>
+                </div>
+            </motion.div>
+        );
+    };
+
 
 
     if (showWarmup) {
@@ -1013,65 +1106,7 @@ export default function InterviewChat({
                     </div>
                 )}
 
-                {/* Loading/Thinking Indicator - Pulsing circle with logo */}
-                {isLoading && currentQuestion && (
-                    <motion.div
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: 1 }}
-                        exit={{ opacity: 0 }}
-                        className={`${isEmbedded ? 'absolute' : 'fixed'} inset-0 z-40 flex items-center justify-center`}
-                    >
-                        {/* Subtle backdrop */}
-                        <div className="absolute inset-0 bg-gradient-to-b from-white/60 to-white/40 backdrop-blur-[2px]" />
-
-                        {/* Centered loading indicator - Logo in pulsing circle */}
-                        <div className="relative flex items-center justify-center">
-                            {/* Outer pulsing ring */}
-                            <motion.div
-                                className="absolute rounded-full"
-                                style={{
-                                    width: 96,
-                                    height: 96,
-                                    border: `3px solid ${brandColor}30`,
-                                }}
-                                animate={{
-                                    scale: [1, 1.15, 1],
-                                    opacity: [0.6, 0.2, 0.6],
-                                }}
-                                transition={{
-                                    duration: 1.5,
-                                    repeat: Infinity,
-                                    ease: 'easeInOut',
-                                }}
-                            />
-                            {/* Inner circle with logo */}
-                            <motion.div
-                                className="relative flex items-center justify-center rounded-full bg-white shadow-lg"
-                                style={{
-                                    width: 80,
-                                    height: 80,
-                                    border: `2px solid ${brandColor}40`,
-                                }}
-                                animate={{
-                                    scale: [1, 1.03, 1],
-                                }}
-                                transition={{
-                                    duration: 1.5,
-                                    repeat: Infinity,
-                                    ease: 'easeInOut',
-                                }}
-                            >
-                                {logoUrl ? (
-                                    <div className="flex h-11 w-11 items-center justify-center">
-                                        <img src={logoUrl} alt={botName} className="max-h-full max-w-full object-contain" />
-                                    </div>
-                                ) : (
-                                    <Icons.Logo size={36} style={{ color: brandColor }} />
-                                )}
-                            </motion.div>
-                        </div>
-                    </motion.div>
-                )}
+                {isLoading && currentQuestion && !showDockedQuestion && renderLoadingIndicator(false)}
 
                 <AnimatePresence mode="wait">
                     {currentQuestion && !isLoading && !showDockedQuestion && renderQuestionCard(false)}
@@ -1108,6 +1143,12 @@ export default function InterviewChat({
                 style={isEmbedded ? undefined : { bottom: `${footerBottomOffsetPx}px` }}
             >
                 <div className="max-w-3xl mx-auto w-full relative">
+                    {showDockedQuestion && isLoading && currentQuestion && !isCompleted && (
+                        <div className="pointer-events-none">
+                            {renderLoadingIndicator(true)}
+                        </div>
+                    )}
+
                     {showDockedQuestion && !isCompleted && (
                         <div className="mb-3 pointer-events-auto">
                             {renderQuestionCard(true)}

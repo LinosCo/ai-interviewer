@@ -7,12 +7,14 @@
  */
 
 export type InterviewTier = 'standard' | 'avanzato';
-export type CriticalEscalationMode = 'minimal' | 'selective' | 'aggressive';
+export type CriticalEscalationMode = 'minimal' | 'focused' | 'selective' | 'aggressive';
 
 export interface TierConfig {
   modelRouting: {
     /**
      * 'minimal'    — cheapest path: critical only for clarification/scope recovery
+     * 'focused'    — advanced path: critical only for clarification, scope recovery,
+     *                and genuinely high-signal deepening turns
      * 'selective'  — current logic: critical used ~25-30% of turns
      *                (first turn on topic, clarification, off-topic, high-signal deepening, transition)
      * 'aggressive' — critical for ALL explore/deepen/transition turns (~70-80%)
@@ -83,7 +85,7 @@ const STANDARD: TierConfig = {
 };
 
 const AVANZATO: TierConfig = {
-  modelRouting: { criticalEscalation: 'selective' },
+  modelRouting: { criticalEscalation: 'focused' },
   budgets: {
     bonusTurnCap: 2,
     deepenMaxTurnsPerTopic: 2,
@@ -96,7 +98,7 @@ const AVANZATO: TierConfig = {
     probeImpactExploreThreshold: 0.30,
     probeImpactDeepenThreshold: 0.24,
   },
-  knowledge: { runtimeKnowledgeTimeoutMs: 1200, expandedCues: true },
+  knowledge: { runtimeKnowledgeTimeoutMs: 1000, expandedCues: true },
   tone: { useLlm: false },
   naturalness: {
     reflectiveTurns: true,
@@ -107,7 +109,7 @@ const AVANZATO: TierConfig = {
     narrativeTransitions: true,
     contextDrivenReordering: true,
   },
-  latency: { mainResponseTimeoutMs: 30_000 },
+  latency: { mainResponseTimeoutMs: 28_000 },
 };
 
 export function getTierConfig(quality?: string | null): TierConfig {

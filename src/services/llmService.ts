@@ -102,26 +102,26 @@ export class LLMService {
                     : { provider: 'openai', name: 'gpt-4.1-mini' };
 
         const critical: InterviewModelSelection = availability.openai
-            ? { provider: 'openai', name: 'gpt-5-mini' }
-            : availability.gemini
-                ? { provider: 'gemini', name: 'gemini-2.5-flash' }
-                : availability.anthropic
-                    ? { provider: 'anthropic', name: 'claude-haiku-4-5' }
+            ? { provider: 'openai', name: 'gpt-4o' }
+            : availability.anthropic
+                ? { provider: 'anthropic', name: 'claude-haiku-4-5' }
+                : availability.gemini
+                    ? { provider: 'gemini', name: 'gemini-2.5-flash' }
                     : primary;
 
         const quality: InterviewModelSelection = availability.openai
-            ? { provider: 'openai', name: 'gpt-5-mini' }
-            : availability.gemini
-                ? { provider: 'gemini', name: 'gemini-2.5-flash' }
-                : availability.anthropic
-                    ? { provider: 'anthropic', name: 'claude-haiku-4-5' }
+            ? { provider: 'openai', name: 'gpt-4o' }
+            : availability.anthropic
+                ? { provider: 'anthropic', name: 'claude-haiku-4-5' }
+                : availability.gemini
+                    ? { provider: 'gemini', name: 'gemini-2.5-flash' }
                     : critical;
 
         const dataCollection: InterviewModelSelection = availability.openai
-            ? { provider: 'openai', name: 'gpt-5-nano' }
+            ? { provider: 'openai', name: 'gpt-4o-mini' }
             : availability.gemini
                 ? { provider: 'gemini', name: 'gemini-2.5-flash-lite' }
-                : primary;
+            : primary;
 
         return { primary, critical, quality, dataCollection };
     }

@@ -1294,10 +1294,9 @@ export async function POST(req: Request) {
             })
             : 'none';
         // --- CIL PRE-PASS (avanzato only, but not every turn) ---
-        const AVANZATO_CIL_RECENT_TURNS = 6;
+        const AVANZATO_CIL_RECENT_TURNS = 5;
         const shouldRunCIL = isAvanzato && (
             nextState.phase === 'DEEPEN'
-            || nextState.turnInTopic === 0
             || userTurnSignal !== 'none'
         );
 
@@ -1558,6 +1557,10 @@ hard_rules:
                 systemPrompt += (language || '').toLowerCase().startsWith('it')
                     ? `\n\n## MODALITA STANDARD\nResta naturale e conversazionale, ma lavora come un'intervista diagnostica leggera.\n- Dopo una risposta gia utile, passa al topic successivo invece di fare follow-up opzionali.\n- Preferisci domande concrete e confrontabili: pratica attuale, frequenza, ostacolo, chi decide, canale, metrica, esempio recente o prossimo passo.\n- Evita allargamenti filosofici o troppo esplorativi se non servono.`
                     : `\n\n## STANDARD MODE\nStay natural and conversational, but act like a lightweight diagnostic interview.\n- Once the user has given a usable answer, move to the next topic instead of asking optional follow-ups.\n- Prefer concrete, comparable questions: current practice, frequency, blocker, owner, channel, metric, recent example, or next step.\n- Avoid philosophical or overly exploratory broadening unless clearly useful.`;
+            } else {
+                systemPrompt += (language || '').toLowerCase().startsWith('it')
+                    ? `\n\n## MODALITA AVANZATA\nScegli il filo piu promettente emerso dall'ultima risposta e resta su quello. Meglio una domanda precisa e distintiva che due piste insieme.`
+                    : `\n\n## ADVANCED MODE\nChoose the most promising thread from the last answer and stay on it. One distinctive, precise question is better than two broader angles in the same turn.`;
             }
         }
 
@@ -1575,10 +1578,10 @@ hard_rules:
             messagesForAI = canonicalMessages.slice(-6).map((m: any) => ({ role: m.role, content: m.content }));
         } else if (supervisorInsight?.status === 'DEEP_OFFER_ASK') {
             // Bigger context: the AI needs interview history to craft a genuine, contextualised offer
-            const deepOfferWindow = interviewerQuality === 'avanzato' ? 16 : 12;
+            const deepOfferWindow = interviewerQuality === 'avanzato' ? 12 : 12;
             messagesForAI = canonicalMessages.slice(-deepOfferWindow).map((m: any) => ({ role: m.role, content: m.content }));
         } else if (nextState.phase === 'EXPLORE' || nextState.phase === 'DEEPEN') {
-            const topicWindow = interviewerQuality === 'avanzato' ? 14 : 8;
+            const topicWindow = interviewerQuality === 'avanzato' ? 10 : 8;
             messagesForAI = canonicalMessages.slice(-topicWindow).map((m: any) => ({ role: m.role, content: m.content }));
         }
 

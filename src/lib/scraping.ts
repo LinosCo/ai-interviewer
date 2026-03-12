@@ -230,7 +230,6 @@ async function fetchWithDnsFallback(
         return { response, resolvedUrl: fallbackUrl };
     }
 }
-
 export async function scrapeUrl(url: string): Promise<ScrapedContent> {
     try {
         if (isLikelySitemapInput(url)) {

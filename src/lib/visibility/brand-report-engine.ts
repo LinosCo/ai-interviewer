@@ -151,6 +151,34 @@ async function fetchGSCData(organizationId: string): Promise<{
     };
 }
 
+function parseAdditionalUrls(
+    value: unknown
+): Array<{ url: string; label?: string }> {
+    if (!Array.isArray(value)) return [];
+
+    return value
+        .map((item, index) => {
+            if (!item || typeof item !== 'object') return null;
+            const record = item as Record<string, unknown>;
+            if (typeof record.url !== 'string') return null;
+
+            const rawUrl = record.url.trim();
+            if (!rawUrl) return null;
+
+            try {
+                const normalized = new URL(rawUrl).toString();
+                const label = typeof record.label === 'string' && record.label.trim()
+                    ? record.label.trim()
+                    : `URL ${index + 1}`;
+
+                return { url: normalized, label };
+            } catch {
+                return null;
+            }
+        })
+        .filter((item): item is { url: string; label?: string } => !!item);
+}
+
 // ─── AI Tips generation ───────────────────────────────────────────────────────
 
 async function generateAITips(
@@ -260,6 +288,8 @@ export class BrandReportEngine {
                 id: true,
                 brandName: true,
                 websiteUrl: true,
+                sitemapUrl: true,
+                additionalUrls: true,
                 language: true,
                 organizationId: true,
                 description: true,
@@ -271,6 +301,10 @@ export class BrandReportEngine {
 
         const targetWebsiteUrl = options?.websiteUrl || config.websiteUrl;
         if (!targetWebsiteUrl) throw new Error('No websiteUrl configured for this brand');
+        const targetSitemapUrl = options?.sitemapUrl || config.sitemapUrl || undefined;
+        const targetManualUrls = (options?.additionalUrls && options.additionalUrls.length > 0)
+            ? options.additionalUrls
+            : parseAdditionalUrls(config.additionalUrls);
 
         // Create pending record
         const report = await prisma.brandReport.create({
@@ -294,8 +328,8 @@ export class BrandReportEngine {
             const crawl = await crawlSite(targetWebsiteUrl, {
                 gscPages: gscData?.topSearchPages ?? [],
                 maxPages: 30,
-                sitemapUrl: options?.sitemapUrl,
-                manualUrls: (options?.additionalUrls || []).map((item) => item.url),
+                sitemapUrl: targetSitemapUrl,
+                manualUrls: targetManualUrls.map((item) => item.url),
             });
 
             // Generate AI tips

@@ -77,7 +77,7 @@ export async function POST(req: Request) {
         }
 
         // Fetch Sitemap via the same parser used by Brand Monitor so nested
-        // sitemap indexes are handled consistently.
+        // sitemap indexes like Rank Math / Yoast are handled consistently.
         const { urls: sites } = await parseProvidedSitemap(url);
 
         if (!sites || sites.length === 0) {

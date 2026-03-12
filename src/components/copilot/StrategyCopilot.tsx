@@ -202,7 +202,6 @@ export function StrategyCopilot({ userTier }: StrategyCopilotProps) {
         };
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [isLoading, conversationId, selectedProject?.id]);
-
     // If the landing chatbot embed leaks into dashboard via client-side navigation,
     // keep removing only its root container.
     useEffect(() => {

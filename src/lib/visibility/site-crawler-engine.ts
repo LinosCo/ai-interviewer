@@ -134,6 +134,7 @@ function extractSitemapEntries(xml: string): { pageUrls: string[]; sitemapUrls: 
         // Fallback handled below.
     }
 
+    // Fallback for malformed XML or unconventional sitemap structures.
     if (pageUrls.size === 0 && sitemapUrls.size === 0) {
         const locs = extractSitemapLocs(xml);
         for (const loc of locs) {
@@ -225,6 +226,7 @@ export async function parseSitemap(baseUrl: string): Promise<{ urls: string[]; s
     const trimmed = baseUrl.trim();
     if (!trimmed) return { urls: [], sitemapUrl: null };
 
+    // If the input itself is already a sitemap URL, parse it directly.
     if (isLikelySitemapUrl(trimmed)) {
         return parseProvidedSitemap(trimmed);
     }
@@ -234,7 +236,7 @@ export async function parseSitemap(baseUrl: string): Promise<{ urls: string[]; s
         const parsed = new URL(trimmed);
         originBase = `${parsed.protocol}//${parsed.host}`;
     } catch {
-        // Keep null; below we fallback to raw input candidates.
+        // Keep null; below we fall back to raw input-based candidates.
     }
 
     const candidates = new Set<string>();
@@ -293,6 +295,8 @@ export async function parseProvidedSitemap(sitemapUrl: string): Promise<{ urls: 
         candidates.add(`${originBase}/sitemap.xml`);
         candidates.add(`${originBase}/sitemap_index.xml`);
         candidates.add(`${originBase}/wp-sitemap.xml`);
+        candidates.add(`${originBase}/page-sitemap.xml`);
+        candidates.add(`${originBase}/post-sitemap.xml`);
     }
 
     const discovered: string[] = [];

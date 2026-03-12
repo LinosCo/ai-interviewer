@@ -93,10 +93,10 @@ export class LLMService {
     }
 
     private static buildAdvancedSelections(availability: Record<ModelProvider, boolean>): InterviewModelSelections {
-        const primary: InterviewModelSelection = availability.gemini
-            ? { provider: 'gemini', name: 'gemini-2.5-flash' }
-            : availability.openai
-                ? { provider: 'openai', name: 'gpt-4o-mini' }
+        const primary: InterviewModelSelection = availability.openai
+            ? { provider: 'openai', name: 'gpt-5-mini' }
+            : availability.gemini
+                ? { provider: 'gemini', name: 'gemini-2.5-flash' }
                 : availability.anthropic
                     ? { provider: 'anthropic', name: 'claude-haiku-4-5' }
                     : { provider: 'openai', name: 'gpt-4.1-mini' };
@@ -113,10 +113,10 @@ export class LLMService {
             ? { provider: 'anthropic', name: 'claude-haiku-4-5' }
             : critical;
 
-        const dataCollection: InterviewModelSelection = availability.gemini
-            ? { provider: 'gemini', name: 'gemini-2.5-flash-lite' }
-            : availability.openai
-                ? { provider: 'openai', name: 'gpt-4o-mini' }
+        const dataCollection: InterviewModelSelection = availability.openai
+            ? { provider: 'openai', name: 'gpt-5-nano' }
+            : availability.gemini
+                ? { provider: 'gemini', name: 'gemini-2.5-flash-lite' }
                 : primary;
 
         return { primary, critical, quality, dataCollection };

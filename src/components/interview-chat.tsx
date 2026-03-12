@@ -575,6 +575,8 @@ export default function InterviewChat({
         ? footerHeight
         : footerHeight + (isMobileKeyboardOpen ? 18 : 34);
     const questionScrollMarginBottomPx = footerHeight + (isMobileKeyboardOpen ? 20 : 28);
+    const showDockedQuestion = isMobileKeyboardOpen && Boolean(currentQuestion) && !isLoading && !isCompleted;
+    const dockedQuestionBottomPx = footerBottomOffsetPx + footerHeight + 8;
 
     useEffect(() => {
         if (!isMobileKeyboardOpen) return;
@@ -591,6 +593,69 @@ export default function InterviewChat({
         }, 80);
         return () => window.clearTimeout(timer);
     }, [footerHeight, isMobileKeyboardOpen]);
+
+    const renderQuestionCard = (docked = false) => {
+        if (!currentQuestion) return null;
+        return (
+            <motion.div
+                key={`${currentQuestion.id}-${docked ? 'docked' : 'flow'}`}
+                initial={{ opacity: 0, y: 20, scale: 0.99 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                exit={{ opacity: 0, y: -10, scale: 0.99 }}
+                transition={{ duration: 0.3, ease: [0.23, 1, 0.32, 1] }}
+                className={`w-full max-w-2xl ${!docked && isMobileKeyboardOpen ? 'mt-auto' : ''}`}
+                style={docked ? undefined : { scrollMarginBottom: `${questionScrollMarginBottomPx}px` }}
+                ref={docked ? undefined : questionCardRef}
+            >
+                <div className={`relative ${docked ? 'rounded-[24px] bg-white/92 px-5 py-4 shadow-2xl ring-1 ring-black/5 backdrop-blur-md' : ''}`}>
+                    {!docked && (
+                        <div className="absolute -left-12 top-0 hidden md:block" style={{ color: brandColor, opacity: 0.3 }}>
+                            <Icons.Chat size={32} />
+                        </div>
+                    )}
+
+                    <div className={docked ? 'space-y-3' : 'space-y-6'}>
+                        <div className="flex items-center gap-2 font-bold text-sm uppercase tracking-widest" style={{ color: brandColor }}>
+                            <span>{t.question} {totalQuestions}</span>
+                            <div className="h-px w-12" style={{ background: brandColor, opacity: 0.4 }} />
+                        </div>
+
+                        <div className={`prose max-w-none prose-headings:font-bold prose-p:text-gray-900 prose-p:font-medium prose-a:font-semibold ${docked ? 'prose-base' : 'prose-lg'}`}>
+                            <ReactMarkdown
+                                components={{
+                                    blockquote: ({ children }) => (
+                                        <blockquote className="border-l-4 border-gray-200 pl-4 py-2 my-4 text-gray-500 bg-gray-50 rounded-r-lg italic [&>p]:!text-base [&>p]:!font-medium [&>p]:!text-gray-500 [&>p]:!mb-0">
+                                            {children}
+                                        </blockquote>
+                                    ),
+                                    p: ({ children }) => {
+                                        const text = String(children);
+                                        const isShort = text.length < 80;
+                                        const isLong = text.length > 200;
+
+                                        return (
+                                            <p className={`
+                                                ${isShort ? 'text-lg md:text-xl font-semibold text-gray-900' : ''}
+                                                ${!isShort && !isLong ? 'text-base md:text-lg font-medium text-gray-800' : ''}
+                                                ${isLong ? 'text-base md:text-lg text-gray-700' : ''}
+                                                ${docked ? 'leading-relaxed mb-4' : 'leading-relaxed mb-6'}
+                                            `} style={{ textShadow: 'none' }}>
+                                                {children}
+                                            </p>
+                                        );
+                                    },
+                                    strong: ({ children }) => <span style={{ color: brandColor, fontWeight: 700 }}>{children}</span>,
+                                    a: ({ href, children }) => <a href={href} style={{ color: brandColor, textDecoration: 'underline' }}>{children}</a>
+                                }}
+                            >
+                                {currentQuestion.content}
+                            </ReactMarkdown>
+                        </div>
+                    </div>
+                </div>
+            </motion.div>
+        );
+    };
 
 
 
@@ -872,7 +937,7 @@ export default function InterviewChat({
             >
 
                 {/* Previous Answer Context - Moved outside keyed motion.div to prevent duplication */}
-                {messages.length > 1 && messages[messages.length - 2]?.role === 'user' && !isLoading && (
+                {messages.length > 1 && messages[messages.length - 2]?.role === 'user' && !isLoading && !showDockedQuestion && (
                     <div className={`w-full max-w-2xl ${isMobileKeyboardOpen ? 'mb-2' : 'mb-4'}`}>
                         <motion.div
                             key={`answer-${messages[messages.length - 2].id}`}
@@ -951,72 +1016,7 @@ export default function InterviewChat({
                 )}
 
                 <AnimatePresence mode="wait">
-                    {currentQuestion && !isLoading && (
-                        <motion.div
-                            key={currentQuestion.id}
-                            initial={{ opacity: 0, y: 20, scale: 0.99 }}
-                            animate={{ opacity: 1, y: 0, scale: 1 }}
-                            exit={{ opacity: 0, y: -10, scale: 0.99 }}
-                            transition={{ duration: 0.3, ease: [0.23, 1, 0.32, 1] }}
-                            className={`w-full max-w-2xl ${isMobileKeyboardOpen ? 'mt-auto' : ''}`}
-                            style={{ scrollMarginBottom: `${questionScrollMarginBottomPx}px` }}
-                            ref={questionCardRef}
-                        >
-                            {/* Bot Question Card */}
-                            <div className="relative">
-                                {/* Decor */}
-                                <div className="absolute -left-12 top-0 hidden md:block" style={{ color: brandColor, opacity: 0.3 }}>
-                                    <Icons.Chat size={32} />
-                                </div>
-
-                                <div className="space-y-6">
-                                    {/* Question Index */}
-                                    <div className="flex items-center gap-2 font-bold text-sm uppercase tracking-widest" style={{ color: brandColor }}>
-                                        <span>{t.question} {totalQuestions}</span>
-                                        <div className="h-px w-12" style={{ background: brandColor, opacity: 0.4 }} />
-                                    </div>
-
-                                    {/* Question Text */}
-                                    <div className="prose prose-lg max-w-none prose-headings:font-bold prose-p:text-gray-900 prose-p:font-medium prose-a:font-semibold">
-                                        <ReactMarkdown
-                                            components={{
-                                                // Handle Blockquotes (Transitions) - Make them distinct and smaller
-                                                blockquote: ({ children }) => (
-                                                    <blockquote className="border-l-4 border-gray-200 pl-4 py-2 my-6 text-gray-500 bg-gray-50 rounded-r-lg italic [&>p]:!text-base [&>p]:!font-medium [&>p]:!text-gray-500 [&>p]:!mb-0">
-                                                        {children}
-                                                    </blockquote>
-                                                ),
-                                                p: ({ children }) => {
-                                                    const text = String(children);
-                                                    // Much more conservative sizing logic
-                                                    const isShort = text.length < 80;
-                                                    const isLong = text.length > 200;
-
-                                                    // If it looks like a transition message (starts with >), handled by blockquote usually, 
-                                                    // but if safe-guarding:
-
-                                                    return (
-                                                        <p className={`
-                                                            ${isShort ? 'text-lg md:text-xl font-semibold text-gray-900' : ''} 
-                                                            ${!isShort && !isLong ? 'text-base md:text-lg font-medium text-gray-800' : ''}
-                                                            ${isLong ? 'text-base md:text-lg text-gray-700' : ''}
-                                                            leading-relaxed mb-6
-                                                        `} style={{ textShadow: 'none' }}>
-                                                            {children}
-                                                        </p>
-                                                    );
-                                                },
-                                                strong: ({ children }) => <span style={{ color: brandColor, fontWeight: 700 }}>{children}</span>,
-                                                a: ({ href, children }) => <a href={href} style={{ color: brandColor, textDecoration: 'underline' }}>{children}</a>
-                                            }}
-                                        >
-                                            {currentQuestion.content}
-                                        </ReactMarkdown>
-                                    </div>
-                                </div>
-                            </div>
-                        </motion.div>
-                    )}
+                    {currentQuestion && !isLoading && !showDockedQuestion && renderQuestionCard(false)}
 
                     {isLoading && !currentQuestion && (
                         <motion.div
@@ -1042,6 +1042,17 @@ export default function InterviewChat({
                     )}
                 </AnimatePresence>
             </div>
+
+            {showDockedQuestion && (
+                <div
+                    className="fixed left-0 right-0 z-40 px-4 pointer-events-none"
+                    style={{ bottom: `${dockedQuestionBottomPx}px` }}
+                >
+                    <div className="max-w-2xl mx-auto">
+                        {renderQuestionCard(true)}
+                    </div>
+                </div>
+            )}
 
             {/* Input Area or Completion Screen */}
             <div

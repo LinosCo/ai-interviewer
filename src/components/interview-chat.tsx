@@ -610,7 +610,7 @@ export default function InterviewChat({
     const inputTopPaddingClass = isEmbedded
         ? 'pt-4'
         : isMobileKeyboardOpen
-            ? 'pt-2 md:pt-12'
+            ? 'pt-1 md:pt-12'
             : 'pt-8 md:pt-12';
     const footerBottomOffsetPx = isEmbedded ? 0 : (supportsVisualViewport ? 0 : keyboardHeightGuess);
     const chatBottomPaddingPx = isEmbedded
@@ -622,6 +622,7 @@ export default function InterviewChat({
         ? Math.max(120, Math.min(280, Math.round(effectiveViewportHeight * 0.32)))
         : 220;
     const dockedQuestionCompactText = dockedQuestionMaxHeightPx <= 170;
+    const questionSpacingClass = isMobileKeyboardOpen ? 'space-y-4 md:space-y-6' : 'space-y-6';
 
     useEffect(() => {
         if (!isMobileKeyboardOpen) return;
@@ -668,7 +669,7 @@ export default function InterviewChat({
                         </div>
                     )}
 
-                    <div className={docked ? 'space-y-3' : 'space-y-6'}>
+                    <div className={docked ? 'space-y-3' : questionSpacingClass}>
                         <div className="flex items-center gap-2 font-bold text-sm uppercase tracking-widest" style={{ color: brandColor }}>
                             <span>{t.question} {totalQuestions}</span>
                             <div className="h-px w-12" style={{ background: brandColor, opacity: 0.4 }} />
@@ -758,50 +759,86 @@ export default function InterviewChat({
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
-                className={`${isEmbedded ? 'absolute' : 'fixed'} inset-0 z-40 flex items-center justify-center`}
+                className="w-full max-w-2xl mt-5 md:mt-8"
             >
-                <div className="absolute inset-0 bg-gradient-to-b from-white/60 to-white/40 backdrop-blur-[2px]" />
-                <div className="relative flex items-center justify-center">
+                <div className="flex items-center justify-start">
                     <motion.div
-                        className="absolute rounded-full"
-                        style={{
-                            width: 96,
-                            height: 96,
-                            border: `3px solid ${brandColor}30`,
-                        }}
-                        animate={{
-                            scale: [1, 1.15, 1],
-                            opacity: [0.6, 0.2, 0.6],
-                        }}
-                        transition={{
-                            duration: 1.5,
-                            repeat: Infinity,
-                            ease: 'easeInOut',
-                        }}
-                    />
-                    <motion.div
-                        className="relative flex items-center justify-center rounded-full bg-white shadow-lg"
-                        style={{
-                            width: 80,
-                            height: 80,
-                            border: `2px solid ${brandColor}40`,
-                        }}
-                        animate={{
-                            scale: [1, 1.03, 1],
-                        }}
-                        transition={{
-                            duration: 1.5,
-                            repeat: Infinity,
-                            ease: 'easeInOut',
-                        }}
+                        className="relative overflow-hidden rounded-[28px] border border-white/70 bg-white/78 px-4 py-4 shadow-[0_24px_50px_-32px_rgba(15,23,42,0.45)] backdrop-blur-xl"
+                        style={{ boxShadow: `0 24px 50px -32px ${brandColor}35` }}
                     >
-                        {logoUrl ? (
-                            <div className="flex h-11 w-11 items-center justify-center">
-                                <img src={logoUrl} alt={botName} className="max-h-full max-w-full object-contain" />
+                        <motion.div
+                            className="absolute inset-0 rounded-[28px]"
+                            style={{ boxShadow: `inset 0 0 0 1px ${brandColor}20` }}
+                            animate={{
+                                opacity: [0.82, 1, 0.82],
+                                boxShadow: [
+                                    `inset 0 0 0 1px ${brandColor}20`,
+                                    `inset 0 0 0 6px ${brandColor}08`,
+                                    `inset 0 0 0 1px ${brandColor}20`,
+                                ],
+                            }}
+                            transition={{
+                                duration: 1.8,
+                                repeat: Infinity,
+                                ease: 'easeInOut',
+                            }}
+                        />
+                        <div className="relative flex items-center gap-4">
+                            <div
+                                className="relative flex h-14 w-14 items-center justify-center rounded-[18px] border bg-white shadow-sm"
+                                style={{
+                                    borderColor: `${brandColor}40`,
+                                    boxShadow: `0 12px 24px -18px ${brandColor}80`,
+                                }}
+                            >
+                                <motion.div
+                                    className="absolute inset-[-5px] rounded-[22px] border"
+                                    style={{ borderColor: `${brandColor}28` }}
+                                    animate={{
+                                        scale: [1, 1.06, 1],
+                                        opacity: [0.42, 0.1, 0.42],
+                                    }}
+                                    transition={{
+                                        duration: 1.8,
+                                        repeat: Infinity,
+                                        ease: 'easeInOut',
+                                    }}
+                                />
+                                {logoUrl ? (
+                                    <img src={logoUrl} alt={botName} className="relative z-10 w-8 h-8 object-contain" />
+                                ) : (
+                                    <Icons.Logo size={26} style={{ color: brandColor }} className="relative z-10" />
+                                )}
                             </div>
-                        ) : (
-                            <Icons.Logo size={36} style={{ color: brandColor }} />
-                        )}
+                            <div className="min-w-0">
+                                <div className="text-[10px] font-bold uppercase tracking-[0.28em] text-gray-400">
+                                    {language?.toLowerCase().startsWith('it') ? 'AI al lavoro' : 'AI thinking'}
+                                </div>
+                                <div className="mt-2 flex items-center gap-1.5">
+                                    {[0, 1, 2].map((dot) => (
+                                        <motion.span
+                                            key={dot}
+                                            className="h-2.5 w-2.5 rounded-full"
+                                            style={{ background: brandColor }}
+                                            animate={{
+                                                opacity: [0.25, 0.95, 0.25],
+                                                y: [0, -2, 0],
+                                                scale: [0.92, 1.08, 0.92],
+                                            }}
+                                            transition={{
+                                                duration: 1.1,
+                                                repeat: Infinity,
+                                                ease: 'easeInOut',
+                                                delay: dot * 0.14,
+                                            }}
+                                        />
+                                    ))}
+                                    <span className="ml-2 text-sm font-semibold text-gray-600">
+                                        {language?.toLowerCase().startsWith('it') ? 'Sto preparando la prossima domanda…' : 'Preparing the next question...'}
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
                     </motion.div>
                 </div>
             </motion.div>
@@ -1117,16 +1154,28 @@ export default function InterviewChat({
                             animate={{ opacity: 1 }}
                             className="flex flex-col items-center gap-6 mt-12"
                         >
-                            <div className="relative w-16 h-16">
-                                <div className="absolute inset-0 rounded-full border-4" style={{ borderColor: `${brandColor}20` }}></div>
-                                <div className="absolute inset-0 rounded-full border-4 border-t-transparent animate-spin" style={{ borderColor: brandColor, borderTopColor: 'transparent' }}></div>
-                                <div className="absolute inset-[10px] rounded-full bg-white shadow-sm flex items-center justify-center">
+                            <div className="relative flex h-20 w-20 items-center justify-center">
+                                <motion.div
+                                    className="absolute inset-0 rounded-[28px] border-2"
+                                    style={{ borderColor: `${brandColor}22` }}
+                                    animate={{
+                                        scale: [1, 1.05, 1],
+                                        opacity: [0.45, 0.12, 0.45],
+                                    }}
+                                    transition={{
+                                        duration: 1.6,
+                                        repeat: Infinity,
+                                        ease: 'easeInOut',
+                                    }}
+                                />
+                                <div
+                                    className="relative flex h-16 w-16 items-center justify-center rounded-2xl border bg-white shadow-lg"
+                                    style={{ borderColor: `${brandColor}38` }}
+                                >
                                     {logoUrl ? (
-                                        <div className="flex h-7 w-7 items-center justify-center">
-                                            <img src={logoUrl} alt={botName} className="max-h-full max-w-full object-contain" />
-                                        </div>
+                                        <img src={logoUrl} alt={botName} className="h-8 w-8 object-contain" />
                                     ) : (
-                                        <Icons.Logo size={22} style={{ color: brandColor }} />
+                                        <Icons.Logo size={24} style={{ color: brandColor }} />
                                     )}
                                 </div>
                             </div>

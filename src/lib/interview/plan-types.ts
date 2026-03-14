@@ -3,6 +3,7 @@ export type InterviewPlan = {
   meta: {
     generatedAt: string;
     planLogicVersion: string;
+    budgetSignature: string;
     maxDurationMins: number;
     totalTimeSec: number;
     perTopicTimeSec: number;

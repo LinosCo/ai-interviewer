@@ -165,11 +165,11 @@ export function buildRuntimeSemanticContextPrompt(params: {
 
     const recentStems = (params.recentBridgeStems || []).slice(0, 5);
     const stemsHintIt = recentStems.length > 0
-        ? `8. NON iniziare con nessuna di queste aperture già usate di recente: ${recentStems.map(s => `"${s}"`).join(', ')}. Usa un incipit diverso e naturale.`
-        : '8. Varia l\'incipit: non usare la stessa apertura del turno precedente.';
+        ? `- NON iniziare con nessuna di queste aperture già usate di recente: ${recentStems.map(s => `"${s}"`).join(', ')}. Usa un incipit diverso e naturale.`
+        : '- Varia l\'incipit: non usare la stessa apertura del turno precedente.';
     const stemsHintEn = recentStems.length > 0
-        ? `8. Do NOT start with any of these recently used openings: ${recentStems.map(s => `"${s}"`).join(', ')}. Use a different, natural opening.`
-        : '8. Vary your opening: do not reuse the same opening as the previous turn.';
+        ? `- Do NOT start with any of these recently used openings: ${recentStems.map(s => `"${s}"`).join(', ')}. Use a different, natural opening.`
+        : '- Vary your opening: do not reuse the same opening as the previous turn.';
 
     if ((language || '').toLowerCase().startsWith('it')) {
         return `
@@ -178,14 +178,19 @@ export function buildRuntimeSemanticContextPrompt(params: {
 - Ultima domanda da non ripetere: "${previousQuestion || 'N/A'}"
 - Profondità risposta: ${responseDepth}
 
-Regole:
-1. Apri con una frase breve sul merito, non con una formula.
-2. ${depthHintIt[responseDepth]}
-3. ${transitionHintIt}
-4. Preferisci una sola lente utile: esempio, impatto, priorita o azione concreta.
+Istruzioni di coerenza:
+1. Inizia con una frase breve che riconosce genuinamente il contenuto della risposta utente (non una formula).
+2. Mantieni la nuova domanda semanticamente diversa dalla precedente.
+3. ${depthHintIt[responseDepth]}
+4. ${transitionHintIt}
+5. Preferisci una sola lente utile: esempio, impatto, priorita o azione concreta.
+6. Evita formule rigide ("ora passiamo a", "cambio argomento") e chiusure premature.
+7. Evita aperture generiche/retoriche ("molto interessante", "e un punto importante", "grazie per aver condiviso"): reagisci al merito con un dettaglio concreto.
+8. Se naturale, aggiungi un vincolo leggero (tempo, segmento, canale o metrica). Se risulta forzato o fuori tema, resta su una domanda semplice.
+9. Se l'ultima risposta apre un angolo nuovo, segui quell'angolo. Non trascinare lo stesso motivo interpretativo per inerzia.
 ${stemsHintIt}
 ${clarificationRequested
-                ? '5. Se l\'utente sta chiedendo un chiarimento, chiarisci prima in modo diretto e poi fai una sola domanda coerente.'
+                ? '- Se l\'utente sta chiedendo un chiarimento, chiarisci prima in modo diretto e poi fai una sola domanda coerente.'
                 : ''}
 `.trim();
     }
@@ -196,14 +201,19 @@ ${clarificationRequested
 - Previous question to avoid: "${previousQuestion || 'N/A'}"
 - Response depth: ${responseDepth}
 
-Rules:
-1. Open with one short substance-based sentence, not a formula.
-2. ${depthHintEn[responseDepth]}
-3. ${transitionHintEn}
-4. Prefer one useful lens only: example, impact, priority, or concrete action.
+Coherence instructions:
+1. Open with one short sentence that genuinely acknowledges the content of the user's response (not a formula).
+2. Keep the new question semantically distinct from the previous one.
+3. ${depthHintEn[responseDepth]}
+4. ${transitionHintEn}
+5. Prefer one useful lens only: example, impact, priority, or concrete action.
+6. Avoid rigid templates ("now let's move to") and premature closure cues.
+7. Avoid generic/ceremonial openers ("very interesting", "that's an important point", "thanks for sharing"): respond to the substance using one concrete detail.
+8. If natural, add one light constraint (timeframe, segment, channel, or metric). If this feels forced or off-topic, keep a simple focused question.
+9. If the latest answer opens a new angle, follow that angle. Do not drag the same interpretive motif forward out of inertia.
 ${stemsHintEn}
 ${clarificationRequested
-            ? '5. If the user is asking for clarification, clarify first directly, then ask one coherent follow-up question.'
+            ? '- If the user is asking for clarification, clarify first directly, then ask one coherent follow-up question.'
             : ''}
 `.trim();
 }

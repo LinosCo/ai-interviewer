@@ -1,4 +1,4 @@
-export type DuplicateReason = 'none' | 'exact' | 'high_similarity' | 'same_prefix';
+export type DuplicateReason = 'none' | 'exact' | 'high_similarity' | 'same_prefix' | 'theme_fixation';
 
 export interface DuplicateQuestionMatch {
     isDuplicate: boolean;
@@ -110,10 +110,61 @@ function samePrefix(a: string[], b: string[], minPrefixTokens: number): boolean 
     return true;
 }
 
+function findThemeFixationMatch(params: {
+    candidateQuestion: string;
+    historyAssistantMessages: string[];
+    language: string;
+    lastUserMessage?: string | null;
+}): DuplicateQuestionMatch | null {
+    const lastUserMessage = String(params.lastUserMessage || '').trim();
+    if (!lastUserMessage) return null;
+
+    const recentQuestions = (params.historyAssistantMessages || [])
+        .flatMap(extractQuestions)
+        .slice(-3);
+    if (recentQuestions.length < 2) return null;
+
+    const candidateTokens = toTokens(params.candidateQuestion, params.language);
+    const lastUserTokens = toTokens(lastUserMessage, params.language);
+    const previousQuestionTokens = toTokens(recentQuestions[recentQuestions.length - 1], params.language);
+    if (candidateTokens.length < 4 || lastUserTokens.length < 2 || previousQuestionTokens.length < 2) {
+        return null;
+    }
+
+    const freshUserTokenSet = new Set(
+        lastUserTokens.filter((token) => !previousQuestionTokens.includes(token))
+    );
+    if (freshUserTokenSet.size < 2) return null;
+
+    const assistantTokenCounts = new Map<string, number>();
+    for (const question of recentQuestions) {
+        for (const token of new Set(toTokens(question, params.language))) {
+            assistantTokenCounts.set(token, (assistantTokenCounts.get(token) || 0) + 1);
+        }
+    }
+
+    const lastUserTokenSet = new Set(lastUserTokens);
+    const repeatedAssistantAnchors = candidateTokens.filter((token) =>
+        (assistantTokenCounts.get(token) || 0) >= 2 && !lastUserTokenSet.has(token)
+    );
+    if (repeatedAssistantAnchors.length === 0) return null;
+
+    const candidateFreshOverlap = candidateTokens.filter((token) => freshUserTokenSet.has(token)).length;
+    if (candidateFreshOverlap > 0) return null;
+
+    return {
+        isDuplicate: true,
+        matchedQuestion: recentQuestions[recentQuestions.length - 1] || null,
+        similarity: Math.min(0.99, repeatedAssistantAnchors.length / Math.max(candidateTokens.length, 1) + 0.45),
+        reason: 'theme_fixation'
+    };
+}
+
 export function findDuplicateQuestionMatch(params: {
     candidateResponse: string;
     historyAssistantMessages: string[];
     language?: string;
+    lastUserMessage?: string | null;
 }): DuplicateQuestionMatch {
     const language = (params.language || 'en').toLowerCase();
     const candidateQuestion = getPrimaryQuestion(params.candidateResponse);
@@ -170,6 +221,16 @@ export function findDuplicateQuestionMatch(params: {
                 }
             }
         }
+    }
+
+    const themeFixation = findThemeFixationMatch({
+        candidateQuestion,
+        historyAssistantMessages: params.historyAssistantMessages,
+        language,
+        lastUserMessage: params.lastUserMessage
+    });
+    if (themeFixation) {
+        return themeFixation;
     }
 
     return bestMatch;

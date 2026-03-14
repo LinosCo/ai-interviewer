@@ -20,11 +20,12 @@ import { checkCreditsForAction } from '@/lib/guards/resourceGuard';
 import { getCompletionGuardAction, shouldInterceptDeepOfferClosure, shouldInterceptTopicPhaseClosure } from '@/lib/interview/phase-flow';
 // NOTE: v2 post-processing moved to post-processing-v2.ts - quality gates removed
 import { extractDeterministicFieldValue, isLikelyNonValueAck, normalizeCandidateFieldIds, responseMentionsCandidateField } from '@/lib/interview/data-collection-guard';
-import { createDeepOfferInsight, createDefaultSupervisorInsight, runDeepOfferPhase, type InterviewStateLike, type Phase, type SupervisorInsight, type TransitionMode } from '@/lib/interview/interview-supervisor';
+import { createDefaultSupervisorInsight, runDeepOfferPhase, type InterviewStateLike, type Phase, type SupervisorInsight, type TransitionMode } from '@/lib/interview/interview-supervisor';
 import type { ValidationResponse } from '@/lib/interview/validation-response';
 import { findDuplicateQuestionMatch } from '@/lib/interview/question-dedup';
 import { handleExplorePhase, handleDeepenPhase } from '@/lib/interview/explore-deepen-machine';
 import { computeSignalScore } from '@/lib/interview/signal-score';
+import { buildContextualDeepOfferInsight } from '@/lib/interview/deep-offer-context';
 import { buildTurnGuidanceBlock, buildGuardsBlock } from '@/lib/llm/runtime-prompt-blocks';
 import { runPostProcessing } from '@/lib/interview/post-processing-v2';
 import {
@@ -52,7 +53,7 @@ import {
     ITALIAN_STOPWORDS, ENGLISH_STOPWORDS, tokenizeForScoring, lexicalOverlapScore,
     buildTopicSemanticText, getDeepTopics, buildDeepTopicOrder,
     getScanPlanTurns, getDeepPlanTurns, getRemainingSubGoals,
-    buildDeepPlan, selectDeepFocusPoint, buildExtensionPreviewHints, buildExtensionUserSnippets,
+    buildDeepPlan, selectDeepFocusPoint,
     sanitizeUserSnippet, detectFatigue,
 } from '@/lib/chat/context-helpers';
 import {
@@ -684,44 +685,15 @@ export async function POST(req: Request) {
         const buildDeepOfferInsight = (
             sourceState: InterviewState,
             validationFeedback?: ValidationResponse
-        ) => {
-            // For avanzato, enrich interestingTopics with CIL high-strength threads
-            // so the extension offer cites specific semantic threads, not just engagement scores.
-            let effectiveInterestingTopics = sourceState.interestingTopics;
-            if (isAvanzato && cilAnalysisRef.current) {
-                const highThreadTopics: InterestingTopic[] = cilAnalysisRef.current.openThreads
-                    .filter(t => t.strength === 'high')
-                    .map(t => ({
-                        topicId: t.sourceTopicId,
-                        topicLabel: botTopics.find(bt => bt.id === t.sourceTopicId)?.label || '',
-                        engagementScore: 0.9,
-                        bestSnippet: t.anchoredHypothesis || t.description
-                    }));
-                if (highThreadTopics.length > 0) {
-                    const existing = (sourceState.interestingTopics || []).filter(
-                        it => !highThreadTopics.some(ct => ct.topicId === it.topicId)
-                    );
-                    effectiveInterestingTopics = [...highThreadTopics, ...existing];
-                }
-            }
-            const extensionPreview = buildExtensionPreviewHints({
-                botTopics,
-                deepOrder: sourceState.deepTopicOrder,
-                history: sourceState.topicSubGoalHistory,
-                interestingTopics: effectiveInterestingTopics,
-                interviewObjective,
-                language,
-                startIndex: sourceState.topicIndex,
-                maxItems: 2
-            });
-            const extensionUserSnippets = buildExtensionUserSnippets({
-                botTopics,
-                interestingTopics: sourceState.interestingTopics,
-                topicKeyInsights: sourceState.topicKeyInsights,
-                maxItems: 2
-            });
-            return createDeepOfferInsight(extensionPreview, validationFeedback, extensionUserSnippets);
-        };
+        ) => buildContextualDeepOfferInsight({
+            state: sourceState,
+            botTopics,
+            interviewObjective,
+            language,
+            validationFeedback,
+            includeCilThreads: isAvanzato,
+            cilAnalysis: cilAnalysisRef.current
+        });
 
         if (lastMessage?.role === 'user') {
             nextState.lastUserTopicId = currentTopic.id;

@@ -2,6 +2,9 @@ import { FluidBackground } from '@/components/landing/FluidBackground';
 import { SITE_URL } from '@/lib/seo';
 import { getLandingFaqs } from '@/lib/business-tuner-content';
 
+// Skip static generation — DB is not available during Docker builds.
+export const dynamic = 'force-dynamic';
+
 export default async function FAQPage() {
   const faqs = await getLandingFaqs();
 

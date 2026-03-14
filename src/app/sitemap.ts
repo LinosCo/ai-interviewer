@@ -27,9 +27,16 @@ const STATIC_MARKETING_PAGES: StaticPage[] = [
   { path: '/sales-terms', changeFrequency: 'yearly', priority: 0.4 },
 ];
 
+export const dynamic = 'force-dynamic';
+
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const now = new Date();
-  const articles = await getLandingArticles(100);
+  let articles: Awaited<ReturnType<typeof getLandingArticles>> = [];
+  try {
+    articles = await getLandingArticles(100);
+  } catch {
+    // DB unavailable during Docker build — emit static entries only
+  }
 
   const staticEntries = STATIC_MARKETING_PAGES.map((page) => ({
     url: absoluteUrl(page.path),

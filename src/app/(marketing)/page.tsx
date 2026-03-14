@@ -2,6 +2,9 @@ import { MarketingHomeClient } from '@/components/landing';
 import { HOME_PAGE_DESCRIPTION, HOME_PAGE_TITLE, SITE_NAME, SITE_URL } from '@/lib/seo';
 import { getLandingArticles, getLandingFaqs } from '@/lib/business-tuner-content';
 
+// Skip static generation — DB is not available during Docker builds.
+export const dynamic = 'force-dynamic';
+
 export default async function LandingPage() {
   const [faqs, articles] = await Promise.all([
     getLandingFaqs(),

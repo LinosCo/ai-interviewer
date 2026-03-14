@@ -31,6 +31,7 @@ export interface PlanFeatures {
     advancedInterview: boolean;
     chatbot: boolean;
     visibilityTracker: boolean;
+    siteAnalysis: boolean;
     aiTips: boolean;
     copilotStrategico: boolean;
     whiteLabel: boolean | 'conditional';
@@ -59,6 +60,7 @@ export interface PlanLimits {
     maxAiSuggestionsPerMonth: number;
 
     visibilityEnabled: boolean;
+    siteAnalysisEnabled: boolean;
     aiTipsEnabled: boolean;
     whiteLabelEnabled: boolean;
     apiAccessEnabled: boolean;
@@ -112,6 +114,7 @@ export const PLANS: Record<PlanType, PlanConfig> = {
             advancedInterview: false,
             chatbot: false,
             visibilityTracker: false,
+            siteAnalysis: false,
             aiTips: false,
             copilotStrategico: false,
             whiteLabel: false,
@@ -132,6 +135,7 @@ export const PLANS: Record<PlanType, PlanConfig> = {
             maxAiSuggestionsPerMonth: 0,
 
             visibilityEnabled: false,
+            siteAnalysisEnabled: false,
             aiTipsEnabled: false,
             whiteLabelEnabled: false,
             apiAccessEnabled: false,
@@ -163,6 +167,7 @@ export const PLANS: Record<PlanType, PlanConfig> = {
             advancedInterview: false,
             chatbot: true,
             visibilityTracker: true,
+            siteAnalysis: true,
             aiTips: true,
             copilotStrategico: true,
             whiteLabel: false,
@@ -183,6 +188,7 @@ export const PLANS: Record<PlanType, PlanConfig> = {
             maxAiSuggestionsPerMonth: 50,
 
             visibilityEnabled: true,
+            siteAnalysisEnabled: true,
             aiTipsEnabled: true,
             whiteLabelEnabled: false,
             apiAccessEnabled: false,
@@ -216,6 +222,7 @@ export const PLANS: Record<PlanType, PlanConfig> = {
             advancedInterview: false,
             chatbot: true,
             visibilityTracker: false,
+            siteAnalysis: false,
             aiTips: false,
             copilotStrategico: false,
             whiteLabel: false,
@@ -236,6 +243,7 @@ export const PLANS: Record<PlanType, PlanConfig> = {
             maxAiSuggestionsPerMonth: 0,
 
             visibilityEnabled: false,
+            siteAnalysisEnabled: false,
             aiTipsEnabled: false,
             whiteLabelEnabled: false,
             apiAccessEnabled: false,
@@ -272,6 +280,7 @@ export const PLANS: Record<PlanType, PlanConfig> = {
             advancedInterview: true,
             chatbot: true,
             visibilityTracker: true,
+            siteAnalysis: true,
             aiTips: true,
             copilotStrategico: true,
             whiteLabel: false,
@@ -292,6 +301,7 @@ export const PLANS: Record<PlanType, PlanConfig> = {
             maxAiSuggestionsPerMonth: 100,
 
             visibilityEnabled: true,
+            siteAnalysisEnabled: true,
             aiTipsEnabled: true,
             whiteLabelEnabled: false,
             apiAccessEnabled: false,
@@ -330,6 +340,7 @@ export const PLANS: Record<PlanType, PlanConfig> = {
             advancedInterview: true,
             chatbot: true,
             visibilityTracker: true,
+            siteAnalysis: true,
             aiTips: true,
             copilotStrategico: true,
             whiteLabel: true,
@@ -350,6 +361,7 @@ export const PLANS: Record<PlanType, PlanConfig> = {
             maxAiSuggestionsPerMonth: 200,
 
             visibilityEnabled: true,
+            siteAnalysisEnabled: true,
             aiTipsEnabled: true,
             whiteLabelEnabled: true,
             apiAccessEnabled: true,
@@ -385,6 +397,7 @@ export const PLANS: Record<PlanType, PlanConfig> = {
             advancedInterview: true,
             chatbot: true,
             visibilityTracker: true,
+            siteAnalysis: true,
             aiTips: true,
             copilotStrategico: true,
             whiteLabel: 'conditional', // Con 10+ clienti
@@ -407,6 +420,7 @@ export const PLANS: Record<PlanType, PlanConfig> = {
             maxAiSuggestionsPerMonth: 100,
 
             visibilityEnabled: true,
+            siteAnalysisEnabled: true,
             aiTipsEnabled: true,
             whiteLabelEnabled: false,
             apiAccessEnabled: false,
@@ -442,6 +456,7 @@ export const PLANS: Record<PlanType, PlanConfig> = {
             advancedInterview: true,
             chatbot: true,
             visibilityTracker: true,
+            siteAnalysis: true,
             aiTips: true,
             copilotStrategico: true,
             whiteLabel: true,
@@ -463,6 +478,7 @@ export const PLANS: Record<PlanType, PlanConfig> = {
             maxVisibilityQueriesPerMonth: -1,
             maxAiSuggestionsPerMonth: -1,
             visibilityEnabled: true,
+            siteAnalysisEnabled: true,
             aiTipsEnabled: true,
             whiteLabelEnabled: true,
             apiAccessEnabled: true,
@@ -494,6 +510,7 @@ export const PLANS: Record<PlanType, PlanConfig> = {
             advancedInterview: true,
             chatbot: true,
             visibilityTracker: true,
+            siteAnalysis: true,
             aiTips: true,
             copilotStrategico: true,
             whiteLabel: true,
@@ -516,6 +533,7 @@ export const PLANS: Record<PlanType, PlanConfig> = {
             maxAiSuggestionsPerMonth: -1,
 
             visibilityEnabled: true,
+            siteAnalysisEnabled: true,
             aiTipsEnabled: true,
             whiteLabelEnabled: true,
             apiAccessEnabled: true,

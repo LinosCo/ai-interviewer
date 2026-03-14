@@ -679,7 +679,7 @@ model Bot {
   maxOpenQuestions      Int                  @default(5)
   modelProvider         String               @default("openai")
   modelName             String               @default("gpt-4o-mini")
-  interviewerQuality    String               @default("quantitativo")
+  interviewerQuality    String               @default("standard")
   cilBonusTurnCapOverride Int?                 // null = dynamic formula; set to override CIL budget stealing cap
   openaiApiKey          String?
   anthropicApiKey       String?
@@ -841,7 +841,7 @@ model TrainingBot {
 
   modelProvider String  @default("openai")
   modelName           String  @default("gpt-4o-mini")
-  interviewerQuality  String  @default("quantitativo")
+  interviewerQuality  String  @default("standard")
   customApiKey        String?
 
   organizationId String

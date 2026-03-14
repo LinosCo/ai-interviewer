@@ -22,7 +22,7 @@ function safeColor(color: string, fallback = '#f59e0b'): string {
   return /^#[0-9a-fA-F]{6}$/.test(color) ? color : fallback;
 }
 
-function getFieldPlaceholder(fieldId: string, language: string, inputType: FieldInteractionPayload['inputType']): string {
+function getFieldPlaceholder(fieldId: string, language: string, inputType: FieldInteractionPayload['inputType'], label?: string): string {
   const isItalian = language.toLowerCase().startsWith('it');
 
   if (inputType === 'email') {
@@ -43,7 +43,7 @@ function getFieldPlaceholder(fieldId: string, language: string, inputType: Field
     case 'location':
       return isItalian ? 'Inserisci la tua località' : 'Enter your location';
     default:
-      return isItalian ? 'Inserisci la risposta' : 'Enter your answer';
+      return label || (isItalian ? 'Inserisci la risposta' : 'Enter your answer');
   }
 }
 
@@ -100,7 +100,10 @@ export function StructuredInterviewInput({
           const isChoice = field.inputType === 'choice' && Array.isArray(field.options) && field.options!.length > 0;
           const selectedOption = formOptionIds[field.fieldId];
           return (
-            <div key={field.fieldId} className="space-y-1">
+            <div key={field.fieldId} className="space-y-1.5">
+              {field.label && (
+                <p className="text-xs font-semibold text-gray-500 px-1">{field.label}</p>
+              )}
               {isChoice ? (
                 <div className="grid grid-cols-1 gap-2">
                   {field.options!.map((option) => {
@@ -132,7 +135,7 @@ export function StructuredInterviewInput({
                   value={formValues[field.fieldId] || ''}
                   onChange={(e) => setFormValues(prev => ({ ...prev, [field.fieldId]: e.target.value }))}
                   disabled={loading}
-                  placeholder={getFieldPlaceholder(field.fieldId, language, field.inputType)}
+                  placeholder={getFieldPlaceholder(field.fieldId, language, field.inputType, field.label)}
                   className="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 disabled:opacity-50"
                   style={{ ['--tw-ring-color' as any]: `${safeColor(brandColor)}55` }}
                 />

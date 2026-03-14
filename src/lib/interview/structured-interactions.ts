@@ -25,6 +25,7 @@ export interface FieldInteractionPayload {
 
 export interface FormFieldDescriptor {
   fieldId: string;
+  label?: string;
   inputType: StructuredFieldInputType;
   required: boolean;
   options?: InteractionChoiceOption[];
@@ -173,8 +174,20 @@ export function buildDataCollectionFormPayload(params: {
 }): FormInteractionPayload {
   const fields: FormFieldDescriptor[] = params.fieldIds.map((fieldId) => {
     const { inputType, options } = getStructuredFieldInputType(fieldId, params.candidateFields || []);
+    const rawField = Array.isArray(params.candidateFields)
+      ? params.candidateFields.find((c) =>
+          typeof c === 'string' ? c === fieldId : c?.field === fieldId || c?.id === fieldId
+        )
+      : null;
+    const label: string | undefined =
+      typeof rawField?.question === 'string' && rawField.question.trim()
+        ? rawField.question.trim()
+        : typeof rawField?.label === 'string' && rawField.label.trim()
+          ? rawField.label.trim()
+          : undefined;
     return {
       fieldId,
+      ...(label ? { label } : {}),
       inputType,
       required: false,  // all fields are skippable
       ...(options && options.length > 0 ? { options } : {}),

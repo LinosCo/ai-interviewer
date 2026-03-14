@@ -106,6 +106,12 @@ export function UpgradeModal({
                                     Brand Monitor
                                 </li>
                             )}
+                            {required.limits.siteAnalysisEnabled && (
+                                <li className="flex items-center gap-2">
+                                    <Icons.Check className="w-4 h-4 text-green-600" />
+                                    Analisi Sito
+                                </li>
+                            )}
                             {required.limits.aiTipsEnabled && (
                                 <li className="flex items-center gap-2">
                                     <Icons.Check className="w-4 h-4 text-green-600" />

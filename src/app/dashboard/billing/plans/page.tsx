@@ -67,6 +67,7 @@ export default async function PlansPage({
         { name: 'Interview AI', key: 'interviewAI' },
         { name: 'Chatbot', key: 'chatbot' },
         { name: 'Brand Monitor', key: 'visibilityTracker' },
+        { name: 'Analisi Sito', key: 'siteAnalysis' },
         { name: 'AI Tips', key: 'aiTips' },
         { name: 'Copilot Strategico', key: 'copilotStrategico' },
         { name: 'CMS Integrations', key: 'cmsIntegrations' },

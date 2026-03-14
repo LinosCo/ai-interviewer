@@ -24,6 +24,7 @@ const FEATURE_CATEGORIES: Array<{ name: string; features: Feature[] }> = [
         name: 'Funzionalità Avanzate',
         features: [
             { key: 'visibilityEnabled', label: 'Brand Monitor', boolean: true, getValue: (p) => p.limits.visibilityEnabled },
+            { key: 'siteAnalysisEnabled', label: 'Analisi Sito', boolean: true, getValue: (p) => p.limits.siteAnalysisEnabled },
             { key: 'aiTipsEnabled', label: 'AI Tips', boolean: true, getValue: (p) => p.limits.aiTipsEnabled },
             { key: 'canTransferProjects', label: 'Trasferimento Progetti', boolean: true, getValue: (p) => p.limits.canTransferProjects }
         ]

@@ -74,6 +74,7 @@ export const LANDING_PLANS: LandingPlan[] = [
         features: [
             '20K crediti/mese',
             'Brand Monitor',
+            'Analisi Sito',
             'AI Tips',
             'Copilot Strategico',
             'Google Analytics e Search Console',

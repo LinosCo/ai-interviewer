@@ -431,6 +431,11 @@ export default async function BillingPage({
                             available={planConfig.features.visibilityTracker}
                         />
                         <FeatureItem
+                            label="Analisi Sito"
+                            value={planConfig.features.siteAnalysis ? 'Attivo' : 'Non incluso'}
+                            available={planConfig.features.siteAnalysis}
+                        />
+                        <FeatureItem
                             label="AI Tips"
                             value={planConfig.features.aiTips ? 'Attivo' : 'Non incluso'}
                             available={planConfig.features.aiTips}

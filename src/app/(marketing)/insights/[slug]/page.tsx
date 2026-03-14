@@ -5,14 +5,12 @@ import type { Metadata } from 'next';
 import { SITE_NAME, SITE_URL } from '@/lib/seo';
 import { getLandingArticleBySlug, getLandingArticles } from '@/lib/business-tuner-content';
 
+// Skip static generation — DB is not available during Docker builds.
+export const dynamic = 'force-dynamic';
+
 type Params = {
   slug: string;
 };
-
-export async function generateStaticParams() {
-  const articles = await getLandingArticles(50);
-  return articles.map((article) => ({ slug: article.slug }));
-}
 
 export async function generateMetadata({
   params,

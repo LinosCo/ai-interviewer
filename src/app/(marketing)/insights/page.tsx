@@ -2,6 +2,9 @@ import Link from 'next/link';
 import { buildMarketingMetadata, SITE_NAME, SITE_URL } from '@/lib/seo';
 import { getLandingArticles } from '@/lib/business-tuner-content';
 
+// Skip static generation — DB is not available during Docker builds.
+export const dynamic = 'force-dynamic';
+
 export const metadata = buildMarketingMetadata({
   title: 'Insights e contenuti',
   description: 'Approfondimenti, aggiornamenti e contenuti SEO pubblicati dal CMS di Business Tuner.',

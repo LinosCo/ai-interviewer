@@ -143,10 +143,11 @@ function normalizePgConnectionString(rawConnectionString: string): string {
     }
 }
 
-function createPrismaClient(): PrismaClient {
+function tryCreatePrismaClient(): PrismaClient | null {
     const connectionString = process.env.DIRECT_URL || process.env.DATABASE_URL;
     if (!connectionString) {
-        throw new Error('Missing DIRECT_URL or DATABASE_URL');
+        console.warn('[prisma] No DATABASE_URL / DIRECT_URL found — will use HTTP benchmark-init endpoint instead.');
+        return null;
     }
 
     // eslint-disable-next-line @typescript-eslint/no-require-imports
@@ -160,6 +161,46 @@ function createPrismaClient(): PrismaClient {
     const adapter = new PrismaPg(pool);
 
     return new PrismaClient({ adapter });
+}
+
+/**
+ * Called when no Prisma client is available.
+ * Hits POST /api/chat/benchmark-init to create the conversation record
+ * and retrieve bot config — all without a direct DB connection.
+ */
+async function httpBenchmarkInit(params: {
+    baseUrl: string;
+    botId: string;
+    scenarioId: string;
+    personaName: string;
+}): Promise<{
+    conversationId: string;
+    botName: string;
+    language: string;
+    candidateFields: string[];
+    apiKey: string;
+}> {
+    const url = `${params.baseUrl}/api/chat/benchmark-init`;
+    const res = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-chat-simulate': '1' },
+        body: JSON.stringify({
+            botId: params.botId,
+            scenarioId: params.scenarioId,
+            personaName: params.personaName,
+        }),
+    });
+    if (!res.ok) {
+        const text = await res.text().catch(() => '');
+        throw new Error(`benchmark-init HTTP ${res.status}: ${text}`);
+    }
+    return res.json() as Promise<{
+        conversationId: string;
+        botName: string;
+        language: string;
+        candidateFields: string[];
+        apiKey: string;
+    }>;
 }
 
 function parseArgs(): CliArgs {
@@ -483,10 +524,11 @@ async function callChat(params: {
 }
 
 async function fetchAssistantTurn(
-    prisma: PrismaClient,
+    prisma: PrismaClient | null,
     conversationId: string,
     clientMessageId?: string
 ): Promise<ObservedAssistantTurn> {
+    if (!prisma) throw new Error('no-prisma'); // caller has catch-fallback that uses HTTP response text
     const message = await prisma.message.findFirst({
         where: clientMessageId
             ? {
@@ -987,13 +1029,14 @@ function logScenarioDebug(scenarioId: string, step: string, details?: Record<str
     console.log(`[scenario:${scenarioId}] ${step}${payload}`);
 }
 
-async function deleteConversation(prisma: PrismaClient, conversationId: string): Promise<void> {
+async function deleteConversation(prisma: PrismaClient | null, conversationId: string): Promise<void> {
+    if (!prisma) return; // no direct DB access — cleanup skipped (stage API will GC or cleanup cron handles it)
     await prisma.message.deleteMany({ where: { conversationId } });
     await prisma.conversation.delete({ where: { id: conversationId } });
 }
 
 async function runScenario(params: {
-    prisma: PrismaClient;
+    prisma: PrismaClient | null;
     openai: ReturnType<typeof createOpenAI>;
     args: CliArgs;
     bot: {
@@ -1027,18 +1070,34 @@ async function runScenario(params: {
     };
 
     logScenarioDebug(scenario.id, 'conversation.create.begin');
-    const conversation = await prisma.conversation.create({
-        data: {
-            botId: bot.id,
-            participantId: `agentic-${scenario.id}-${Date.now()}`,
-            status: 'STARTED',
-            metadata: {
-                simulationHarness: 'agentic-regression',
-                scenarioId: scenario.id,
-                persona: persona.name,
+    let conversationId: string;
+    if (prisma) {
+        const conv = await prisma.conversation.create({
+            data: {
+                botId: bot.id,
+                participantId: `agentic-${scenario.id}-${Date.now()}`,
+                status: 'STARTED',
+                metadata: {
+                    simulationHarness: 'agentic-regression',
+                    scenarioId: scenario.id,
+                    persona: persona.name,
+                },
             },
-        },
-    });
+            select: { id: true },
+        });
+        conversationId = conv.id;
+    } else {
+        // No direct DB — delegate to the HTTP benchmark-init endpoint
+        const init = await httpBenchmarkInit({
+            baseUrl: args.baseUrl,
+            botId: bot.id,
+            scenarioId: scenario.id,
+            personaName: persona.name,
+        });
+        conversationId = init.conversationId;
+    }
+    // Wrap in a thin object so all downstream references stay consistent
+    const conversation = { id: conversationId };
     logScenarioDebug(scenario.id, 'conversation.create.done', { conversationId: conversation.id });
 
     const transcriptLocal: Array<{ role: 'assistant' | 'user'; content: string }> = [];
@@ -1143,7 +1202,7 @@ async function runScenario(params: {
         logScenarioDebug(scenario.id, 'conversation.snapshot.begin', {
             conversationId: conversation.id,
         });
-        const conversationSnapshot = await prisma.conversation.findUnique({
+        const conversationSnapshot = prisma ? await prisma.conversation.findUnique({
             where: { id: conversation.id },
             select: {
                 status: true,
@@ -1153,7 +1212,7 @@ async function runScenario(params: {
                     select: { role: true, content: true, metadata: true },
                 },
             },
-        });
+        }) : null;
         logScenarioDebug(scenario.id, 'conversation.snapshot.done', {
             status: conversationSnapshot?.status || null,
             messageCount: conversationSnapshot?.messages?.length || 0,
@@ -1253,36 +1312,63 @@ async function runScenario(params: {
 
 async function main() {
     const args = parseArgs();
-    const prisma = createPrismaClient();
+    const prisma = tryCreatePrismaClient();
     const rand = mulberry32(args.seed);
 
     try {
-        const bot = await prisma.bot.findUnique({
-            where: { id: args.botId },
-            select: {
-                id: true,
-                name: true,
-                language: true,
-                candidateDataFields: true,
-                openaiApiKey: true,
-            },
-        });
-        if (!bot) {
-            throw new Error(`Bot not found: ${args.botId}`);
-        }
+        let bot: { id: string; name: string; language: string | null; candidateDataFields: unknown };
+        let apiKey: string;
+        let candidateFields: string[];
 
-        const globalConfig = await prisma.globalConfig.findUnique({
-            where: { id: 'default' },
-            select: { openaiApiKey: true },
-        });
-        const apiKey = process.env.OPENAI_API_KEY || bot.openaiApiKey || globalConfig?.openaiApiKey || '';
-        if (!apiKey) {
-            throw new Error('OpenAI API key missing (env / bot / globalConfig).');
+        if (prisma) {
+            // Direct DB path — fetch everything via Prisma
+            const dbBot = await prisma.bot.findUnique({
+                where: { id: args.botId },
+                select: {
+                    id: true,
+                    name: true,
+                    language: true,
+                    candidateDataFields: true,
+                    openaiApiKey: true,
+                },
+            });
+            if (!dbBot) {
+                throw new Error(`Bot not found: ${args.botId}`);
+            }
+            const globalConfig = await prisma.globalConfig.findUnique({
+                where: { id: 'default' },
+                select: { openaiApiKey: true },
+            });
+            apiKey = process.env.OPENAI_API_KEY || dbBot.openaiApiKey || globalConfig?.openaiApiKey || '';
+            if (!apiKey) {
+                throw new Error('OpenAI API key missing (env / bot / globalConfig).');
+            }
+            candidateFields = Array.isArray(dbBot.candidateDataFields)
+                ? dbBot.candidateDataFields.map((value) => String(value || '').trim()).filter(Boolean)
+                : [];
+            bot = dbBot;
+        } else {
+            // No DB — probe the benchmark-init endpoint with a dummy scenario to get bot metadata
+            console.log(`[main] No DB — probing ${args.baseUrl}/api/chat/benchmark-init for bot config…`);
+            const probe = await httpBenchmarkInit({
+                baseUrl: args.baseUrl,
+                botId: args.botId,
+                scenarioId: '__probe__',
+                personaName: '__probe__',
+            });
+            // probe created a real conversation we don't need — that's fine (cleanup=false keeps it, or cron sweeps it)
+            apiKey = process.env.OPENAI_API_KEY || probe.apiKey;
+            if (!apiKey) {
+                throw new Error('OpenAI API key missing (env / benchmark-init response).');
+            }
+            candidateFields = probe.candidateFields;
+            bot = {
+                id: args.botId,
+                name: probe.botName,
+                language: probe.language,
+                candidateDataFields: probe.candidateFields,
+            };
         }
-
-        const candidateFields = Array.isArray(bot.candidateDataFields)
-            ? bot.candidateDataFields.map((value) => String(value || '').trim()).filter(Boolean)
-            : [];
         const scenarios = buildScenarioMatrix(candidateFields).filter((scenario) =>
             args.scenarioFilter ? scenario.id.includes(args.scenarioFilter) : true
         );
@@ -1402,7 +1488,7 @@ async function main() {
         console.error(error);
         process.exitCode = 1;
     } finally {
-        await prisma.$disconnect();
+        if (prisma) await prisma.$disconnect();
     }
 }
 

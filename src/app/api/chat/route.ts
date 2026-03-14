@@ -1880,6 +1880,7 @@ hard_rules:
                     text: fallback,
                     currentTopicId: nextTopicId,
                     isCompleted: false,
+                    phase: nextState.phase,
                     serverResponseLatencyMs: Date.now() - startTime
                 });
             }
@@ -2696,6 +2697,7 @@ hard_rules:
                     currentTopicId: nextTopicId,
                     isCompleted: true,
                     interactionPayload: null,
+                    phase: nextState.phase,
                     serverResponseLatencyMs: Date.now() - startTime
                 });
             }
@@ -2766,6 +2768,7 @@ hard_rules:
             currentTopicId: nextTopicId,
             isCompleted: false,
             interactionPayload,
+            phase: nextState.phase,
             serverResponseLatencyMs: Date.now() - startTime
         });
 

@@ -486,6 +486,7 @@ async function callChat(params: {
     text: string;
     isCompleted: boolean;
     currentTopicId?: string | null;
+    phase?: string | null;
     interactionPayload?: InterviewInteractionPayload | null;
     roundTripLatencyMs: number;
 }> {
@@ -516,6 +517,7 @@ async function callChat(params: {
         text: String(payload.text || ''),
         isCompleted: Boolean(payload.isCompleted),
         currentTopicId: payload.currentTopicId,
+        phase: typeof payload.phase === 'string' ? payload.phase : null,
         interactionPayload: (payload.interactionPayload && typeof payload.interactionPayload === 'object')
             ? (payload.interactionPayload as InterviewInteractionPayload)
             : null,
@@ -1135,7 +1137,11 @@ async function runScenario(params: {
             logScenarioDebug(scenario.id, 'fetchAssistantTurn.initial.fallback');
             firstAssistant = {
                 content: String(firstReply.text || ''),
-                metadata: {},
+                metadata: {
+                    phase: firstReply.phase ?? undefined,
+                    topicId: firstReply.currentTopicId ?? undefined,
+                    interactionPayload: firstReply.interactionPayload ?? null,
+                },
             };
         }
         transcriptLocal.push({ role: 'assistant', content: firstAssistant.content });
@@ -1198,7 +1204,7 @@ async function runScenario(params: {
                 assistant = {
                     content: String(chatReply.text || ''),
                     metadata: {
-                        phase: undefined,
+                        phase: chatReply.phase ?? undefined,  // now populated from API response
                         supervisorStatus: null,
                         topicLabel: chatReply.currentTopicId ?? undefined,
                         topicId: chatReply.currentTopicId ?? undefined,

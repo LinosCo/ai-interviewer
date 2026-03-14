@@ -1904,7 +1904,8 @@ hard_rules:
             nextState.phase === 'EXPLORE' ||
             nextState.phase === 'DEEPEN' ||
             nextState.phase === 'DEEP_OFFER'
-        ) && !supervisorInsight?.status?.startsWith('DATA_COLLECTION');
+        ) && !supervisorInsight?.status?.startsWith('DATA_COLLECTION')
+          && !simulationMode;
 
         if (useStreaming) {
             const encoder = new TextEncoder();
@@ -1918,12 +1919,19 @@ hard_rules:
             const sseStream = new ReadableStream({
                 async start(controller) {
                     let fullText = '';
+                    const streamTimeoutMs = Math.min((tierConfig.latency?.mainResponseTimeoutMs ?? 8000) * 2, 30000);
+                    const streamTimeoutId = setTimeout(() => {
+                        console.error('[STREAM] Timeout exceeded, aborting stream');
+                        controller.error(new Error('STREAM_TIMEOUT'));
+                    }, streamTimeoutMs);
                     try {
                         for await (const chunk of streamResult.textStream) {
                             fullText += chunk;
                             controller.enqueue(encoder.encode(`data: ${JSON.stringify({ t: chunk })}\n\n`));
                         }
+                        clearTimeout(streamTimeoutId);
                     } catch (err) {
+                        clearTimeout(streamTimeoutId);
                         console.error('[STREAM] textStream error:', err);
                     }
 

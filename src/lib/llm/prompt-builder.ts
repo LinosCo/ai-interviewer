@@ -613,16 +613,20 @@ Brief connection, then ONE exploratory question.
             parts.push(this.buildTopicFocusBlock(currentTopic, bot.topics, supervisorInsight, bot));
         }
 
-        // Block 4: Memory
-        const memory = await this.buildMemoryBlock(conversation, interviewerQuality, bot.language, prefetchedMemoryData);
-        if (memory) parts.push(memory);
+        // Block 4: Memory — skip during DATA_COLLECTION (recalled facts irrelevant for form collection)
+        if (!isDataCollection) {
+            const memory = await this.buildMemoryBlock(conversation, interviewerQuality, bot.language, prefetchedMemoryData);
+            if (memory) parts.push(memory);
+        }
 
-        // Block 5: Knowledge
-        const planTopic = currentTopic && interviewPlan
-            ? (interviewPlan.explore?.topics || []).find(t => t.topicId === currentTopic.id)
-            : null;
-        const knowledge = this.buildKnowledgeBlock(planTopic || null, interviewPlan, manualKnowledgeGuide, bot.language, interviewerQuality);
-        if (knowledge) parts.push(knowledge);
+        // Block 5: Knowledge — skip during DATA_COLLECTION (topic depth irrelevant for form collection)
+        if (!isDataCollection) {
+            const planTopic = currentTopic && interviewPlan
+                ? (interviewPlan.explore?.topics || []).find(t => t.topicId === currentTopic.id)
+                : null;
+            const knowledge = this.buildKnowledgeBlock(planTopic || null, interviewPlan, manualKnowledgeGuide, bot.language, interviewerQuality);
+            if (knowledge) parts.push(knowledge);
+        }
 
         // Block 5.5: Avanzato Qualitative Methodology (only for avanzato, not during DATA_COLLECTION)
         if (isAvanzato && !isDataCollection) {

@@ -15,6 +15,83 @@ interface ChatInterfaceProps {
     topics?: unknown;
 }
 
+interface ChatResponseData {
+    text: string;
+    phase?: string;
+    isCompleted?: boolean;
+    currentTopicId?: string | null;
+    candidateProfile?: Record<string, string>;
+    interactionPayload?: unknown;
+    serverResponseLatencyMs?: number;
+}
+
+/**
+ * Consumes a chat API response, handling both SSE streaming and regular JSON.
+ * For SSE: streams tokens into the `onToken` callback as they arrive, then
+ * returns the full text + metadata from the final `done` chunk.
+ * For JSON: returns the parsed body directly.
+ */
+async function consumeChatResponse(
+    response: Response,
+    onToken: (fullTextSoFar: string) => void
+): Promise<ChatResponseData> {
+    const contentType = response.headers.get('content-type') || '';
+
+    if (contentType.includes('text/event-stream')) {
+        const reader = response.body!.getReader();
+        const decoder = new TextDecoder();
+        let buffer = '';
+        let fullText = '';
+        let meta: Partial<ChatResponseData> = {};
+        let firstToken = true;
+
+        while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+
+            buffer += decoder.decode(value, { stream: true });
+            const lines = buffer.split('\n');
+            buffer = lines.pop() ?? '';
+
+            for (const line of lines) {
+                if (!line.startsWith('data: ')) continue;
+                const rawPayload = line.slice(6).trim();
+                if (!rawPayload) continue;
+
+                let payload: Record<string, unknown>;
+                try {
+                    payload = JSON.parse(rawPayload);
+                } catch {
+                    continue;
+                }
+
+                if (typeof payload.t === 'string') {
+                    fullText += payload.t;
+                    if (firstToken) {
+                        firstToken = false;
+                    }
+                    onToken(fullText);
+                } else if (payload.done === true) {
+                    meta = payload as Partial<ChatResponseData>;
+                }
+            }
+        }
+
+        return {
+            text: fullText,
+            phase: meta.phase,
+            isCompleted: meta.isCompleted,
+            currentTopicId: meta.currentTopicId,
+            candidateProfile: meta.candidateProfile,
+            serverResponseLatencyMs: meta.serverResponseLatencyMs,
+        };
+    } else {
+        return response.json() as Promise<ChatResponseData>;
+    }
+}
+
+const STREAMING_MSG_ID = 'streaming-in-progress';
+
 export default function ChatInterface({ conversationId, botId, initialMessages, topics }: ChatInterfaceProps) {
     void topics;
 
@@ -50,7 +127,7 @@ export default function ChatInterface({ conversationId, botId, initialMessages, 
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    messages: [], // Send empty to trigger "I am ready" in backend
+                    messages: [],
                     conversationId,
                     botId,
                     effectiveDuration: 0
@@ -59,15 +136,38 @@ export default function ChatInterface({ conversationId, botId, initialMessages, 
 
             if (!response.ok) throw new Error('Failed to start');
 
-            const data = await response.json();
+            const contentType = response.headers.get('content-type') || '';
+            if (contentType.includes('text/event-stream')) {
+                // Add a streaming placeholder message immediately
+                setIsLoading(false);
+                setMessages(prev => [...prev, {
+                    id: STREAMING_MSG_ID,
+                    role: 'assistant',
+                    content: ''
+                }]);
+            }
+
+            const data = await consumeChatResponse(response, (fullTextSoFar) => {
+                setMessages(prev => prev.map(m =>
+                    m.id === STREAMING_MSG_ID
+                        ? { ...m, content: fullTextSoFar }
+                        : m
+                ));
+            });
+
             const assistantText = data.text || '';
-            setMessages(prev => [...prev, {
-                id: Date.now().toString(),
-                role: 'assistant',
-                content: assistantText
-            }]);
+
+            setMessages(prev => {
+                const withoutStreaming = prev.filter(m => m.id !== STREAMING_MSG_ID);
+                return [...withoutStreaming, {
+                    id: Date.now().toString(),
+                    role: 'assistant',
+                    content: assistantText
+                }];
+            });
         } catch (error) {
             console.error('Start error:', error);
+            setMessages(prev => prev.filter(m => m.id !== STREAMING_MSG_ID));
         } finally {
             setIsLoading(false);
             inFlightRequestRef.current = false;
@@ -108,7 +208,6 @@ export default function ChatInterface({ conversationId, botId, initialMessages, 
         setMessages(prev => [...prev, userMessage]);
         setInput('');
 
-        // Let's add interval for Thinking Time
         setIsLoading(true);
         inFlightRequestRef.current = true;
 
@@ -129,7 +228,26 @@ export default function ChatInterface({ conversationId, botId, initialMessages, 
                 throw new Error('Failed to get response');
             }
 
-            const data = await response.json();
+            const contentType = response.headers.get('content-type') || '';
+            if (contentType.includes('text/event-stream')) {
+                // Hide the generic loading spinner — real tokens are coming
+                setIsLoading(false);
+                // Insert a streaming placeholder message
+                setMessages(prev => [...prev, {
+                    id: STREAMING_MSG_ID,
+                    role: 'assistant',
+                    content: ''
+                }]);
+            }
+
+            const data = await consumeChatResponse(response, (fullTextSoFar) => {
+                setMessages(prev => prev.map(m =>
+                    m.id === STREAMING_MSG_ID
+                        ? { ...m, content: fullTextSoFar }
+                        : m
+                ));
+            });
+
             const assistantText = data.text || '';
 
             // Calculate Reading Time: ~225 words per minute
@@ -137,18 +255,24 @@ export default function ChatInterface({ conversationId, botId, initialMessages, 
             const readingTimeSeconds = Math.ceil((wordCount / 225) * 60);
             setEffectiveSeconds(prev => prev + readingTimeSeconds);
 
-            setMessages(prev => [...prev, {
-                id: Date.now().toString(),
-                role: 'assistant',
-                content: assistantText
-            }]);
+            setMessages(prev => {
+                const withoutStreaming = prev.filter(m => m.id !== STREAMING_MSG_ID);
+                return [...withoutStreaming, {
+                    id: Date.now().toString(),
+                    role: 'assistant',
+                    content: assistantText
+                }];
+            });
         } catch (error) {
             console.error('Chat error:', error);
-            setMessages(prev => [...prev, {
-                id: Date.now().toString(),
-                role: 'assistant',
-                content: 'Sorry, there was an error. Please try again.'
-            }]);
+            setMessages(prev => {
+                const withoutStreaming = prev.filter(m => m.id !== STREAMING_MSG_ID);
+                return [...withoutStreaming, {
+                    id: Date.now().toString(),
+                    role: 'assistant',
+                    content: 'Sorry, there was an error. Please try again.'
+                }];
+            });
         } finally {
             setIsLoading(false);
             inFlightRequestRef.current = false;

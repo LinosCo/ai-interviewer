@@ -1,6 +1,6 @@
 
 import { ChatService } from '@/services/chat-service';
-import { generateObject, generateText } from 'ai';
+import { generateObject, generateText, streamText } from 'ai';
 import { createOpenAI } from '@ai-sdk/openai';
 import { z } from 'zod';
 import { PromptBuilder, addValidationFeedbackToPrompt } from '@/lib/llm/prompt-builder';
@@ -415,6 +415,34 @@ export async function POST(req: Request) {
             return result;
         }) as typeof generateText;
 
+        // trackedStreamText: wraps streamText and collects usage after the stream is consumed
+        // Usage is collected via the stream's usage promise (resolves after full stream completes)
+        const trackedStreamText = (...args: Parameters<typeof streamText>) => {
+            const firstArg = (args[0] || {}) as { model?: unknown };
+            const modelId = resolveModelIdForUsage(firstArg.model);
+            const streamResult = (streamText as any)(...args);
+            // Attach usage collection after stream resolves (non-blocking)
+            void (async () => {
+                try {
+                    const usage = await streamResult.usage;
+                    if (usage) {
+                        collectLlmUsage({
+                            source: 'chat_route_stream_text',
+                            model: modelId,
+                            usage: {
+                                inputTokens: usage.promptTokens ?? 0,
+                                outputTokens: usage.completionTokens ?? 0,
+                                totalTokens: (usage.promptTokens ?? 0) + (usage.completionTokens ?? 0)
+                            }
+                        });
+                    }
+                } catch {
+                    // usage tracking is best-effort for streaming
+                }
+            })();
+            return streamResult as ReturnType<typeof streamText>;
+        };
+
         const getLlmUsageSnapshot = () => ({
             inputTokens: llmUsageTotals.inputTokens,
             outputTokens: llmUsageTotals.outputTokens,
@@ -571,14 +599,16 @@ export async function POST(req: Request) {
             });
         })();
 
-        const [savedUserMessage, , openAIKey, runtimeModels] = await Promise.all([
+        const [savedUserMessage, , openAIKey, runtimeModels, prefetchedMemoryData] = await Promise.all([
             saveUserMessagePromise,
             // Update progress
             ChatService.updateProgress(conversationId, safeEffectiveDuration),
             // Get API key
             LLMService.getApiKey(bot, 'openai').then(async key => key || await getConfigValue('openaiApiKey') || ''),
             // Pre-fetch routed models (primary + critical paths)
-            LLMService.getInterviewRuntimeModels(bot)
+            LLMService.getInterviewRuntimeModels(bot),
+            // Pre-fetch memory data in parallel to avoid sequential latency
+            MemoryManager.get(conversationId),
         ]);
         requestLog(`⏱️ Parallel ops: ${Date.now() - parallelStart}ms`);
 
@@ -1587,7 +1617,8 @@ export async function POST(req: Request) {
             supervisorInsight,
             interviewPlan,
             manualInterviewGuide || undefined,
-            interviewerQuality
+            interviewerQuality,
+            prefetchedMemoryData  // NEW: pre-fetched to run in parallel with other init ops
         );
         const manualKnowledgePrompt = buildManualKnowledgePromptBlock({
             manualGuide: manualInterviewGuide,
@@ -1866,6 +1897,126 @@ hard_rules:
             ? `${systemPromptWithValidationFeedback}\n\nSUPERVISOR FEEDBACK: ${feedbackContext}`
             : systemPromptWithValidationFeedback;
 
+        // ====================================================================
+        // SSE STREAMING PATH (EXPLORE / DEEPEN / DEEP_OFFER only)
+        // ====================================================================
+        const useStreaming = (
+            nextState.phase === 'EXPLORE' ||
+            nextState.phase === 'DEEPEN' ||
+            nextState.phase === 'DEEP_OFFER'
+        ) && !supervisorInsight?.status?.startsWith('DATA_COLLECTION');
+
+        if (useStreaming) {
+            const encoder = new TextEncoder();
+            const streamResult = trackedStreamText({
+                model: modelForMainResponse,
+                messages: messagesForAI,
+                system: contextWithFeedback,
+                temperature: 0.7,
+            });
+
+            const sseStream = new ReadableStream({
+                async start(controller) {
+                    let fullText = '';
+                    try {
+                        for await (const chunk of streamResult.textStream) {
+                            fullText += chunk;
+                            controller.enqueue(encoder.encode(`data: ${JSON.stringify({ t: chunk })}\n\n`));
+                        }
+                    } catch (err) {
+                        console.error('[STREAM] textStream error:', err);
+                    }
+
+                    const responseText = fullText || (language === 'it'
+                        ? 'Mi dispiace, riprova.'
+                        : 'I apologize, please try again.');
+
+                    // --- Post-stream async work (fire-and-forget) ---
+                    void (async () => {
+                        try {
+                            // Record sub-goal history (mirrors the non-streaming path)
+                            if ((nextState.phase === 'EXPLORE' || nextState.phase === 'DEEPEN') && microPlannerDecision.focusSubGoal) {
+                                const history = { ...(nextState.topicSubGoalHistory || {}) };
+                                const existing = history[plannerTopicId] || [];
+                                if (!existing.includes(microPlannerDecision.focusSubGoal)) {
+                                    history[plannerTopicId] = [...existing, microPlannerDecision.focusSubGoal];
+                                    nextState.topicSubGoalHistory = history;
+                                }
+                            }
+                            // Persist CIL state
+                            // Note: use cilAnalysisRef.current because cilAnalysis const is defined
+                            // after the streaming return and would be undefined in this closure.
+                            const streamCilAnalysis = cilAnalysisRef.current;
+                            if (streamCilAnalysis && isAvanzato) {
+                                nextState.cilState = mergeCILState(
+                                    state.cilState ?? EMPTY_CIL_STATE,
+                                    streamCilAnalysis,
+                                    canonicalMessages.length
+                                );
+                            }
+                            await Promise.all([
+                                prisma.message.create({
+                                    data: {
+                                        conversationId,
+                                        role: 'assistant',
+                                        content: responseText,
+                                        metadata: {
+                                            ...(clientMessageId ? { replyToClientMessageId: clientMessageId } : {}),
+                                            phase: nextState.phase,
+                                            supervisorStatus: supervisorInsight?.status ?? null,
+                                            topicLabel: targetTopic?.label || currentTopic.label,
+                                            topicId: targetTopic?.id || currentTopic.id,
+                                            streamedResponse: true,
+                                        } as Prisma.InputJsonObject
+                                    }
+                                }),
+                                prisma.conversation.update({
+                                    where: { id: conversationId },
+                                    data: {
+                                        metadata: nextState as any,
+                                        currentTopicId: nextTopicId
+                                    }
+                                })
+                            ]);
+                            await flushInterviewTokenUsage('standard_response');
+                            // Memory update (fire-and-forget)
+                            if (lastMessage?.role === 'user') {
+                                MemoryManager.updateAfterUserResponse(
+                                    conversationId,
+                                    lastMessage.content,
+                                    currentTopic.id,
+                                    currentTopic.label,
+                                    openAIKey
+                                ).catch(err => console.error("Memory update failed", err));
+                            }
+                        } catch (persistErr) {
+                            console.error('[STREAM] Post-stream persist failed:', persistErr);
+                        }
+                    })();
+
+                    const meta = {
+                        done: true,
+                        phase: nextState.phase,
+                        isCompleted: false,
+                        currentTopicId: nextTopicId,
+                        // _freshCandidateProfileCache not yet available here (declared later, populated in DATA_COLLECTION only)
+                        candidateProfile: (conversation.candidateProfile as Record<string, string>) ?? {},
+                        serverResponseLatencyMs: Date.now() - startTime,
+                    };
+                    controller.enqueue(encoder.encode(`data: ${JSON.stringify(meta)}\n\n`));
+                    controller.close();
+                }
+            });
+
+            return new Response(sseStream, {
+                headers: {
+                    'Content-Type': 'text/event-stream',
+                    'Cache-Control': 'no-cache, no-transform',
+                    'X-Accel-Buffering': 'no',
+                },
+            });
+        }
+
         let result: any;
         try {
             result = await Promise.race([
@@ -1893,7 +2044,7 @@ hard_rules:
                     currentTopicId: nextTopicId,
                     isCompleted: false,
                     phase: nextState.phase,
-                    candidateProfile: _freshCandidateProfileCache ?? conversation.candidateProfile ?? {},
+                    candidateProfile: (conversation.candidateProfile as Record<string, string>) ?? {},
                     serverResponseLatencyMs: Date.now() - startTime
                 });
             }
@@ -2679,15 +2830,16 @@ hard_rules:
                     { simulationMode, onLlmUsage: collectLlmUsage, language, effectiveDuration: typeof effectiveDuration === 'number' ? effectiveDuration : null }
                 );
                 const finalResponseText = responseText.replace(/INTERVIEW_COMPLETED/gi, '').trim();
-                await prisma.message.create({
+                void prisma.message.create({
                     data: {
                         conversationId,
                         role: 'assistant',
                         content: finalResponseText,
                         metadata: buildAssistantMetadata(true)
                     }
-                });
-                await flushInterviewTokenUsage('completed_response');
+                }).catch(err => console.error('[persist] DB write failed on completion (non-blocking):', err));
+                void flushInterviewTokenUsage('completed_response')
+                    .catch(err => console.error('[flush] token usage failed on completion (non-blocking):', err));
                 // Record sub-goal used this turn on completion path
                 if ((nextState.phase === 'EXPLORE' || nextState.phase === 'DEEPEN') && microPlannerDecision.focusSubGoal) {
                     const history = { ...(nextState.topicSubGoalHistory || {}) };
@@ -2740,9 +2892,22 @@ hard_rules:
             );
         }
 
-        // Run save operations in parallel - they're independent
-        await Promise.all([
-            // Save assistant message
+        const totalTime = Date.now() - startTime;
+        requestLog(`✅ Finished. Response sent. Next Phase: ${nextState.phase}`);
+        requestLog(`⏱️ TOTAL REQUEST: ${totalTime}ms`);
+
+        const responsePayload = Response.json({
+            text: responseText,
+            currentTopicId: nextTopicId,
+            isCompleted: false,
+            interactionPayload,
+            phase: nextState.phase,
+            candidateProfile: _freshCandidateProfileCache ?? conversation.candidateProfile ?? {},
+            serverResponseLatencyMs: Date.now() - startTime
+        });
+
+        // Fire-and-forget: client doesn't need to wait for DB persistence
+        void Promise.all([
             prisma.message.create({
                 data: {
                     conversationId,
@@ -2751,7 +2916,6 @@ hard_rules:
                     metadata: buildAssistantMetadata(false)
                 }
             }),
-            // Update conversation state (metadata + topic in one query)
             prisma.conversation.update({
                 where: { id: conversationId },
                 data: {
@@ -2759,11 +2923,10 @@ hard_rules:
                     currentTopicId: nextTopicId
                 }
             })
-        ]);
+        ]).catch(err => console.error('[persist] DB write failed (non-blocking):', err));
 
-        const totalTime = Date.now() - startTime;
-        requestLog(`✅ Finished. Response sent. Next Phase: ${nextState.phase}`);
-        requestLog(`⏱️ TOTAL REQUEST: ${totalTime}ms`);
+        void flushInterviewTokenUsage('standard_response')
+            .catch(err => console.error('[flush] token usage failed (non-blocking):', err));
 
         // Memory update (fire and forget - don't block response)
         if (lastMessage?.role === 'user') {
@@ -2776,16 +2939,7 @@ hard_rules:
             ).catch(err => console.error("Memory update failed", err));
         }
 
-        await flushInterviewTokenUsage('standard_response');
-        return Response.json({
-            text: responseText,
-            currentTopicId: nextTopicId,
-            isCompleted: false,
-            interactionPayload,
-            phase: nextState.phase,
-            candidateProfile: _freshCandidateProfileCache ?? conversation.candidateProfile ?? {},
-            serverResponseLatencyMs: Date.now() - startTime
-        });
+        return responsePayload;
 
     } catch (error: any) {
         console.error("Chat API Error:", error);

@@ -5,6 +5,7 @@ import type { SupervisorInsight } from '@/lib/interview/interview-supervisor';
 import type { InterviewPlan, PlanTopic } from '@/lib/interview/plan-types';
 import type { ValidationResponse } from '@/lib/interview/validation-response';
 import type { CILAnalysis, CILState } from '@/lib/interview/cil/types';
+import type { ConversationMemoryData } from '@/types/memory';
 import { sanitize, sanitizeConfig } from '@/lib/llm/prompt-sanitizer';
 
 export class PromptBuilder {
@@ -458,10 +459,13 @@ Brief connection, then ONE exploratory question.
     private static async buildMemoryBlock(
         conversation: Conversation,
         interviewerQuality?: string,
-        language?: string
+        language?: string,
+        prefetchedData?: ConversationMemoryData | null
     ): Promise<string | null> {
         try {
-            const memory = await MemoryManager.get(conversation.id);
+            const memory = prefetchedData !== undefined
+                ? prefetchedData  // use pre-fetched data (avoids sequential DB call)
+                : await MemoryManager.get(conversation.id);
             if (memory && memory.factsCollected.length > 0) {
                 return MemoryManager.formatForPrompt(memory, {
                     language: language || 'en',
@@ -590,9 +594,12 @@ Brief connection, then ONE exploratory question.
         supervisorInsight?: SupervisorInsight,
         interviewPlan?: InterviewPlan,
         manualKnowledgeGuide?: string,
-        interviewerQuality?: string
+        interviewerQuality?: string,
+        prefetchedMemoryData?: ConversationMemoryData | null  // NEW
     ): Promise<string> {
         const isAvanzato = interviewerQuality === 'avanzato';
+        const isDataCollection = supervisorInsight?.status === 'DATA_COLLECTION_CONSENT'
+            || supervisorInsight?.status === 'DATA_COLLECTION';
         const parts: string[] = [];
 
         // Block 1: Identity
@@ -601,11 +608,13 @@ Brief connection, then ONE exploratory question.
         // Block 2: Interview Context
         parts.push(this.buildInterviewContextBlock(conversation, bot, effectiveDurationSeconds, interviewerQuality));
 
-        // Block 3: Topic Focus
-        parts.push(this.buildTopicFocusBlock(currentTopic, bot.topics, supervisorInsight, bot));
+        // Block 3: Topic Focus — skip during DATA_COLLECTION phases (topic focus is irrelevant)
+        if (!isDataCollection) {
+            parts.push(this.buildTopicFocusBlock(currentTopic, bot.topics, supervisorInsight, bot));
+        }
 
         // Block 4: Memory
-        const memory = await this.buildMemoryBlock(conversation, interviewerQuality, bot.language);
+        const memory = await this.buildMemoryBlock(conversation, interviewerQuality, bot.language, prefetchedMemoryData);
         if (memory) parts.push(memory);
 
         // Block 5: Knowledge
@@ -615,8 +624,8 @@ Brief connection, then ONE exploratory question.
         const knowledge = this.buildKnowledgeBlock(planTopic || null, interviewPlan, manualKnowledgeGuide, bot.language, interviewerQuality);
         if (knowledge) parts.push(knowledge);
 
-        // Block 5.5: Avanzato Qualitative Methodology (only for avanzato)
-        if (isAvanzato) {
+        // Block 5.5: Avanzato Qualitative Methodology (only for avanzato, not during DATA_COLLECTION)
+        if (isAvanzato && !isDataCollection) {
             parts.push(this.buildAvanzatoMethodologyBlock(bot.language));
         }
 

@@ -176,7 +176,7 @@ function parseAdditionalUrls(
                 return null;
             }
         })
-        .filter((item): item is { url: string; label?: string } => !!item);
+        .filter((item): item is { url: string; label: string } => item !== null);
 }
 
 // ─── AI Tips generation ───────────────────────────────────────────────────────

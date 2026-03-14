@@ -730,11 +730,11 @@ export async function POST(req: Request) {
                             gscSiteUrl: googleConnection.gscSiteUrl ?? null,
                         } : null,
                         mcpTotal: mcpConnections.length,
-                        mcpConnected: mcpConnections.filter((c) => c.status === 'CONNECTED').length,
+                        mcpConnected: mcpConnections.filter((c) => (c.status as string) === 'ACTIVE').length,
                         cmsTotal: cmsConnections.length,
-                        cmsConnected: cmsConnections.filter((c) => c.status === 'CONNECTED').length,
+                        cmsConnected: cmsConnections.filter((c) => (c.status as string) === 'ACTIVE').length,
                         n8nTotal: n8nConnections.length,
-                        n8nConnected: n8nConnections.filter((c) => c.status === 'CONNECTED').length,
+                        n8nConnected: n8nConnections.filter((c) => (c.status as string) === 'ACTIVE').length,
                     };
                 }
             } catch (err) {

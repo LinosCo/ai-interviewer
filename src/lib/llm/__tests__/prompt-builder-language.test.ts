@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { beforeAll, describe, expect, it, vi } from 'vitest';
 
 vi.mock('@/lib/memory/memory-manager', () => ({

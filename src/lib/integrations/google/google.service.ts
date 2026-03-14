@@ -109,8 +109,8 @@ class GoogleServiceClass {
         data: {
           googleConnectionId: params.googleConnectionId,
           action: params.action,
-          arguments: params.arguments,
-          result: params.result,
+          arguments: params.arguments as any,
+          result: params.result as any,
           success: params.success,
           errorMessage: params.errorMessage || null,
           creditsUsed: 0,

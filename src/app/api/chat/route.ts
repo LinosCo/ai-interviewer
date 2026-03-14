@@ -256,6 +256,7 @@ export async function POST(req: Request) {
     let conversationId: string | undefined; // hoisted for finally-block lock release
     try {
         const simulationMode = isLocalSimulationRequest(req);
+        const isHarnessRequest = req.headers.get('x-chat-simulate') === '1';
         const abVariantHeader = String(req.headers.get('x-interview-ab') || '').trim().toLowerCase();
         const abVariant: InterviewAbVariant = abVariantHeader === 'control' ? 'control' : 'treatment';
         const softQualityGuardsEnabled = abVariant === 'control' ? true : ENABLE_SOFT_QUALITY_GUARDS;
@@ -1963,7 +1964,8 @@ hard_rules:
             nextState.phase === 'DEEPEN' ||
             nextState.phase === 'DEEP_OFFER'
         ) && !supervisorInsight?.status?.startsWith('DATA_COLLECTION')
-          && !simulationMode;
+          && !simulationMode
+          && !isHarnessRequest;
 
         if (useStreaming) {
             const encoder = new TextEncoder();

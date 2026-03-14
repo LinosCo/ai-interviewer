@@ -107,6 +107,78 @@ export function getTipOperationalState(
   };
 }
 
+export type VisibleTipStatus = 'nuovo' | 'in_lavorazione' | 'completato' | 'archiviato';
+
+export function getVisibleStatus(
+  tip: ProjectTipSnapshot,
+  detail?: ProjectTipDetailSnapshot | null,
+): { status: VisibleTipStatus; label: string; dotClass: string; hasError: boolean } {
+  // Archived
+  if (tip.status === 'ARCHIVED') {
+    return { status: 'archiviato', label: 'Archiviato', dotClass: 'bg-slate-400', hasError: false };
+  }
+
+  // Completed
+  const hasCompletedExecution = Boolean(detail?.executions.some((e) => e.status === 'SUCCEEDED'));
+  if (hasCompletedExecution || tip.status === 'COMPLETED') {
+    return { status: 'completato', label: 'Completato', dotClass: 'bg-emerald-500', hasError: false };
+  }
+
+  // In lavorazione — has routing, draft, or dispatched execution
+  const hasFailed = Boolean(
+    detail?.executions.some((e) => e.status === 'FAILED')
+    || detail?.routes.some((r) => r.status === 'FAILED'),
+  );
+  const hasRouting = (tip.routeCount ?? 0) > 0
+    || tip.routingStatus === 'PLANNED'
+    || tip.routingStatus === 'READY'
+    || tip.routingStatus === 'DISPATCHED';
+  const hasDraft = tip.draftStatus === 'READY' || tip.draftStatus === 'GENERATED';
+  const isInProgress = tip.status === 'REVIEWED'
+    || tip.status === 'APPROVED'
+    || tip.status === 'DRAFTED'
+    || tip.status === 'ROUTED'
+    || tip.status === 'AUTOMATED';
+
+  if (hasRouting || hasDraft || isInProgress) {
+    return { status: 'in_lavorazione', label: 'In lavorazione', dotClass: 'bg-amber-500', hasError: hasFailed };
+  }
+
+  // Default: Nuovo
+  return { status: 'nuovo', label: 'Nuovo', dotClass: 'bg-blue-500', hasError: false };
+}
+
+export type TipOriginCategory = 'sito' | 'ascolto' | 'copilot' | 'manuale';
+
+export function getTipOriginCategory(tip: ProjectTipSnapshot): TipOriginCategory {
+  switch (tip.originType) {
+    case 'BRAND_REPORT':
+    case 'WEBSITE_ANALYSIS':
+      return 'sito';
+    case 'CROSS_CHANNEL_INSIGHT':
+      return 'ascolto';
+    case 'COPILOT':
+      return 'copilot';
+    case 'MANUAL':
+    default:
+      return 'manuale';
+  }
+}
+
+export const ORIGIN_CATEGORY_LABELS: Record<TipOriginCategory, string> = {
+  sito: 'SEO & LLM',
+  ascolto: 'Ascolto',
+  copilot: 'Copilot',
+  manuale: 'Manuale',
+};
+
+export const ORIGIN_CATEGORY_ICONS: Record<TipOriginCategory, string> = {
+  sito: 'Globe',
+  ascolto: 'MessageCircle',
+  copilot: 'Sparkles',
+  manuale: 'PenLine',
+};
+
 export const ROUTING_POLICY_LABELS: Record<TipRoutingDraft['policyMode'], string> = {
   MANUAL: 'Solo manuale',
   AUTO_APPROVE: 'Approvazione automatica',

@@ -23,9 +23,24 @@ export interface FieldInteractionPayload {
   options?: InteractionChoiceOption[];
 }
 
+export interface FormFieldDescriptor {
+  fieldId: string;
+  inputType: StructuredFieldInputType;
+  required: boolean;
+  options?: InteractionChoiceOption[];
+}
+
+export interface FormInteractionPayload {
+  version: 1;
+  kind: 'form';
+  interactionId: string;
+  fields: FormFieldDescriptor[];
+}
+
 export type InterviewInteractionPayload =
   | ConsentInteractionPayload
-  | FieldInteractionPayload;
+  | FieldInteractionPayload
+  | FormInteractionPayload;
 
 export interface StructuredConsentSubmission {
   interactionId: string;
@@ -42,9 +57,16 @@ export interface StructuredFieldSubmission {
   optionId?: string | null;
 }
 
+export interface StructuredFormSubmission {
+  interactionId: string;
+  kind: 'form';
+  values: Record<string, { action: 'submit' | 'skip'; value?: string | null; optionId?: string | null }>;
+}
+
 export type StructuredInterviewSubmission =
   | StructuredConsentSubmission
-  | StructuredFieldSubmission;
+  | StructuredFieldSubmission
+  | StructuredFormSubmission;
 
 export const StructuredInterviewSubmissionSchema = z.discriminatedUnion('kind', [
   z.object({
@@ -59,6 +81,15 @@ export const StructuredInterviewSubmissionSchema = z.discriminatedUnion('kind', 
     action: z.enum(['submit', 'skip']),
     value: z.string().optional().nullable(),
     optionId: z.string().optional().nullable(),
+  }),
+  z.object({
+    interactionId: z.string().min(1),
+    kind: z.literal('form'),
+    values: z.record(z.object({
+      action: z.enum(['submit', 'skip']),
+      value: z.string().optional().nullable(),
+      optionId: z.string().optional().nullable(),
+    })),
   }),
 ]);
 
@@ -135,6 +166,28 @@ export function buildDataCollectionInteractionPayload(params: {
   };
 }
 
+export function buildDataCollectionFormPayload(params: {
+  interactionId: string;
+  fieldIds: string[];
+  candidateFields?: any[];
+}): FormInteractionPayload {
+  const fields: FormFieldDescriptor[] = params.fieldIds.map((fieldId) => {
+    const { inputType, options } = getStructuredFieldInputType(fieldId, params.candidateFields || []);
+    return {
+      fieldId,
+      inputType,
+      required: false,  // all fields are skippable
+      ...(options && options.length > 0 ? { options } : {}),
+    };
+  });
+  return {
+    version: 1,
+    kind: 'form',
+    interactionId: params.interactionId,
+    fields,
+  };
+}
+
 export function getStructuredSubmissionDisplayText(
   submission: StructuredInterviewSubmission,
   language: string = 'en'
@@ -146,6 +199,16 @@ export function getStructuredSubmissionDisplayText(
       return isItalian ? 'Sì, acconsento.' : 'Yes, I agree.';
     }
     return isItalian ? 'No, preferisco di no.' : 'No, I prefer not to.';
+  }
+
+  if (submission.kind === 'form') {
+    // Return summary of filled values, comma-separated
+    const filled = Object.entries(submission.values)
+      .filter(([, v]) => v.action === 'submit' && (v.value || v.optionId))
+      .map(([, v]) => v.value || v.optionId || '')
+      .filter(Boolean)
+      .join(', ');
+    return filled || (isItalian ? 'Dati inviati.' : 'Data submitted.');
   }
 
   if (submission.action === 'skip') {

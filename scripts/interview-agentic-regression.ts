@@ -487,6 +487,7 @@ async function callChat(params: {
     isCompleted: boolean;
     currentTopicId?: string | null;
     phase?: string | null;
+    candidateProfile?: Record<string, string> | null;
     interactionPayload?: InterviewInteractionPayload | null;
     roundTripLatencyMs: number;
 }> {
@@ -518,11 +519,34 @@ async function callChat(params: {
         isCompleted: Boolean(payload.isCompleted),
         currentTopicId: payload.currentTopicId,
         phase: typeof payload.phase === 'string' ? payload.phase : null,
+        candidateProfile: (payload.candidateProfile && typeof payload.candidateProfile === 'object')
+            ? (payload.candidateProfile as Record<string, string>)
+            : null,
         interactionPayload: (payload.interactionPayload && typeof payload.interactionPayload === 'object')
             ? (payload.interactionPayload as InterviewInteractionPayload)
             : null,
         roundTripLatencyMs,
     };
+}
+
+async function callChatWithRetry(
+    params: Parameters<typeof callChat>[0],
+    maxRetries = 2
+): Promise<Awaited<ReturnType<typeof callChat>>> {
+    let lastError: unknown;
+    for (let attempt = 0; attempt <= maxRetries; attempt++) {
+        try {
+            return await callChat(params);
+        } catch (err) {
+            lastError = err;
+            if (attempt < maxRetries) {
+                const delayMs = 2000 * Math.pow(2, attempt);
+                console.warn(`[callChat] attempt ${attempt + 1} failed, retrying in ${delayMs}ms…`, err);
+                await new Promise((r) => setTimeout(r, delayMs));
+            }
+        }
+    }
+    throw lastError;
 }
 
 async function fetchAssistantTurn(
@@ -774,6 +798,7 @@ async function judgeRun(params: {
     language: string;
     transcript: Array<{ role: string; text: string; phase?: string; topicLabel?: string }>;
     scenario: ScenarioDefinition;
+    tier: 'standard' | 'avanzato';
 }): Promise<JudgeResult | null> {
     if (!params.model) {
         return null;
@@ -799,6 +824,14 @@ async function judgeRun(params: {
         })
         .join('\n');
 
+    const tierBlock = params.tier === 'avanzato'
+        ? [
+            'IMPORTANT — This is an AVANZATO (advanced) interview. The interviewer is designed to explore topics in depth with follow-up questions, resulting in longer conversations (20-30 turns is expected and correct).',
+            'Evaluate on: depth of insight extracted, quality of follow-up questions, whether the conversation reached meaningful emotional/motivational content.',
+            'Do NOT penalize for turn count or conversation length.',
+          ].join(' ')
+        : 'Criteri: qualità delle domande, coerenza dei follow-up, gestione chiarimenti/off-topic, correttezza deep offer, correttezza data collection, naturalezza e capacità di mantenere coinvolgimento.';
+
     try {
         const result = await generateObject({
             model: params.openai(params.model),
@@ -807,7 +840,7 @@ async function judgeRun(params: {
                 `Language: ${params.language}`,
                 `Scenario under test: ${params.scenario.id} - ${params.scenario.description}`,
                 'Valuta questa intervista come QA pre-release.',
-                'Criteri: qualità delle domande, coerenza dei follow-up, gestione chiarimenti/off-topic, correttezza deep offer, correttezza data collection, naturalezza e capacità di mantenere coinvolgimento.',
+                tierBlock,
                 'Usa score 0-100. pass solo se la conversazione è pronta per test pubblico senza riserve sostanziali.',
                 'Transcript:',
                 transcriptText,
@@ -1108,12 +1141,14 @@ async function runScenario(params: {
     const phasesSeen = new Set<string>();
     let effectiveDuration = 0;
     let completed = false;
+    // Accumulates the latest non-empty candidateProfile from each HTTP response (DB fallback)
+    let latestProfileFromHttp: Record<string, string> = {};
 
     try {
         logScenarioDebug(scenario.id, 'callChat.initial.begin', {
             conversationId: conversation.id,
         });
-        const firstReply = await callChat({
+        const firstReply = await callChatWithRetry({
             baseUrl: args.baseUrl,
             conversationId: conversation.id,
             botId: bot.id,
@@ -1153,6 +1188,9 @@ async function runScenario(params: {
         });
         assistantLatencies.push(firstReply.roundTripLatencyMs);
         if (firstAssistant.metadata.phase) phasesSeen.add(firstAssistant.metadata.phase);
+        if (firstReply.candidateProfile && Object.keys(firstReply.candidateProfile).length > 0) {
+            latestProfileFromHttp = { ...latestProfileFromHttp, ...firstReply.candidateProfile };
+        }
         completed = firstReply.isCompleted;
         let currentAssistant = firstAssistant;
 
@@ -1182,7 +1220,7 @@ async function runScenario(params: {
                 clientMessageId,
                 effectiveDuration,
             });
-            const chatReply = await callChat({
+            const chatReply = await callChatWithRetry({
                 baseUrl: args.baseUrl,
                 conversationId: conversation.id,
                 botId: bot.id,
@@ -1222,6 +1260,9 @@ async function runScenario(params: {
             const latency = chatReply.roundTripLatencyMs || (Date.now() - startedAt);
             assistantLatencies.push(latency);
             if (assistant.metadata.phase) phasesSeen.add(assistant.metadata.phase);
+            if (chatReply.candidateProfile && Object.keys(chatReply.candidateProfile).length > 0) {
+                latestProfileFromHttp = { ...latestProfileFromHttp, ...chatReply.candidateProfile };
+            }
             transcriptLocal.push({
                 role: 'assistant',
                 content: assistant.content,
@@ -1253,7 +1294,9 @@ async function runScenario(params: {
 
         const candidateProfile = (conversationSnapshot?.candidateProfile && typeof conversationSnapshot.candidateProfile === 'object')
             ? (conversationSnapshot.candidateProfile as Record<string, string>)
-            : {};
+            : Object.keys(latestProfileFromHttp).length > 0
+                ? latestProfileFromHttp
+                : {};
 
         const transcript = conversationSnapshot
             ? (conversationSnapshot.messages || [])
@@ -1307,12 +1350,15 @@ async function runScenario(params: {
             fieldQuestionCounts,
             phasesSeen,
         });
+        const tier = ((bot as { interviewerQuality?: string }).interviewerQuality as 'standard' | 'avanzato' | undefined) ??
+            (bot.name?.toLowerCase().includes('tedx') ? 'avanzato' : 'standard');
         const judge = await judgeRun({
             openai,
             model: args.judgeModel,
             language,
             transcript,
             scenario,
+            tier,
         });
 
         return {

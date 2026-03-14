@@ -34,6 +34,8 @@ interface ChatApiResponse {
     error?: string;
     interactionPayload?: InterviewInteractionPayload | null;
     serverResponseLatencyMs?: number | null;
+    phase?: string | null;
+    candidateProfile?: Record<string, unknown> | null;
 }
 
 interface InterviewChatProps {
@@ -526,8 +528,60 @@ export default function InterviewChat({
                 throw new Error(toUserFacingInterviewError(response.status, payload, language));
             }
 
-            const data: ChatApiResponse = await response.json();
-            const assistantText = data.text || '';
+            const contentType = response.headers.get('Content-Type') || '';
+            const isSSE = contentType.includes('text/event-stream');
+
+            let assistantText = '';
+            let data: Partial<ChatApiResponse> = {};
+
+            if (isSSE && response.body) {
+                // SSE streaming path: read chunks, accumulate text, get metadata from final event
+                const reader = response.body.getReader();
+                const decoder = new TextDecoder();
+                let buffer = '';
+
+                while (true) {
+                    const { done, value } = await reader.read();
+                    if (done) break;
+                    buffer += decoder.decode(value, { stream: true });
+                    // Process complete SSE lines
+                    const lines = buffer.split('\n');
+                    buffer = lines.pop() ?? ''; // keep incomplete line in buffer
+                    for (const line of lines) {
+                        if (!line.startsWith('data: ')) continue;
+                        const jsonStr = line.slice(6).trim();
+                        if (!jsonStr) continue;
+                        try {
+                            const event = JSON.parse(jsonStr);
+                            if (event.t !== undefined) {
+                                // Text chunk
+                                assistantText += event.t;
+                            } else if (event.done) {
+                                // Final metadata
+                                data = {
+                                    text: assistantText,
+                                    isCompleted: event.isCompleted ?? false,
+                                    currentTopicId: event.currentTopicId ?? null,
+                                    phase: event.phase ?? null,
+                                    candidateProfile: event.candidateProfile ?? {},
+                                    interactionPayload: event.interactionPayload ?? null,
+                                    serverResponseLatencyMs: event.serverResponseLatencyMs ?? null,
+                                };
+                            }
+                        } catch {
+                            // ignore malformed SSE event
+                        }
+                    }
+                }
+                if (!data.text) {
+                    data.text = assistantText;
+                    data.isCompleted = data.isCompleted ?? false;
+                }
+            } else {
+                // Non-streaming path (DATA_COLLECTION, timeouts, etc.)
+                data = await response.json();
+                assistantText = data.text || '';
+            }
 
             if (data.isCompleted || assistantText.includes('INTERVIEW_COMPLETED')) {
                 setIsCompleted(true);

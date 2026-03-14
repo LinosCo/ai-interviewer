@@ -85,7 +85,7 @@ export const StructuredInterviewSubmissionSchema = z.discriminatedUnion('kind', 
   z.object({
     interactionId: z.string().min(1),
     kind: z.literal('form'),
-    values: z.record(z.object({
+    values: z.record(z.string(), z.object({
       action: z.enum(['submit', 'skip']),
       value: z.string().optional().nullable(),
       optionId: z.string().optional().nullable(),

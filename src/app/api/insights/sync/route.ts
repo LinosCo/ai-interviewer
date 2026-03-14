@@ -109,13 +109,9 @@ export async function GET(request: Request) {
             },
             orderBy: { priorityScore: 'desc' }
         });
-        const siteInsights = await loadSiteAnalysisInsights({
-            organizationId: orgId,
-            projectId: projectId || undefined
-        });
         const tipHistoryByContentKind = await loadTipHistoryByContentKind(projectId || undefined);
         const enrichedInsights = enrichInsightsWithActionMetadata(
-            [...insights, ...siteInsights].sort((a: any, b: any) => (b.priorityScore || 0) - (a.priorityScore || 0)),
+            insights.sort((a: any, b: any) => (b.priorityScore || 0) - (a.priorityScore || 0)),
             tipHistoryByContentKind
         );
 

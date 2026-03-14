@@ -6,7 +6,6 @@ import {
     enrichInsightsWithActionMetadata,
     loadTipHistoryByContentKind
 } from '@/lib/insights/action-history';
-import { loadSiteAnalysisInsights } from '@/lib/insights/site-analysis-insights';
 import { resolveActiveOrganizationIdForUser } from '@/lib/active-organization';
 import {
     WorkspaceError,
@@ -49,13 +48,9 @@ export async function POST(request: Request) {
         }
 
         const result = await CrossChannelSyncEngine.sync(orgId, projectId || undefined);
-        const siteInsights = await loadSiteAnalysisInsights({
-            organizationId: orgId,
-            projectId: projectId || undefined
-        });
         const tipHistoryByContentKind = await loadTipHistoryByContentKind(projectId || undefined);
         const enrichedInsights = enrichInsightsWithActionMetadata(
-            [...result.insights, ...siteInsights].sort((a: any, b: any) => (b.priorityScore || 0) - (a.priorityScore || 0)),
+            result.insights.sort((a: any, b: any) => (b.priorityScore || 0) - (a.priorityScore || 0)),
             tipHistoryByContentKind
         );
 

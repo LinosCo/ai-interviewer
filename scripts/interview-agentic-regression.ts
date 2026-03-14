@@ -1185,12 +1185,28 @@ async function runScenario(params: {
                 textLength: String(chatReply.text || '').length,
             });
             logScenarioDebug(scenario.id, 'fetchAssistantTurn.turn.begin', { clientMessageId });
-            const assistant = await fetchAssistantTurn(prisma, conversation.id, clientMessageId);
-            logScenarioDebug(scenario.id, 'fetchAssistantTurn.turn.done', {
-                clientMessageId,
-                phase: assistant.metadata.phase || null,
-                textLength: String(assistant.content || '').length,
-            });
+            let assistant: ObservedAssistantTurn;
+            try {
+                assistant = await fetchAssistantTurn(prisma, conversation.id, clientMessageId);
+                logScenarioDebug(scenario.id, 'fetchAssistantTurn.turn.done', {
+                    clientMessageId,
+                    phase: assistant.metadata.phase || null,
+                    textLength: String(assistant.content || '').length,
+                });
+            } catch {
+                logScenarioDebug(scenario.id, 'fetchAssistantTurn.turn.fallback', { clientMessageId });
+                assistant = {
+                    content: String(chatReply.text || ''),
+                    metadata: {
+                        phase: undefined,
+                        supervisorStatus: null,
+                        topicLabel: chatReply.currentTopicId ?? undefined,
+                        topicId: chatReply.currentTopicId ?? undefined,
+                        responseLatencyMs: chatReply.roundTripLatencyMs,
+                        interactionPayload: chatReply.interactionPayload ?? null,
+                    },
+                };
+            }
             const latency = chatReply.roundTripLatencyMs || (Date.now() - startedAt);
             assistantLatencies.push(latency);
             if (assistant.metadata.phase) phasesSeen.add(assistant.metadata.phase);

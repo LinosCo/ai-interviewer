@@ -875,7 +875,7 @@ export default function InterviewChat({
                 exit={{ opacity: 0 }}
                 className="w-full max-w-2xl mt-5 md:mt-8"
             >
-                <div className="flex items-center justify-start">
+                <div className="flex items-center justify-center">
                     <motion.div
                         className="relative overflow-hidden rounded-[28px] border border-white/70 bg-white/78 px-4 py-4 shadow-[0_24px_50px_-32px_rgba(15,23,42,0.45)] backdrop-blur-xl"
                         style={{ boxShadow: `0 24px 50px -32px ${brandColor}35` }}
@@ -925,10 +925,7 @@ export default function InterviewChat({
                                 )}
                             </div>
                             <div className="min-w-0">
-                                <div className="text-[10px] font-bold uppercase tracking-[0.28em] text-gray-400">
-                                    {language?.toLowerCase().startsWith('it') ? 'AI al lavoro' : 'AI thinking'}
-                                </div>
-                                <div className="mt-2 flex items-center gap-1.5">
+                                <div className="flex items-center gap-1.5">
                                     {[0, 1, 2].map((dot) => (
                                         <motion.span
                                             key={dot}

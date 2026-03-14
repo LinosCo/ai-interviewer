@@ -1449,6 +1449,18 @@ export async function POST(req: Request) {
 
         // Log supervisor insight and next state transition for visibility
         requestLog(`📊 [SUPERVISOR] Insight: ${supervisorInsight?.status || 'N/A'}, NextSubGoal: ${supervisorInsight?.nextSubGoal || 'N/A'}`);
+
+        // Guard: DEEP_OFFER must be presented at least once before DATA_COLLECTION.
+        // state.deepAccepted === null means the offer has never been made this conversation.
+        // We skip the guard when state.phase is already DEEP_OFFER (i.e., the offer was just refused
+        // and we are legitimately exiting to DATA_COLLECTION).
+        if (nextState.phase === 'DATA_COLLECTION' && state.deepAccepted === null && state.phase !== 'DEEP_OFFER') {
+            requestLog(`🛡️ [FLOW] Redirecting DATA_COLLECTION → DEEP_OFFER (offer not yet seen)`);
+            nextState.phase = 'DEEP_OFFER';
+            nextState.deepAccepted = null;
+            supervisorInsight = createDefaultSupervisorInsight();
+        }
+
         requestLog(`🧭 [FLOW] Phase Transition: ${state.phase} -> ${nextState.phase}`);
         if (state.topicIndex !== nextState.topicIndex) {
             requestLog(`🔄 [TOPIC] Pivot: Topic Index ${state.topicIndex} -> ${nextState.topicIndex}`);
@@ -1881,6 +1893,7 @@ hard_rules:
                     currentTopicId: nextTopicId,
                     isCompleted: false,
                     phase: nextState.phase,
+                    candidateProfile: _freshCandidateProfileCache ?? conversation.candidateProfile ?? {},
                     serverResponseLatencyMs: Date.now() - startTime
                 });
             }
@@ -2698,6 +2711,7 @@ hard_rules:
                     isCompleted: true,
                     interactionPayload: null,
                     phase: nextState.phase,
+                    candidateProfile: currentProfileForCompletion ?? conversation.candidateProfile ?? {},
                     serverResponseLatencyMs: Date.now() - startTime
                 });
             }
@@ -2769,6 +2783,7 @@ hard_rules:
             isCompleted: false,
             interactionPayload,
             phase: nextState.phase,
+            candidateProfile: _freshCandidateProfileCache ?? conversation.candidateProfile ?? {},
             serverResponseLatencyMs: Date.now() - startTime
         });
 

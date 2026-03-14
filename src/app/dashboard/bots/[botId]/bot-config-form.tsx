@@ -58,10 +58,31 @@ function PlanCoverageSummaryCard({ botId, plan }: { botId: string; plan: Intervi
         );
     }
 
-    const excluded = plan.coverage?.likelyExcludedWithoutDeepOffer || [];
-    const targetRate = coveragePercent(plan.coverage?.target?.coverageRate);
-    const stretchRate = coveragePercent(plan.coverage?.stretch?.coverageRate);
-    const fullRate = coveragePercent(plan.coverage?.full?.coverageRate);
+    if (!plan.coverage) {
+        return (
+            <div className="mt-4 rounded-lg border border-dashed border-amber-300 bg-amber-50 p-4">
+                <div className="flex items-center justify-between gap-3">
+                    <div>
+                        <div className="text-sm font-semibold text-gray-900">Piano da rigenerare</div>
+                        <p className="mt-1 text-xs text-gray-500">
+                            Il piano esiste ma manca la coverage. Apri il Plan Studio per rigenerarlo.
+                        </p>
+                    </div>
+                    <Link
+                        href={`/dashboard/bots/${botId}/plan`}
+                        className="inline-flex items-center rounded-lg border border-amber-300 bg-white px-3 py-2 text-xs font-semibold text-amber-700 hover:bg-amber-50"
+                    >
+                        Apri Plan Studio
+                    </Link>
+                </div>
+            </div>
+        );
+    }
+
+    const excluded = plan.coverage.likelyExcludedWithoutDeepOffer || [];
+    const targetRate = coveragePercent(plan.coverage.target?.coverageRate);
+    const stretchRate = coveragePercent(plan.coverage.stretch?.coverageRate);
+    const fullRate = coveragePercent(plan.coverage.full?.coverageRate);
 
     return (
         <div className="mt-4 rounded-xl border border-amber-200 bg-gradient-to-br from-amber-50 to-white p-4">

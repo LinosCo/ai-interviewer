@@ -24,6 +24,7 @@ export default async function DashboardLayout({
     let canManageProjects = false;
     let hasChatbot = false;
     let hasVisibilityTracker = false;
+    let hasSiteAnalysis = false;
     let hasAiTips = false;
 
     let initialOrganizations: any[] = [];
@@ -130,6 +131,7 @@ export default async function DashboardLayout({
                     canManageProjects = true;
                     hasChatbot = true;
                     hasVisibilityTracker = true;
+                    hasSiteAnalysis = true;
                     hasAiTips = true;
                 } else {
                     // Check if user can manage multiple projects (STARTER and above)
@@ -138,6 +140,7 @@ export default async function DashboardLayout({
                     // Feature flags based on plan
                     hasChatbot = plan.features.chatbot;
                     hasVisibilityTracker = plan.features.visibilityTracker;
+                    hasSiteAnalysis = plan.features.siteAnalysis;
                     hasAiTips = plan.features.aiTips;
                 }
             }
@@ -155,6 +158,7 @@ export default async function DashboardLayout({
                     canManageProjects={canManageProjects}
                     hasChatbot={hasChatbot}
                     hasVisibilityTracker={hasVisibilityTracker}
+                    hasSiteAnalysis={hasSiteAnalysis}
                     hasAiTips={hasAiTips}
                 />
 

@@ -17,6 +17,7 @@ interface DashboardSidebarProps {
     hasChatbot?: boolean;
     hasVisibilityTracker?: boolean;
     hasAiTips?: boolean;
+    hasSiteAnalysis?: boolean;
 }
 
 export function DashboardSidebar({
@@ -26,7 +27,8 @@ export function DashboardSidebar({
     canManageProjects = false,
     hasChatbot = false,
     hasVisibilityTracker = false,
-    hasAiTips = false
+    hasAiTips = false,
+    hasSiteAnalysis = false,
 }: DashboardSidebarProps) {
     const [isOpen, setIsOpen] = useState(false);
     const [adminExpanded, setAdminExpanded] = useState(false);
@@ -42,9 +44,10 @@ export function DashboardSidebar({
     const primaryItems = [
         { href: '/dashboard/interviews', icon: Icons.MessageSquare, label: 'Interviste AI', visible: true },
         { href: '/dashboard/bots', icon: Icons.Bot, label: 'Chatbot AI', visible: hasChatbot },
-        { href: '/dashboard/training', icon: Icons.GraduationCap, label: 'Formazione', visible: true },
         { href: '/dashboard/visibility', icon: Icons.Search, label: 'Brand Monitor', visible: hasVisibilityTracker },
+        { href: '/dashboard/site-analysis', icon: Icons.Globe, label: 'Analisi Sito', visible: hasSiteAnalysis },
         { href: '/dashboard/insights', icon: Icons.Layers, label: 'AI Tips', visible: hasAiTips },
+        { href: '/dashboard/training', icon: Icons.GraduationCap, label: 'Formazione', visible: true },
     ].filter(item => item.visible);
 
     // Secondary features (Management & Tools)

@@ -302,7 +302,7 @@ export async function maybeRefineWithLlm(
     topicId: topic.topicId,
     label: topic.label,
     description: topic.rationale,
-    subGoals: topic.subGoalPlans.map((subGoal) => subGoal.label),
+    subGoals: (topic.subGoalPlans ?? []).map((subGoal) => subGoal.label),
   }));
 
   try {
@@ -339,7 +339,7 @@ export async function maybeRefineWithLlm(
         importanceScore,
         importanceBand: mapImportanceBand(importanceScore),
         rationale: gradedTopic.rationale?.trim() || 'llm_graded',
-        subGoalPlans: topic.subGoalPlans.map((subGoal) => {
+        subGoalPlans: (topic.subGoalPlans ?? []).map((subGoal) => {
           const gradedSubGoal = subGoalsByIndex.get(subGoal.editorialOrderIndex);
           if (!gradedSubGoal) return subGoal;
           const subGoalScore = round2(clamp((gradedSubGoal.importanceScore || subGoal.importanceScore * 100) / 100, 0.1, 0.99));

@@ -112,7 +112,7 @@ function applyOverrideValues(base: InterviewPlan, safeOverrides?: InterviewPlanO
       orderIndex: topic.orderIndex,
       editorialOrderIndex: topic.editorialOrderIndex ?? topic.orderIndex,
       subGoals: topic.subGoals,
-      subGoalPlans: topic.subGoalPlans.map((subGoal, index) => {
+      subGoalPlans: (topic.subGoalPlans ?? []).map((subGoal, index) => {
         const subGoalOverride = topicOverride?.subGoals?.[subGoal.id];
         const subGoalScore = typeof subGoalOverride?.importanceScore === 'number'
           ? clamp(round2(subGoalOverride.importanceScore), 0, 1)

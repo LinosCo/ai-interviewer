@@ -277,7 +277,7 @@ function TopicCard({
       </div>
 
       <div className="mt-4 space-y-3">
-        {topic.subGoalPlans.map((subGoal: PlanSubGoal) => {
+        {(topic.subGoalPlans ?? []).map((subGoal: PlanSubGoal) => {
           const subGoalOverrides = topicOverrides?.subGoals?.[subGoal.id];
           return (
             <div key={subGoal.id} className="rounded-lg border border-gray-100 p-3">

@@ -256,7 +256,7 @@ function TopicCard({ topic, index, planTopic, botId, isEditing, onEdit, onCancel
                     {planTopic && (
                         <div className="mb-3 flex flex-wrap gap-2">
                             <span className="inline-flex items-center rounded-full border border-amber-200 bg-amber-50 px-2.5 py-1 text-[11px] font-medium text-amber-700">
-                                target {planTopic.targetSubGoalCount}/{planTopic.subGoalPlans.filter((subGoal: any) => subGoal.enabled).length} subgoal
+                                target {planTopic.targetSubGoalCount}/{(planTopic.subGoalPlans ?? []).filter((subGoal: any) => subGoal.enabled).length} subgoal
                             </span>
                             <span className="inline-flex items-center rounded-full border border-blue-200 bg-blue-50 px-2.5 py-1 text-[11px] font-medium text-blue-700">
                                 stretch {planTopic.stretchSubGoalCount}

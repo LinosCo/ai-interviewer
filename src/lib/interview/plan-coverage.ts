@@ -1,6 +1,6 @@
 import type { Bot } from '@prisma/client';
 
-export const PLAN_LOGIC_VERSION = '3.0';
+export const PLAN_LOGIC_VERSION = '3.1';
 
 import type {
   CoverageTier,
@@ -39,7 +39,7 @@ export function buildCoverageMetrics(params: {
 }): PlanCoverageMetrics {
   const enabledTopics = params.topics.filter((topic) => topic.enabled !== false);
   const coveredTopics = enabledTopics.filter((topic) => {
-    const enabledSubGoals = topic.subGoalPlans.filter((subGoal) => subGoal.enabled);
+    const enabledSubGoals = (topic.subGoalPlans ?? []).filter((subGoal) => subGoal.enabled);
     if (enabledSubGoals.length === 0) {
       return params.includeOverflow || params.includeStretch || topic.targetTurns > 0;
     }
@@ -52,7 +52,7 @@ export function buildCoverageMetrics(params: {
     });
   }).length;
 
-  const enabledSubGoals = enabledTopics.flatMap((topic) => topic.subGoalPlans.filter((subGoal) => subGoal.enabled));
+  const enabledSubGoals = enabledTopics.flatMap((topic) => (topic.subGoalPlans ?? []).filter((subGoal) => subGoal.enabled));
   const coveredSubGoals = enabledSubGoals.filter((subGoal) => {
     if (subGoal.coverageTier === 'target') return true;
     if (params.includeStretch && subGoal.coverageTier === 'stretch') return true;
@@ -78,7 +78,7 @@ export function buildCoverageMetrics(params: {
 export function buildLikelyExcludedWithoutDeepOffer(topics: PlanTopic[]) {
   return topics
     .flatMap((topic) =>
-      topic.subGoalPlans
+      (topic.subGoalPlans ?? [])
         .filter((subGoal) => subGoal.enabled && subGoal.coverageTier !== 'target')
         .map((subGoal) => ({
           topicId: topic.topicId,
@@ -261,12 +261,12 @@ export function applyComputation(
   const perTopicTimeSec = targetDurationSec / topicsCount;
 
   const targetCapsByTopic = Object.fromEntries(enabledTopics.map((topic) => {
-    const enabledSubGoals = topic.subGoalPlans.filter((subGoal) => subGoal.enabled).length;
+    const enabledSubGoals = (topic.subGoalPlans ?? []).filter((subGoal) => subGoal.enabled).length;
     const suggestedCap = Math.max(1, Math.min(topic.configuredMaxTurns, Math.max(1, enabledSubGoals || 1)));
     return [topic.topicId, suggestedCap];
   }));
   const stretchCapsByTopic = Object.fromEntries(enabledTopics.map((topic) => {
-    const enabledSubGoals = topic.subGoalPlans.filter((subGoal) => subGoal.enabled).length;
+    const enabledSubGoals = (topic.subGoalPlans ?? []).filter((subGoal) => subGoal.enabled).length;
     const suggestedCap = Math.max(1, Math.min(topic.configuredMaxTurns, Math.max(1, enabledSubGoals || 1) + cfg.planMaxTurnsBonus));
     return [topic.topicId, suggestedCap];
   }));
@@ -289,7 +289,7 @@ export function applyComputation(
     .map((topic) => {
       const topicOverride = overrides?.explore?.topics?.[topic.topicId];
       const lockedCoverage = new Map<string, CoverageTier>();
-      for (const subGoal of topic.subGoalPlans) {
+      for (const subGoal of (topic.subGoalPlans ?? [])) {
         const overrideTier = topicOverride?.subGoals?.[subGoal.id]?.coverageTier;
         if (overrideTier) {
           lockedCoverage.set(subGoal.id, overrideTier);
@@ -304,7 +304,7 @@ export function applyComputation(
         targetTurns,
         topicOverride?.stretchTurns ?? stretchTurnsAllocation[topic.topicId] ?? targetTurns
       );
-      const fullCoverageSubGoalCount = topic.subGoalPlans.filter((subGoal) => subGoal.enabled).length;
+      const fullCoverageSubGoalCount = (topic.subGoalPlans ?? []).filter((subGoal) => subGoal.enabled).length;
       const defaultTargetSubGoalCount = Math.min(fullCoverageSubGoalCount, Math.max(0, targetTurns));
       const defaultStretchSubGoalCount = Math.min(fullCoverageSubGoalCount, Math.max(defaultTargetSubGoalCount, stretchTurns));
       const targetSubGoalCount = clamp(
@@ -318,7 +318,7 @@ export function applyComputation(
         fullCoverageSubGoalCount
       );
       const subGoalPlans = assignCoverageTiers({
-        subGoals: topic.subGoalPlans.map((subGoal) => ({
+        subGoals: (topic.subGoalPlans ?? []).map((subGoal) => ({
           ...subGoal,
           coverageTier: subGoal.enabled ? 'overflow' : 'disabled',
         })),

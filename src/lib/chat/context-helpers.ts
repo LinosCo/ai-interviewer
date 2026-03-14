@@ -177,13 +177,15 @@ export function buildDeepTopicOrder(
     interestingTopics: InterestingTopic[] | undefined,
     history?: Record<string, string[]>,
     interviewObjective?: string,
-    language: string = 'en'
+    language: string = 'en',
+    plan?: InterviewPlan
 ): string[] {
     const scored = botTopics.map((t, idx) => {
         const match = (interestingTopics || []).find(it => it.topicId === t.id);
-        const remainingSubGoals = getRemainingSubGoals(t, history).length;
-        const totalSubGoals = Math.max(1, Array.isArray(t?.subGoals) ? t.subGoals.length : 1);
-        const uncoveredRatio = Math.max(0, Math.min(1, remainingSubGoals / totalSubGoals));
+        const remainingTargetSubGoals = getRemainingSubGoals(t, history, plan, 'target_only').length;
+        const remainingStretchSubGoals = getRemainingSubGoals(t, history, plan, 'target_and_stretch').length;
+        const totalSubGoals = Math.max(1, getPlannedSubGoals(t, plan, 'target_and_stretch').length || (Array.isArray(t?.subGoals) ? t.subGoals.length : 1));
+        const uncoveredRatio = Math.max(0, Math.min(1, remainingStretchSubGoals / totalSubGoals));
         const topicText = buildTopicSemanticText(t);
         const snippetText = match?.bestSnippet || '';
         const interestScore = match?.engagementScore ?? 0;
@@ -193,22 +195,28 @@ export function buildDeepTopicOrder(
         const objectiveAlignment = interviewObjective
             ? lexicalOverlapScore(topicText, interviewObjective, language)
             : 0;
+        const planTopic = getPlanTopic(plan, t.id);
+        const importanceScore = planTopic?.importanceScore ?? 0.5;
         // Naturalness-first weighting:
-        // 1) what remains uncovered, 2) what sounded interesting, 3) what aligns with interview objective.
+        // 1) uncovered target/stretch, 2) strategic importance from the plan, 3) conversational interest and objective alignment.
         const priorityScore = (
-            uncoveredRatio * 0.4 +
-            interestScore * 0.25 +
-            snippetAlignment * 0.15 +
-            objectiveAlignment * 0.2
+            Math.max(0, Math.min(1, remainingTargetSubGoals)) * 0.2 +
+            uncoveredRatio * 0.25 +
+            importanceScore * 0.25 +
+            interestScore * 0.15 +
+            snippetAlignment * 0.05 +
+            objectiveAlignment * 0.1
         );
 
         return {
             id: t.id,
             score: priorityScore,
-            remainingSubGoals,
+            remainingSubGoals: remainingStretchSubGoals,
+            remainingTargetSubGoals,
             idx
         };
     }).sort((a, b) =>
+        (b.remainingTargetSubGoals - a.remainingTargetSubGoals) ||
         (b.remainingSubGoals - a.remainingSubGoals) ||
         (b.score - a.score) ||
         (a.idx - b.idx)
@@ -219,17 +227,50 @@ export function buildDeepTopicOrder(
 
 export function getScanPlanTurns(plan: InterviewPlan, topicId: string): number {
     const topic = plan.explore.topics.find(t => t.topicId === topicId);
-    return Math.max(1, topic?.maxTurns ?? 1);
+    return Math.max(1, topic?.targetTurns ?? topic?.baseTurns ?? topic?.maxTurns ?? 1);
 }
 
 export function getDeepPlanTurns(plan: InterviewPlan, topicId: string): number {
-    const base = plan.deepen.maxTurnsPerTopic;
-    return Math.max(1, base);
+    const topic = plan.explore.topics.find(t => t.topicId === topicId);
+    const residualStretchTurns = Math.max(
+        1,
+        (topic?.stretchTurns ?? topic?.maxTurns ?? plan.deepen.maxTurnsPerTopic) - (topic?.targetTurns ?? 0)
+    );
+    return Math.max(1, Math.min(plan.deepen.maxTurnsPerTopic, residualStretchTurns));
 }
 
-export function getRemainingSubGoals(topic: any, history: Record<string, string[]> | undefined) {
+type CoverageFilter = 'target_only' | 'target_and_stretch' | 'all_enabled';
+
+export function getPlanTopic(plan: InterviewPlan | undefined, topicId: string) {
+    return plan?.explore?.topics?.find((topic) => topic.topicId === topicId) || null;
+}
+
+function getPlannedSubGoals(topic: any, plan: InterviewPlan | undefined, coverage: CoverageFilter = 'all_enabled'): string[] {
+    const planTopic = getPlanTopic(plan, topic.id);
+    if (!planTopic?.subGoalPlans?.length) {
+        return (topic.subGoals || []).filter(Boolean);
+    }
+    return [...planTopic.subGoalPlans]
+        .filter((subGoal) => {
+            if (!subGoal.enabled) return false;
+            if (coverage === 'target_only') return subGoal.coverageTier === 'target';
+            if (coverage === 'target_and_stretch') {
+                return subGoal.coverageTier === 'target' || subGoal.coverageTier === 'stretch';
+            }
+            return subGoal.coverageTier !== 'disabled';
+        })
+        .sort((a, b) => a.editorialOrderIndex - b.editorialOrderIndex)
+        .map((subGoal) => subGoal.label);
+}
+
+export function getRemainingSubGoals(
+    topic: any,
+    history: Record<string, string[]> | undefined,
+    plan?: InterviewPlan,
+    coverage: CoverageFilter = 'all_enabled'
+) {
     const used = (history || {})[topic.id] || [];
-    return (topic.subGoals || []).filter((sg: string) => !used.includes(sg));
+    return getPlannedSubGoals(topic, plan, coverage).filter((sg: string) => !used.includes(sg));
 }
 
 export function buildDeepPlan(
@@ -241,14 +282,15 @@ export function buildDeepPlan(
     interviewObjective?: string,
     language: string = 'en'
 ) {
-    const topicsWithRemaining = botTopics.filter(t => getRemainingSubGoals(t, history).length > 0);
+    const topicsWithRemaining = botTopics.filter(t => getRemainingSubGoals(t, history, plan, 'target_and_stretch').length > 0);
     if (topicsWithRemaining.length > 0) {
         const ordered = buildDeepTopicOrder(
             botTopics,
             interestingTopics,
             history,
             interviewObjective,
-            language
+            language,
+            plan
         ).filter(id =>
             topicsWithRemaining.some(t => t.id === id)
         );
@@ -270,7 +312,7 @@ export function buildDeepPlan(
         for (const topicId of ordered) {
             const topic = botTopics.find(t => t.id === topicId);
             if (!topic) continue;
-            const remainingSubGoals = getRemainingSubGoals(topic, history).length;
+            const remainingSubGoals = getRemainingSubGoals(topic, history, plan, 'target_and_stretch').length;
             const planMax = getDeepPlanTurns(plan, topicId);
             maxTurnsByTopic[topicId] = Math.max(1, Math.min(planMax, remainingSubGoals));
         }
@@ -299,7 +341,8 @@ export function buildDeepPlan(
         interestingTopics,
         history,
         interviewObjective,
-        language
+        language,
+        plan
     ).slice(0, fallbackCount);
     const deepTurnsByTopic: Record<string, number> = {};
     ordered.forEach(id => {
@@ -350,6 +393,7 @@ export function selectDeepFocusPoint(params: {
 
 export function buildExtensionPreviewHints(params: {
     botTopics: any[];
+    plan?: InterviewPlan;
     deepOrder?: string[];
     history?: Record<string, string[]>;
     interestingTopics?: InterestingTopic[];
@@ -360,6 +404,7 @@ export function buildExtensionPreviewHints(params: {
 }): string[] {
     const {
         botTopics,
+        plan,
         deepOrder,
         history,
         interestingTopics,
@@ -381,7 +426,7 @@ export function buildExtensionPreviewHints(params: {
 
     const preview: string[] = [];
     for (const topic of rotatedTopics) {
-        const availableSubGoals = getRemainingSubGoals(topic, history);
+        const availableSubGoals = getRemainingSubGoals(topic, history, plan, 'target_and_stretch');
         if (availableSubGoals.length === 0) continue;
 
         const engagingSnippet = (interestingTopics || []).find(

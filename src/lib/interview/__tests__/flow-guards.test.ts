@@ -73,8 +73,8 @@ describe('flow-guards', () => {
     });
 
     describe('getFieldLabel', () => {
-        it('returns localized labels and falls back to the raw field id', () => {
-            expect(getFieldLabel('email', 'it')).toBe('il tuo indirizzo email');
+        it('returns canonical field ids without localized hardcoding', () => {
+            expect(getFieldLabel('email', 'it')).toBe('email');
             expect(getFieldLabel('unknownField', 'it')).toBe('unknownField');
         });
     });

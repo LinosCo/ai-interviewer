@@ -10,11 +10,30 @@ import { Icons } from '@/components/ui/business-tuner/Icons';
 import { WelcomeScreen } from '@/components/chat/WelcomeScreen';
 import { SemanticProgressBar } from '@/components/chat/SemanticProgressBar';
 import { WarmupQuestion } from '@/components/chat/WarmupQuestion';
+import { StructuredInterviewInput } from '@/components/chat/StructuredInterviewInput';
+import type { InterviewInteractionPayload, StructuredInterviewSubmission } from '@/lib/interview/structured-interactions';
+import { getStructuredSubmissionDisplayText } from '@/lib/interview/structured-interactions';
 
 interface Message {
     id: string;
     role: 'user' | 'assistant' | 'system';
     content: string;
+    interactionPayload?: InterviewInteractionPayload | null;
+    replyToClientMessageId?: string | null;
+    latencyMetrics?: {
+        clientTurnLatencyMs?: number | null;
+        serverTurnLatencyMs?: number | null;
+    } | null;
+}
+
+interface ChatApiResponse {
+    text: string;
+    currentTopicId?: string | null;
+    isCompleted: boolean;
+    degraded?: boolean;
+    error?: string;
+    interactionPayload?: InterviewInteractionPayload | null;
+    serverResponseLatencyMs?: number | null;
 }
 
 interface InterviewChatProps {
@@ -432,7 +451,12 @@ export default function InterviewChat({
         };
     }, [input]);
 
-    const handleSendMessage = async (messageContent: string, isInitial = false, overrideHistory?: Message[]) => {
+    const handleSendMessage = async (
+        messageContent: string,
+        isInitial = false,
+        overrideHistory?: Message[],
+        structuredSubmission?: StructuredInterviewSubmission
+    ) => {
         if ((!messageContent.trim() || isLoading || inFlightRequestRef.current) && !isInitial) return;
         if (inFlightRequestRef.current) return;
 
@@ -461,6 +485,7 @@ export default function InterviewChat({
 
         setIsLoading(true);
         inFlightRequestRef.current = true;
+        const requestStartedAt = typeof performance !== 'undefined' ? performance.now() : Date.now();
 
         try {
             // Construct payload
@@ -486,7 +511,8 @@ export default function InterviewChat({
                     conversationId,
                     botId,
                     effectiveDuration: Math.floor(effectiveSeconds),
-                    clientMessageId: requestClientMessageId
+                    clientMessageId: requestClientMessageId,
+                    structuredSubmission
                 })
             });
 
@@ -500,7 +526,7 @@ export default function InterviewChat({
                 throw new Error(toUserFacingInterviewError(response.status, payload, language));
             }
 
-            const data = await response.json();
+            const data: ChatApiResponse = await response.json();
             const assistantText = data.text || '';
 
             if (data.isCompleted || assistantText.includes('INTERVIEW_COMPLETED')) {
@@ -518,13 +544,41 @@ export default function InterviewChat({
             setEffectiveSeconds(prev => prev + readingTimeSeconds);
 
             const assistantMessage: Message = {
-                id: Date.now().toString(),
+                id: (typeof crypto !== 'undefined' && 'randomUUID' in crypto)
+                    ? crypto.randomUUID()
+                    : Date.now().toString(),
                 role: 'assistant',
-                content: assistantText
+                content: assistantText,
+                interactionPayload: data.interactionPayload ?? null,
+                replyToClientMessageId: requestClientMessageId ?? null,
+                latencyMetrics: {
+                    clientTurnLatencyMs: null,
+                    serverTurnLatencyMs: data.serverResponseLatencyMs ?? null
+                }
             };
 
             setMessages(prev => [...prev, assistantMessage]);
             setCurrentQuestionIndex(prev => prev + 1);
+
+            if (typeof window !== 'undefined') {
+                requestAnimationFrame(() => {
+                    requestAnimationFrame(() => {
+                        const endedAt = typeof performance !== 'undefined' ? performance.now() : Date.now();
+                        const clientTurnLatencyMs = Math.round(endedAt - requestStartedAt);
+                        setMessages(prev => prev.map(message =>
+                            message.id === assistantMessage.id
+                                ? {
+                                    ...message,
+                                    latencyMetrics: {
+                                        ...(message.latencyMetrics || {}),
+                                        clientTurnLatencyMs
+                                    }
+                                }
+                                : message
+                        ));
+                    });
+                });
+            }
         } catch (error: any) {
             console.error('Chat error:', error);
             setMessages(prev => [...prev, {
@@ -543,6 +597,11 @@ export default function InterviewChat({
         handleSendMessage(input);
     };
 
+    const handleStructuredSubmit = (submission: StructuredInterviewSubmission) => {
+        const displayText = getStructuredSubmissionDisplayText(submission, language);
+        handleSendMessage(displayText, false, undefined, submission);
+    };
+
     const handleKeyDown = (e: React.KeyboardEvent) => {
         if (e.key === 'Enter' && !e.shiftKey) {
             e.preventDefault();
@@ -553,6 +612,7 @@ export default function InterviewChat({
     // Get current question (last assistant message)
     const assistantMessages = messages.filter(m => m.role === 'assistant');
     const currentQuestion = assistantMessages[assistantMessages.length - 1];
+    const currentInteraction = currentQuestion?.interactionPayload ?? null;
     const currentQuestionId = currentQuestion?.id || null;
     const totalQuestions = assistantMessages.length;
     const elapsedMinutes = Math.floor(effectiveSeconds / 60);
@@ -1259,6 +1319,14 @@ export default function InterviewChat({
                                 </button>
                             )}
                         </div>
+                    ) : currentInteraction ? (
+                        <StructuredInterviewInput
+                            interaction={currentInteraction}
+                            brandColor={brandColor}
+                            language={language}
+                            loading={isLoading}
+                            onSubmit={handleStructuredSubmit}
+                        />
                     ) : (
                         <form onSubmit={handleSubmit} className="relative group">
                             <div className="absolute -inset-1 rounded-[20px] blur opacity-20 group-focus-within:opacity-40 transition-opacity duration-500"
@@ -1321,7 +1389,7 @@ export default function InterviewChat({
 
                     {!isCompleted && (
                         <div className="mt-4 flex items-center justify-between px-2 opacity-60 text-xs font-medium text-gray-500">
-                            <span className="hidden md:inline-block">{!isLoading && t.pressEnter}</span>
+                            <span className="hidden md:inline-block">{!isLoading && !currentInteraction ? t.pressEnter : ''}</span>
                             <div className="flex items-center gap-1.5 ml-auto">
                                 <div className={`w-2 h-2 rounded-full ${isLoading ? 'animate-pulse' : isTyping ? 'animate-pulse' : 'bg-gray-300'}`}
                                     style={(isLoading || isTyping) ? { background: brandColor } : undefined} />

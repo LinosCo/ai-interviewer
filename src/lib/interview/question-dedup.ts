@@ -119,26 +119,25 @@ function findThemeFixationMatch(params: {
     const lastUserMessage = String(params.lastUserMessage || '').trim();
     if (!lastUserMessage) return null;
 
-    const recentQuestions = (params.historyAssistantMessages || [])
-        .flatMap(extractQuestions)
+    const recentAssistantMessages = (params.historyAssistantMessages || [])
         .slice(-3);
-    if (recentQuestions.length < 2) return null;
+    if (recentAssistantMessages.length < 2) return null;
 
     const candidateTokens = toTokens(params.candidateQuestion, params.language);
     const lastUserTokens = toTokens(lastUserMessage, params.language);
-    const previousQuestionTokens = toTokens(recentQuestions[recentQuestions.length - 1], params.language);
-    if (candidateTokens.length < 4 || lastUserTokens.length < 2 || previousQuestionTokens.length < 2) {
+    const previousAssistantTokens = toTokens(recentAssistantMessages[recentAssistantMessages.length - 1], params.language);
+    if (candidateTokens.length < 4 || lastUserTokens.length < 2 || previousAssistantTokens.length < 2) {
         return null;
     }
 
     const freshUserTokenSet = new Set(
-        lastUserTokens.filter((token) => !previousQuestionTokens.includes(token))
+        lastUserTokens.filter((token) => !previousAssistantTokens.includes(token))
     );
     if (freshUserTokenSet.size < 2) return null;
 
     const assistantTokenCounts = new Map<string, number>();
-    for (const question of recentQuestions) {
-        for (const token of new Set(toTokens(question, params.language))) {
+    for (const message of recentAssistantMessages) {
+        for (const token of new Set(toTokens(message, params.language))) {
             assistantTokenCounts.set(token, (assistantTokenCounts.get(token) || 0) + 1);
         }
     }
@@ -154,7 +153,7 @@ function findThemeFixationMatch(params: {
 
     return {
         isDuplicate: true,
-        matchedQuestion: recentQuestions[recentQuestions.length - 1] || null,
+        matchedQuestion: getPrimaryQuestion(recentAssistantMessages[recentAssistantMessages.length - 1]) || null,
         similarity: Math.min(0.99, repeatedAssistantAnchors.length / Math.max(candidateTokens.length, 1) + 0.45),
         reason: 'theme_fixation'
     };

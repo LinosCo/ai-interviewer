@@ -14,12 +14,12 @@ import { getConfigValue } from '@/lib/config';
 import { getOrCreateInterviewPlan } from '@/lib/interview/plan-service';
 import type { InterviewPlan } from '@/lib/interview/plan-types';
 import { buildTopicAnchors, buildMessageAnchors, responseMentionsAnchors } from '@/lib/interview/topic-anchors';
-import { getFieldLabel, getNextMissingCandidateField } from '@/lib/interview/flow-guards';
+import { getNextMissingCandidateField } from '@/lib/interview/flow-guards';
 import { validateExtractedField } from '@/lib/interview/field-validation';
 import { checkCreditsForAction } from '@/lib/guards/resourceGuard';
 import { getCompletionGuardAction, shouldInterceptDeepOfferClosure, shouldInterceptTopicPhaseClosure } from '@/lib/interview/phase-flow';
 // NOTE: v2 post-processing moved to post-processing-v2.ts - quality gates removed
-import { extractDeterministicFieldValue, isLikelyNonValueAck, normalizeCandidateFieldIds, responseMentionsCandidateField } from '@/lib/interview/data-collection-guard';
+import { extractDeterministicFieldValue, normalizeCandidateFieldIds } from '@/lib/interview/data-collection-guard';
 import { createDefaultSupervisorInsight, runDeepOfferPhase, type InterviewStateLike, type Phase, type SupervisorInsight, type TransitionMode } from '@/lib/interview/interview-supervisor';
 import type { ValidationResponse } from '@/lib/interview/validation-response';
 import { findDuplicateQuestionMatch } from '@/lib/interview/question-dedup';
@@ -27,8 +27,10 @@ import { handleExplorePhase, handleDeepenPhase } from '@/lib/interview/explore-d
 import { computeSignalScore } from '@/lib/interview/signal-score';
 import { buildContextualDeepOfferInsight } from '@/lib/interview/deep-offer-context';
 import { buildTurnGuidanceBlock, buildGuardsBlock } from '@/lib/llm/runtime-prompt-blocks';
+import { buildTopicTurnDecision, type TopicTurnDecision } from '@/lib/interview/turn-decision';
 import { runPostProcessing } from '@/lib/interview/post-processing-v2';
 import {
+    buildFallbackRuntimeInterviewKnowledge,
     buildManualKnowledgePromptBlock,
     buildRuntimeInterviewKnowledgeSignature,
     buildRuntimeKnowledgePromptBlock,
@@ -57,22 +59,31 @@ import {
     sanitizeUserSnippet, detectFatigue,
 } from '@/lib/chat/context-helpers';
 import {
-    isExtensionOfferQuestion, generateConsentQuestionOnly, generateFieldQuestionOnly,
+    generateConsentQuestionOnly, generateFieldQuestionOnly,
     extractLastAssistantQuestion, buildUserBridgeHint,
     buildRuntimeSemanticContextPrompt,
     normalizeSingleQuestion,
     collectRecentBridgeStems,
-    detectUserTurnSignal, isClarificationHandledResponse,
-    isScopeBoundaryHandledResponse, buildNaturalTopicCue,
+    buildNaturalTopicCue,
     type UserTurnSignal,
 } from '@/lib/chat/response-builder';
 import {
-    extractFieldFromMessage,
     checkUserIntent,
-    detectExplicitClosureIntent,
+    evaluateDataCollectionUserTurn,
+    evaluateAssistantTurn,
+    evaluateTopicalUserTurn,
+    isAssistantExtensionOffer,
+    type AssistantTurnEvaluation,
+    type DataCollectionTurnInterpretation,
     type LLMUsageCollector,
     type LLMUsagePayload,
 } from '@/lib/interview/chat-intent';
+import {
+    StructuredInterviewSubmissionSchema,
+    buildDataCollectionInteractionPayload,
+    type InterviewInteractionPayload,
+    type StructuredInterviewSubmission,
+} from '@/lib/interview/structured-interactions';
 import {
     generateQuestionOnly,
     generateDeepOfferOnly,
@@ -93,9 +104,53 @@ const CONFIG = {
     SAFETY_MAX_ASSISTANT_TURNS: 120,
     SAFETY_MAX_TOTAL_MESSAGES: 260,
 };
+const SOFT_STATE_ENRICHMENT_WAIT_MS = 40;
 const ENABLE_SOFT_QUALITY_GUARDS = false;
 const ENABLE_NON_HARD_SAFETY_REGENERATIONS = false;
 type InterviewAbVariant = 'control' | 'treatment';
+
+function buildPromptCILAnalysis(cilState: CILState | null | undefined): CILAnalysis | null {
+    if (!cilState) return null;
+    const hasThreads = Array.isArray(cilState.openThreads) && cilState.openThreads.length > 0;
+    const hasThemes = Array.isArray(cilState.emergingThemes) && cilState.emergingThemes.length > 0;
+    const lastResponseAnalysis = cilState.lastResponseAnalysis ?? {
+        keySignals: [],
+        emotionalCues: [],
+        interruptedThoughts: [],
+        activeHypotheses: [],
+        contradictionFlags: []
+    };
+    const hasLastResponseSignals =
+        lastResponseAnalysis.keySignals.length > 0 ||
+        lastResponseAnalysis.emotionalCues.length > 0 ||
+        lastResponseAnalysis.interruptedThoughts.length > 0 ||
+        lastResponseAnalysis.activeHypotheses.length > 0 ||
+        lastResponseAnalysis.contradictionFlags.length > 0;
+
+    if (!hasThreads && !hasThemes && !hasLastResponseSignals) {
+        return null;
+    }
+
+    return {
+        openThreads: cilState.openThreads,
+        emergingThemes: cilState.emergingThemes,
+        lastResponseAnalysis,
+        suggestedMove: 'probe_deeper',
+        budgetSignal: null
+    };
+}
+
+async function resolveWithin<T>(promise: Promise<T> | null | undefined, timeoutMs: number): Promise<T | null> {
+    if (!promise) return null;
+    try {
+        return await Promise.race([
+            promise,
+            new Promise<null>((resolve) => setTimeout(() => resolve(null), timeoutMs))
+        ]);
+    } catch {
+        return null;
+    }
+}
 
 function isLocalSimulationRequest(req: Request): boolean {
     const simulateHeader = req.headers.get('x-chat-simulate');
@@ -138,7 +193,7 @@ export interface InterviewState {
     lastUserTopicId?: string | null;
     deepLastSubGoalByTopic?: Record<string, string>;
     clarificationTurnsByTopic?: Record<string, number>;
-    extensionReturnPhase?: 'SCAN' | 'DEEP' | null;
+    extensionReturnPhase?: 'EXPLORE' | 'DEEPEN' | null;
     extensionReturnTopicIndex?: number | null;
     extensionReturnTurnInTopic?: number | null;
     extensionOfferAttempts?: number;
@@ -146,6 +201,9 @@ export interface InterviewState {
     runtimeInterviewKnowledge?: RuntimeInterviewKnowledge | null;
     runtimeInterviewKnowledgeSignature?: string | null;
     cilState?: CILState | null;
+    activeInteractionId?: string | null;
+    activeInteractionKind?: InterviewInteractionPayload['kind'] | null;
+    activeInteractionFieldId?: string | null;
 }
 
 interface QualityTelemetry {
@@ -177,7 +235,8 @@ const ChatRequestSchema = z.object({
     botId: z.string().min(1),
     effectiveDuration: z.union([z.number(), z.string(), z.null()]).optional(),
     introMessage: z.string().optional().nullable(),
-    clientMessageId: z.string().min(8).max(128).optional()
+    clientMessageId: z.string().min(8).max(128).optional(),
+    structuredSubmission: StructuredInterviewSubmissionSchema.optional()
 });
 
 type ClientMessage = z.infer<typeof ChatRequestSchema>['messages'][number];
@@ -198,7 +257,11 @@ export async function POST(req: Request) {
         const parsedBody = ChatRequestSchema.safeParse(body);
         if (!parsedBody.success) {
             return Response.json(
-                { error: 'Invalid chat payload', details: parsedBody.error.issues },
+                {
+                    error: 'Invalid chat payload',
+                    details: parsedBody.error.issues,
+                    serverResponseLatencyMs: Date.now() - startTime
+                },
                 { status: 400 }
             );
         }
@@ -209,25 +272,39 @@ export async function POST(req: Request) {
             botId,
             effectiveDuration,
             introMessage,
-            clientMessageId
+            clientMessageId,
+            structuredSubmission
         } = parsedBody.data;
-        console.log(`\n🚀 [CHAT_API] Processing message for conversation: ${conversationId}`);
+        const requestTag = `[CHAT_API conversation=${conversationId}]`;
+        const requestLog = (...args: any[]) => console.log(requestTag, ...args);
+        const requestError = (...args: any[]) => console.error(requestTag, ...args);
+        const llmTimerLabel = `${requestTag} LLM ${clientMessageId || startTime}`;
+        const requestStructuredSubmission = structuredSubmission ?? null;
+        const normalizeExtensionReturnPhase = (phase: unknown): InterviewState['extensionReturnPhase'] => {
+            if (phase === 'SCAN') return 'EXPLORE';
+            if (phase === 'DEEP') return 'DEEPEN';
+            if (phase === 'EXPLORE' || phase === 'DEEPEN') return phase;
+            return null;
+        };
+
+        console.log(`\n🚀 ${requestTag} Processing message`);
         if (simulationMode) {
-            console.log('🧪 [CHAT_API] Local simulation mode enabled (credits and usage side effects disabled).');
+            requestLog('🧪 Local simulation mode enabled (credits and usage side effects disabled).');
         }
-        console.log(`🧪 [AB] Variant=${abVariant} softGuards=${softQualityGuardsEnabled} nonHardRegens=${nonHardSafetyRegenerationsEnabled}`);
+        requestLog(`🧪 Variant=${abVariant} softGuards=${softQualityGuardsEnabled} nonHardRegens=${nonHardSafetyRegenerationsEnabled}`);
 
         // ====================================================================
         // 1. LOAD DATA (with parallel operations for speed)
         // ====================================================================
         const loadStart = Date.now();
         const conversation = await ChatService.loadConversation(conversationId, botId);
-        console.log(`⏱️ [TIMING] Data load: ${Date.now() - loadStart}ms`);
+        requestLog(`⏱️ Data load: ${Date.now() - loadStart}ms`);
         const bot = conversation.bot;
         if (bot.status !== 'PUBLISHED') {
             return Response.json({
                 text: "Mi dispiace, questa intervista non è al momento disponibile.",
-                isCompleted: false
+                isCompleted: false,
+                serverResponseLatencyMs: Date.now() - startTime
             }, { status: 200 });
         }
         const language = bot.language || 'en';
@@ -240,7 +317,7 @@ export async function POST(req: Request) {
         // may have candidateDataFields populated but collectCandidateData = false.
         // Mirror the same auto-enable logic used in chatbot/message/route.ts.
         const shouldCollectData = Boolean((bot as any).collectCandidateData) || (Array.isArray(candidateDataFields) && candidateDataFields.length > 0);
-        console.log('[DEBUG chat/route] shouldCollectData:', shouldCollectData, typeof shouldCollectData, 'collectCandidateData:', (bot as any).collectCandidateData, 'candidateDataFields:', candidateDataFields);
+        requestLog('[DEBUG chat/route] shouldCollectData:', shouldCollectData, typeof shouldCollectData, 'collectCandidateData:', (bot as any).collectCandidateData, 'candidateDataFields:', candidateDataFields);
         const lastIncomingMessage = incomingMessages[incomingMessages.length - 1];
         const interviewProject = (bot as any).project || {};
         const interviewOrganizationId: string | null =
@@ -405,7 +482,9 @@ export async function POST(req: Request) {
                 return Response.json({
                     text: replayedAssistant.content,
                     currentTopicId: conversation.currentTopicId,
-                    isCompleted: conversation.status === 'COMPLETED'
+                    isCompleted: conversation.status === 'COMPLETED',
+                    interactionPayload: ((replayedAssistant.metadata as Record<string, unknown> | null)?.interactionPayload as InterviewInteractionPayload | null) ?? null,
+                    serverResponseLatencyMs: Date.now() - startTime
                 });
             }
         }
@@ -427,6 +506,7 @@ export async function POST(req: Request) {
                         currentTopicId: conversation.currentTopicId,
                         isCompleted: false,
                         degraded: true,
+                        serverResponseLatencyMs: Date.now() - startTime,
                         code: (creditsCheck as any).code || 'ACCESS_DENIED',
                         error: creditsCheck.error,
                         creditsNeeded: creditsCheck.creditsNeeded,
@@ -450,6 +530,10 @@ export async function POST(req: Request) {
 
         const saveUserMessagePromise = (async () => {
             if (lastIncomingMessage?.role !== 'user') return null;
+            const userMessageMetadata = {
+                ...(clientMessageId ? { clientMessageId } : {}),
+                ...(requestStructuredSubmission ? { structuredSubmission: requestStructuredSubmission } : {})
+            };
 
             if (clientMessageId) {
                 const existingUserMessage = await prisma.message.findFirst({
@@ -472,12 +556,19 @@ export async function POST(req: Request) {
                         conversationId,
                         role: 'user',
                         content: lastIncomingMessage.content,
-                        metadata: { clientMessageId }
+                        metadata: userMessageMetadata
                     }
                 });
             }
 
-            return ChatService.saveUserMessage(conversationId, lastIncomingMessage.content);
+            return prisma.message.create({
+                data: {
+                    conversationId,
+                    role: 'user',
+                    content: lastIncomingMessage.content,
+                    metadata: userMessageMetadata
+                }
+            });
         })();
 
         const [savedUserMessage, , openAIKey, runtimeModels] = await Promise.all([
@@ -489,7 +580,7 @@ export async function POST(req: Request) {
             // Pre-fetch routed models (primary + critical paths)
             LLMService.getInterviewRuntimeModels(bot)
         ]);
-        console.log(`⏱️ [TIMING] Parallel ops: ${Date.now() - parallelStart}ms`);
+        requestLog(`⏱️ Parallel ops: ${Date.now() - parallelStart}ms`);
 
         const canonicalMessages: ClientMessage[] = conversation.messages.map(m => ({
             role: (m.role as ClientMessage['role']) || 'assistant',
@@ -543,7 +634,8 @@ export async function POST(req: Request) {
             return Response.json({
                 text: safetyMessage,
                 currentTopicId: conversation.currentTopicId,
-                isCompleted: true
+                isCompleted: true,
+                serverResponseLatencyMs: Date.now() - startTime
             });
         }
 
@@ -551,7 +643,7 @@ export async function POST(req: Request) {
         const botTopics = [...bot.topics].sort((a, b) => a.orderIndex - b.orderIndex);
         const numTopics = botTopics.length;
         const interviewPlan = await getOrCreateInterviewPlan(bot, tierConfig.budgets);
-        console.log("📊 [PLAN] Meta:", {
+        requestLog("📊 [PLAN] Meta:", {
             maxDurationMins: interviewPlan.meta.maxDurationMins,
             totalTimeSec: interviewPlan.meta.totalTimeSec,
             perTopicTimeSec: interviewPlan.meta.perTopicTimeSec,
@@ -597,7 +689,7 @@ export async function POST(req: Request) {
             deepLastSubGoalByTopic: rawMetadata.deepLastSubGoalByTopic ?? {},
             forceConsentQuestion: rawMetadata.forceConsentQuestion ?? false,
             clarificationTurnsByTopic: rawMetadata.clarificationTurnsByTopic ?? {},
-            extensionReturnPhase: rawMetadata.extensionReturnPhase ?? null,
+            extensionReturnPhase: normalizeExtensionReturnPhase(rawMetadata.extensionReturnPhase),
             extensionReturnTopicIndex: rawMetadata.extensionReturnTopicIndex ?? null,
             extensionReturnTurnInTopic: rawMetadata.extensionReturnTurnInTopic ?? null,
             extensionOfferAttempts: rawMetadata.extensionOfferAttempts ?? 0,
@@ -605,7 +697,26 @@ export async function POST(req: Request) {
             runtimeInterviewKnowledge: rawMetadata.runtimeInterviewKnowledge ?? null,
             runtimeInterviewKnowledgeSignature: rawMetadata.runtimeInterviewKnowledgeSignature ?? null,
             cilState: rawMetadata.cilState ?? null,
+            activeInteractionId: rawMetadata.activeInteractionId ?? null,
+            activeInteractionKind: rawMetadata.activeInteractionKind ?? null,
+            activeInteractionFieldId: rawMetadata.activeInteractionFieldId ?? null,
         };
+        const structuredSubmissionMatchesActiveInteraction = Boolean(
+            requestStructuredSubmission &&
+            state.phase === 'DATA_COLLECTION' &&
+            state.activeInteractionId &&
+            requestStructuredSubmission.interactionId === state.activeInteractionId &&
+            requestStructuredSubmission.kind === state.activeInteractionKind &&
+            (
+                requestStructuredSubmission.kind !== 'field' ||
+                requestStructuredSubmission.fieldId === state.activeInteractionFieldId
+            )
+        );
+        if (requestStructuredSubmission && !structuredSubmissionMatchesActiveInteraction) {
+            requestLog(
+                `⚠️ Ignoring mismatched structured submission kind=${requestStructuredSubmission.kind} field=${requestStructuredSubmission.kind === 'field' ? requestStructuredSubmission.fieldId : 'n/a'}`
+            );
+        }
 
         const activeTopics = state.phase === 'DEEPEN' ? getDeepTopics(botTopics, state.deepTopicOrder) : botTopics;
         const currentTopic = activeTopics[state.topicIndex] || botTopics[0];
@@ -632,36 +743,37 @@ export async function POST(req: Request) {
             state.runtimeInterviewKnowledge,
             runtimeKnowledgeSignature
         );
+        const hasLLMRuntimeKnowledge =
+            hasValidRuntimeKnowledge &&
+            state.runtimeInterviewKnowledge?.source === 'llm';
         const shouldPrepareRuntimeKnowledge =
             (state.phase === 'EXPLORE' || state.phase === 'DEEPEN') &&
             !manualInterviewGuide &&
             !hasValidRuntimeKnowledge;
-        const runtimeInterviewKnowledgePromise: Promise<RuntimeInterviewKnowledge | null> = shouldPrepareRuntimeKnowledge
-            ? generateRuntimeInterviewKnowledge({
-                model: runtimeModels.quality,
+        const fallbackRuntimeInterviewKnowledge = shouldPrepareRuntimeKnowledge
+            ? buildFallbackRuntimeInterviewKnowledge({
                 signature: runtimeKnowledgeSignature,
                 language,
                 interviewGoal: bot.researchGoal || '',
-                targetAudience: bot.targetAudience || '',
                 topics: interviewPlan.explore.topics.map((topic) => ({
                     topicId: topic.topicId,
                     topicLabel: topic.label,
                     subGoals: topic.subGoals || []
-                })),
-                timeoutMs: tierConfig.knowledge.runtimeKnowledgeTimeoutMs,
-                interviewerQuality: interviewerQuality,
-                onUsage: collectLlmUsage
+                }))
             })
-            : Promise.resolve(hasValidRuntimeKnowledge ? state.runtimeInterviewKnowledge || null : null);
+            : null;
+        const promptRuntimeInterviewKnowledge = hasValidRuntimeKnowledge
+            ? state.runtimeInterviewKnowledge || null
+            : fallbackRuntimeInterviewKnowledge;
 
-        console.log(`📊 [STATE] Phase: ${state.phase}, Topic: ${currentTopic.label}, Index: ${state.topicIndex}, Turn: ${state.turnInTopic}`);
-        console.log(`⏱️ [TIME] Effective: ${effectiveSec}s / Max: ${maxDurationMins}m`);
+        requestLog(`📊 [STATE] Phase: ${state.phase}, Topic: ${currentTopic.label}, Index: ${state.topicIndex}, Turn: ${state.turnInTopic}`);
+        requestLog(`⏱️ [TIME] Effective: ${effectiveSec}s / Max: ${maxDurationMins}m`);
         if (process.env.NODE_ENV === 'development' && lastMessage?.role === 'user') {
             const userPreview = String(lastMessage.content || '').slice(0, 400);
             console.log("💬 [USER] Preview:", userPreview);
         }
 
-        console.log("📊 [CHAT] State:", {
+        requestLog("📊 [CHAT] State:", {
             phase: state.phase,
             topic: currentTopic.label,
             topicIndex: state.topicIndex,
@@ -679,8 +791,10 @@ export async function POST(req: Request) {
         let supervisorInsight: SupervisorInsight = createDefaultSupervisorInsight();
         const isAvanzato = interviewerQuality === 'avanzato';
         // Mutable ref so buildDeepOfferInsight (defined below) can read the CIL result
-        // that is only resolved later via await cilPromise.
-        const cilAnalysisRef: { current: CILAnalysis | null } = { current: null };
+        // available for the current turn without waiting on a fresh CIL pass.
+        const cilAnalysisRef: { current: CILAnalysis | null } = {
+            current: buildPromptCILAnalysis(state.cilState ?? null)
+        };
 
         const buildDeepOfferInsight = (
             sourceState: InterviewState,
@@ -688,6 +802,7 @@ export async function POST(req: Request) {
         ) => buildContextualDeepOfferInsight({
             state: sourceState,
             botTopics,
+            interviewPlan,
             interviewObjective,
             language,
             validationFeedback,
@@ -699,18 +814,61 @@ export async function POST(req: Request) {
             nextState.lastUserTopicId = currentTopic.id;
         }
 
+        const topicalUserTurnEvaluationPromise =
+            lastMessage?.role === 'user' && (state.phase === 'EXPLORE' || state.phase === 'DEEPEN')
+                ? evaluateTopicalUserTurn({
+                    userMessage: lastMessage.content,
+                    apiKey: openAIKey,
+                    language,
+                    phase: state.phase,
+                    currentTopicLabel: currentTopic.label,
+                    targetTopicLabel: currentTopic.label,
+                    interviewObjective,
+                    options: { onUsage: collectLlmUsage }
+                })
+                : null;
+
+        let topicalUserTurnEvaluation: Awaited<ReturnType<typeof evaluateTopicalUserTurn>> | null = null;
+        let topicTurnDecision: TopicTurnDecision | null = null;
+        let topicTurnSignalResult: ReturnType<typeof computeSignalScore> | null = null;
+        let topicTurnRemainingTargetSubGoals = 0;
+        let topicTurnRemainingStretchSubGoals = 0;
+
+        if (topicalUserTurnEvaluationPromise && lastMessage?.role === 'user') {
+            topicalUserTurnEvaluation = await topicalUserTurnEvaluationPromise;
+            topicTurnSignalResult = computeSignalScore(lastMessage.content || '', language);
+            topicTurnRemainingTargetSubGoals = getRemainingSubGoals(
+                currentTopic,
+                state.topicSubGoalHistory,
+                interviewPlan,
+                'target_only'
+            ).length;
+            topicTurnRemainingStretchSubGoals = getRemainingSubGoals(
+                currentTopic,
+                state.topicSubGoalHistory,
+                interviewPlan,
+                'target_and_stretch'
+            ).length;
+            topicTurnDecision = buildTopicTurnDecision({
+                phase: state.phase as 'EXPLORE' | 'DEEPEN',
+                interviewerQuality,
+                interpretation: topicalUserTurnEvaluation,
+                signalScore: topicTurnSignalResult.score,
+                remainingTargetSubGoals: topicTurnRemainingTargetSubGoals,
+                remainingStretchSubGoals: topicTurnRemainingStretchSubGoals,
+                turnInTopic: state.turnInTopic,
+                maxTurnsInTopic: state.phase === 'DEEPEN'
+                    ? getDeepPlanTurns(interviewPlan, currentTopic.id)
+                    : getScanPlanTurns(interviewPlan, currentTopic.id)
+            });
+        }
+
         let forceEarlyClosureFromUser = false;
         // Skip closure detection in DEEP_OFFER phase - it has its own logic to handle REFUSE vs ACCEPT
         if (lastMessage?.role === 'user' && state.phase !== 'DATA_COLLECTION' && state.phase !== 'DEEP_OFFER') {
-            const closureIntent = await detectExplicitClosureIntent(
-                lastMessage.content,
-                openAIKey,
-                language,
-                { onUsage: collectLlmUsage }
-            );
-            if (closureIntent.wantsToConclude && closureIntent.confidence !== 'low') {
+            if (topicalUserTurnEvaluation?.wantsToConclude && topicalUserTurnEvaluation.closureConfidence !== 'low') {
                 forceEarlyClosureFromUser = true;
-                console.log(`🛑 [SUPERVISOR] Explicit user intent to conclude detected. reason="${closureIntent.reason}" confidence=${closureIntent.confidence}`);
+                console.log(`🛑 [SUPERVISOR] Explicit user intent to conclude detected. reason="${topicalUserTurnEvaluation.closureReason}" confidence=${topicalUserTurnEvaluation.closureConfidence}`);
 
                 // Reset extension state to avoid offer loops and move straight to closure path.
                 nextState.deepAccepted = false;
@@ -726,13 +884,13 @@ export async function POST(req: Request) {
                     nextState.forceConsentQuestion = true;
                     supervisorInsight = {
                         status: 'DATA_COLLECTION_CONSENT',
-                        stopReason: closureIntent.reason
+                        stopReason: topicalUserTurnEvaluation.closureReason
                     };
                 } else {
                     nextState.phase = 'DATA_COLLECTION';
                     supervisorInsight = {
                         status: 'COMPLETE_WITHOUT_DATA',
-                        stopReason: closureIntent.reason
+                        stopReason: topicalUserTurnEvaluation.closureReason
                     };
                 }
             }
@@ -755,7 +913,10 @@ export async function POST(req: Request) {
                     maxDurationMins,
                     effectiveSec,
                     bonusTurnCap: tierConfig.budgets.bonusTurnCap,
-                    advanceAfterUsableFirstAnswer: interviewerQuality === 'standard'
+                    advanceAfterUsableFirstAnswer: false,
+                    topicSubGoalHistory: state.topicSubGoalHistory,
+                    interviewerQuality,
+                    turnDecision: topicTurnDecision
                 });
 
                 // Merge explore result into nextState
@@ -770,7 +931,16 @@ export async function POST(req: Request) {
             // PHASE: DEEP_OFFER
             // --------------------------------------------------------------------
             else if (state.phase === 'DEEP_OFFER') {
-                console.log(`🎁 [DEEP_OFFER] State: deepAccepted=${state.deepAccepted} returnPhase=${state.extensionReturnPhase || 'DEEP'} attempts=${state.extensionOfferAttempts || 0}`);
+                requestLog(`🎁 [DEEP_OFFER] State: deepAccepted=${state.deepAccepted} returnPhase=${state.extensionReturnPhase || 'DEEPEN'} attempts=${state.extensionOfferAttempts || 0}`);
+                const deepOfferIntentCache = new Map<string, Promise<'ACCEPT' | 'REFUSE' | 'NEUTRAL'>>();
+                const evaluateDeepOfferIntent = (userMessage: string): Promise<'ACCEPT' | 'REFUSE' | 'NEUTRAL'> => {
+                    const cacheKey = String(userMessage || '');
+                    const cached = deepOfferIntentCache.get(cacheKey);
+                    if (cached) return cached;
+                    const intentPromise = checkUserIntent(userMessage, openAIKey, language, 'deep_offer', { onUsage: collectLlmUsage });
+                    deepOfferIntentCache.set(cacheKey, intentPromise);
+                    return intentPromise;
+                };
                 const deepOfferResult = await runDeepOfferPhase({
                     state: state as InterviewStateLike,
                     nextState: nextState as InterviewStateLike,
@@ -783,8 +953,16 @@ export async function POST(req: Request) {
                     deepExtraTurnCap: tierConfig.budgets.deepExtraTurnCap,
                     deps: {
                         checkUserIntent: async (userMessage: string, context: 'deep_offer') =>
-                            checkUserIntent(userMessage, openAIKey, language, context, { onUsage: collectLlmUsage }),
-                        isExtensionOfferQuestion: (message: string) => isExtensionOfferQuestion(message, language),
+                            context === 'deep_offer'
+                                ? evaluateDeepOfferIntent(userMessage)
+                                : checkUserIntent(userMessage, openAIKey, language, context, { onUsage: collectLlmUsage }),
+                        isExtensionOfferQuestion: async (message: string) =>
+                            isAssistantExtensionOffer({
+                                assistantMessage: message,
+                                apiKey: openAIKey,
+                                language,
+                                options: { onUsage: collectLlmUsage }
+                            }),
                         buildDeepOfferInsight: (sourceState: InterviewStateLike, validationFeedback?: ValidationResponse) =>
                             buildDeepOfferInsight(sourceState as InterviewState, validationFeedback),
                         buildDeepPlan: (remainingSec: number) =>
@@ -798,7 +976,7 @@ export async function POST(req: Request) {
                                 language
                             ),
                         getDeepTopics: (deepOrder?: string[]) => getDeepTopics(botTopics, deepOrder),
-                        getRemainingSubGoals: (topic: any, history?: Record<string, string[]>) => getRemainingSubGoals(topic, history),
+                        getRemainingSubGoals: (topic: any, history?: Record<string, string[]>) => getRemainingSubGoals(topic, history, interviewPlan, 'target_and_stretch'),
                         selectDeepFocusPoint: ({ topic, availableSubGoals, engagingSnippet, lastUserMessage }) =>
                             selectDeepFocusPoint({
                                 topic,
@@ -830,7 +1008,11 @@ export async function POST(req: Request) {
                     maxDurationMins,
                     effectiveSec,
                     deepenMaxTurnsPerTopic: tierConfig.budgets.deepenMaxTurnsPerTopic,
-                    deepExtraTurnCap: tierConfig.budgets.deepExtraTurnCap
+                    deepExtraTurnCap: tierConfig.budgets.deepExtraTurnCap,
+                    interviewPlan,
+                    topicSubGoalHistory: state.topicSubGoalHistory,
+                    interviewerQuality,
+                    turnDecision: topicTurnDecision
                 });
 
                 // Merge deepen result into nextState
@@ -895,6 +1077,30 @@ export async function POST(req: Request) {
                     const candidateFieldIds = normalizeCandidateFieldIds(candidateFields);
                     let currentProfile = (conversation.candidateProfile as any) || {};
                     let justAcceptedConsentThisTurn = false;
+                    const dataCollectionInterpretationCache = new Map<string, Promise<DataCollectionTurnInterpretation>>();
+                    const evaluateCurrentDataCollectionTurn = (params: {
+                        consentRequested: boolean;
+                        expectedFieldName?: string | null;
+                    }): Promise<DataCollectionTurnInterpretation> => {
+                        const userText = lastMessage?.role === 'user' ? lastMessage.content : '';
+                        const cacheKey = JSON.stringify({
+                            userText,
+                            consentRequested: params.consentRequested,
+                            expectedFieldName: params.expectedFieldName || null
+                        });
+                        const cached = dataCollectionInterpretationCache.get(cacheKey);
+                        if (cached) return cached;
+                        const evaluationPromise = evaluateDataCollectionUserTurn({
+                            userMessage: userText,
+                            apiKey: openAIKey,
+                            language,
+                            consentRequested: params.consentRequested,
+                            expectedFieldName: params.expectedFieldName || null,
+                            options: { onUsage: collectLlmUsage }
+                        });
+                        dataCollectionInterpretationCache.set(cacheKey, evaluationPromise);
+                        return evaluationPromise;
+                    };
                     console.log(`📋 [DATA_COLLECTION] Fields to collect: ${candidateFieldIds.join(', ')}`);
                     console.log(`📋 [DATA_COLLECTION] Current profile keys: ${Object.keys(currentProfile).join(', ') || 'none'}`);
 
@@ -908,13 +1114,14 @@ export async function POST(req: Request) {
                     } else if (state.consentGiven === false) {
                         // We asked for consent, now check user's response
                         console.log(`📋 [DATA_COLLECTION] Checking consent response`);
-                        const intent = await checkUserIntent(
-                            lastMessage?.content || '',
-                            openAIKey,
-                            language,
-                            'consent',
-                            { onUsage: collectLlmUsage }
-                        );
+                        const interpretation = structuredSubmissionMatchesActiveInteraction && requestStructuredSubmission?.kind === 'consent'
+                            ? {
+                                consentIntent: requestStructuredSubmission.action === 'accept' ? 'ACCEPT' : 'REFUSE'
+                            }
+                            : await evaluateCurrentDataCollectionTurn({
+                                consentRequested: true
+                            });
+                        const intent = interpretation.consentIntent;
                         console.log(`📋 [DATA_COLLECTION] Intent detected: ${intent}`);
 
                         if (intent === 'ACCEPT') {
@@ -973,249 +1180,264 @@ export async function POST(req: Request) {
                             // Critical: do not process the consent message as field content.
                         } else {
                             let haltCollection = false;
-
-                        // CHECK (semantic): Did user change their mind mid-collection?
-                        const midCollectionClosureIntent = lastMessage?.role === 'user'
-                            ? await detectExplicitClosureIntent(lastMessage.content, openAIKey, language, { onUsage: collectLlmUsage })
-                            : { wantsToConclude: false, confidence: 'low' as const, reason: 'no_user_message' };
-                        const userWantsToStopMidCollection =
-                            midCollectionClosureIntent.wantsToConclude && midCollectionClosureIntent.confidence !== 'low';
-
-                        // CHECK: Is user frustrated/complaining about repeated questions?
-                        const FRUSTRATION_IT = /\b(già (detto|chiesto)|te l'ho (già|appena)|incantato|bloccato|ripeti|sempre la stessa|loop)\b/i;
-                        const FRUSTRATION_EN = /\b(already (told|said|asked)|just (told|said)|stuck|loop|same question|repeating)\b/i;
-                        const frustrationPattern = language === 'it' ? FRUSTRATION_IT : FRUSTRATION_EN;
-                        const userFrustrated = lastMessage?.role === 'user' && frustrationPattern.test(lastMessage.content);
-
-                        if (userWantsToStopMidCollection) {
-                            console.log(`📋 [DATA_COLLECTION] User wants to stop mid-collection (semantic). reason="${midCollectionClosureIntent.reason}" confidence=${midCollectionClosureIntent.confidence}`);
-                            await completeInterview(
-                                conversationId,
-                                canonicalMessages,
-                                openAIKey,
-                                currentProfile,
-                                { simulationMode, onLlmUsage: collectLlmUsage, language, effectiveDuration: typeof effectiveDuration === 'number' ? effectiveDuration : null }
+                            const missingFieldIds = candidateFieldIds.filter((fieldName: string) =>
+                                !currentProfile[fieldName] && currentProfile[fieldName] !== '__SKIPPED__'
                             );
-                            supervisorInsight = { status: 'COMPLETE_WITHOUT_DATA' };
-                            nextState.dataCollectionRefused = true;
-                            haltCollection = true;
-                        }
+                            const lastAsked = state.lastAskedField;
+                            const prioritizedField = (lastAsked && missingFieldIds.includes(lastAsked))
+                                ? lastAsked
+                                : (missingFieldIds[0] || null);
+                            const structuredFieldSubmission = (
+                                structuredSubmissionMatchesActiveInteraction &&
+                                requestStructuredSubmission?.kind === 'field' &&
+                                prioritizedField &&
+                                requestStructuredSubmission.fieldId === prioritizedField
+                            )
+                                ? requestStructuredSubmission
+                                : null;
+                            const dataCollectionInterpretation = lastMessage?.role === 'user' && !structuredFieldSubmission
+                                ? await evaluateCurrentDataCollectionTurn({
+                                    consentRequested: false,
+                                    expectedFieldName: prioritizedField
+                                })
+                                : {
+                                    consentIntent: 'NEUTRAL',
+                                    wantsToConclude: false,
+                                    closureConfidence: 'low',
+                                    isFrustrated: false,
+                                    wantsToSkipField: false,
+                                    extractedExpectedFieldValue: null,
+                                    extractedExpectedFieldConfidence: 'none'
+                                } satisfies DataCollectionTurnInterpretation;
 
-                        // If user is frustrated about repeated questions, try to extract info from conversation history
-                        // and complete the interview with what we have
-                        if (userFrustrated) {
-                            console.log(`⚠️ [DATA_COLLECTION] User frustrated - attempting to extract from history and complete`);
+                            const userWantsToStopMidCollection =
+                                dataCollectionInterpretation.wantsToConclude &&
+                                dataCollectionInterpretation.closureConfidence !== 'low';
 
-                            // Determine which name field is configured (name or fullName)
-                            const configuredNameField = candidateFieldIds.find((fieldName: string) =>
-                                fieldName === 'name' || fieldName === 'fullName'
-                            );
-                            const nameFieldKey = configuredNameField || 'fullName';
+                            if (userWantsToStopMidCollection) {
+                                console.log(`📋 [DATA_COLLECTION] User wants to stop mid-collection (semantic). confidence=${dataCollectionInterpretation.closureConfidence}`);
+                                await completeInterview(
+                                    conversationId,
+                                    canonicalMessages,
+                                    openAIKey,
+                                    currentProfile,
+                                    { simulationMode, onLlmUsage: collectLlmUsage, language, effectiveDuration: typeof effectiveDuration === 'number' ? effectiveDuration : null }
+                                );
+                                supervisorInsight = { status: 'COMPLETE_WITHOUT_DATA' };
+                                nextState.dataCollectionRefused = true;
+                                haltCollection = true;
+                            }
 
-                            // Try to find the name in previous messages if we don't have it
-                            if (!currentProfile[nameFieldKey]) {
-                                // Look for a short reply (1-3 words) after a "name" question
-                                for (let i = canonicalMessages.length - 1; i >= 0; i--) {
-                                    const msg = canonicalMessages[i];
-                                    if (msg.role === 'user') {
-                                        const content = msg.content.trim();
-                                        const words = content.split(/\s+/);
-                                        // Short response that looks like a name
-                                        if (words.length <= 3 && content.length < 30 && !/[@\d]/.test(content) && !isLikelyNonValueAck(content)) {
-                                            const cleanedName = content.replace(/[.!?,;:]/g, '').trim();
-                                            if (cleanedName.length > 1) {
-                                                currentProfile = { ...currentProfile, [nameFieldKey]: cleanedName };
-                                                console.log(`✅ [DATA_COLLECTION] Recovered name from history for "${nameFieldKey}"`);
-                                                await prisma.conversation.update({
-                                                    where: { id: conversationId },
-                                                    data: { candidateProfile: currentProfile }
-                                                });
-                                                break;
+                            // If user is frustrated about repeated questions, try to recover obvious data and complete.
+                            if (!haltCollection && dataCollectionInterpretation.isFrustrated) {
+                                console.log(`⚠️ [DATA_COLLECTION] User frustrated - attempting to extract from history and complete`);
+
+                                const configuredNameField = candidateFieldIds.find((fieldName: string) =>
+                                    fieldName === 'name' || fieldName === 'fullName'
+                                );
+                                const nameFieldKey = configuredNameField || 'fullName';
+
+                                if (!currentProfile[nameFieldKey]) {
+                                    for (let i = canonicalMessages.length - 1; i >= 0; i--) {
+                                        const msg = canonicalMessages[i];
+                                        if (msg.role === 'user') {
+                                            const content = msg.content.trim();
+                                            const words = content.split(/\s+/);
+                                            if (words.length <= 3 && content.length < 30 && !/[@\d]/.test(content)) {
+                                                const cleanedName = content.replace(/[.!?,;:]/g, '').trim();
+                                                if (cleanedName.length > 1) {
+                                                    currentProfile = { ...currentProfile, [nameFieldKey]: cleanedName };
+                                                    console.log(`✅ [DATA_COLLECTION] Recovered name from history for "${nameFieldKey}"`);
+                                                    await prisma.conversation.update({
+                                                        where: { id: conversationId },
+                                                        data: { candidateProfile: currentProfile }
+                                                    });
+                                                    break;
+                                                }
                                             }
                                         }
                                     }
                                 }
+
+                                await completeInterview(
+                                    conversationId,
+                                    canonicalMessages,
+                                    openAIKey,
+                                    currentProfile,
+                                    { simulationMode, onLlmUsage: collectLlmUsage, language, effectiveDuration: typeof effectiveDuration === 'number' ? effectiveDuration : null }
+                                );
+                                supervisorInsight = { status: 'COMPLETE_WITHOUT_DATA' };
+                                haltCollection = true;
                             }
 
-                            // Complete with what we have
-                            await completeInterview(
-                                conversationId,
-                                canonicalMessages,
-                                openAIKey,
-                                currentProfile,
-                                { simulationMode, onLlmUsage: collectLlmUsage, language, effectiveDuration: typeof effectiveDuration === 'number' ? effectiveDuration : null }
-                            );
-                            supervisorInsight = { status: 'COMPLETE_WITHOUT_DATA' };
-                            haltCollection = true;
-                        }
-
                             if (!haltCollection) {
-                            // CHECK: Did user say they don't have this field? ("non ho email", "I don't have")
-                            const SKIP_FIELD_IT = /\b(non ho|non ce l'ho|non posso|preferisco non)\b/i;
-                            const SKIP_FIELD_EN = /\b(i don't have|don't have|can't provide|prefer not to)\b/i;
-                            const skipPattern = language === 'it' ? SKIP_FIELD_IT : SKIP_FIELD_EN;
-                            const userWantsToSkip = lastMessage?.role === 'user' && skipPattern.test(lastMessage.content);
-
-                            // Targeted extraction strategy:
-                            // 1) prioritize the field we just asked,
-                            // 2) opportunistically capture deterministic structured fields (email/phone/url),
-                            // 3) avoid broad multi-field LLM extraction to reduce false positives.
-                            if (lastMessage?.role === 'user' && !userWantsToSkip && !justAcceptedConsentThisTurn) {
-                                const missingFieldIds = candidateFieldIds.filter((fieldName: string) =>
-                                    !currentProfile[fieldName] && currentProfile[fieldName] !== '__SKIPPED__'
+                                const userWantsToSkip = Boolean(
+                                    structuredFieldSubmission
+                                        ? structuredFieldSubmission.action === 'skip'
+                                        : (dataCollectionInterpretation.wantsToSkipField && prioritizedField)
                                 );
-                                const lastAsked = state.lastAskedField;
-                                const prioritizedField = (lastAsked && missingFieldIds.includes(lastAsked))
-                                    ? lastAsked
-                                    : (missingFieldIds[0] || null);
 
                                 console.log(`📋 [DATA_COLLECTION] Missing fields: ${missingFieldIds.join(', ') || 'none'}`);
                                 console.log(`📋 [DATA_COLLECTION] Prioritized field: ${prioritizedField || 'none'}`);
 
-                                const userReply = lastMessage.content.trim();
-                                const wordCount = userReply.split(/\s+/).length;
-                                let profileChanged = false;
+                                // Targeted extraction strategy:
+                                // 1) prioritize the field we just asked,
+                                // 2) opportunistically capture deterministic structured fields (email/phone/url),
+                                // 3) use one semantic extraction for the prioritized field only when needed.
+                                if (prioritizedField && structuredFieldSubmission && structuredFieldSubmission.action === 'submit' && !justAcceptedConsentThisTurn) {
+                                    const rawStructuredValue = String(
+                                        structuredFieldSubmission.value ??
+                                        structuredFieldSubmission.optionId ??
+                                        ''
+                                    ).trim();
+                                    let extractedValue: string | null = rawStructuredValue || null;
+                                    let extractedConfidence: 'high' | 'low' | 'none' = extractedValue ? 'high' : 'none';
 
-                                // Opportunistic deterministic extraction for structured fields present in free text.
-                                const opportunisticFields = missingFieldIds.filter((fieldName: string) =>
-                                    ['email', 'phone', 'linkedin', 'portfolio'].includes(fieldName) && fieldName !== prioritizedField
-                                );
-                                for (const fieldName of opportunisticFields) {
-                                    const deterministicValue = extractDeterministicFieldValue(fieldName, lastMessage.content);
-                                    if (deterministicValue) {
-                                        currentProfile = { ...currentProfile, [fieldName]: deterministicValue };
-                                        profileChanged = true;
-                                        console.log(`✅ [DATA_COLLECTION] Opportunistic deterministic capture for "${fieldName}"`);
-                                    }
-                                }
-
-                                if (prioritizedField) {
-                                    // Direct capture for NAME (1-3 words, no special chars)
-                                    const isNameField = prioritizedField === 'fullName' || prioritizedField === 'name';
-                                    const nameFieldKey = prioritizedField === 'name' ? 'name' : 'fullName';
-                                    if (isNameField && wordCount <= 3 && !currentProfile[nameFieldKey] && !isLikelyNonValueAck(userReply)) {
-                                        const cleanedName = userReply.replace(/[.!?,;:]/g, '').trim();
-                                        if (cleanedName.length > 0 && cleanedName.length < 50 && !/[@\d]/.test(cleanedName)) {
-                                            currentProfile = { ...currentProfile, [nameFieldKey]: cleanedName };
-                                            profileChanged = true;
-                                            console.log(`✅ [DATA_COLLECTION] Direct name capture for "${nameFieldKey}"`);
-                                        }
-                                    }
-
-                                    // Direct capture for COMPANY (1-5 words, reasonable length)
-                                    if (prioritizedField === 'company' && wordCount <= 5 && !currentProfile.company && !isLikelyNonValueAck(userReply)) {
-                                        const cleanedCompany = userReply.replace(/[.!?,;:]/g, '').trim();
-                                        if (cleanedCompany.length > 1 && cleanedCompany.length < 100 &&
-                                            !/^(no|non|basta|stop|te l'ho|l'ho già|già detto)/i.test(cleanedCompany)) {
-                                            currentProfile = { ...currentProfile, company: cleanedCompany };
-                                            profileChanged = true;
-                                            console.log(`✅ [DATA_COLLECTION] Direct company capture`);
-                                        }
-                                    }
-
-                                    // Direct capture for ROLE (1-4 words)
-                                    if (prioritizedField === 'role' && wordCount <= 4 && !currentProfile.role && !isLikelyNonValueAck(userReply)) {
-                                        const cleanedRole = userReply.replace(/[.!?,;:]/g, '').trim();
-                                        if (cleanedRole.length > 1 && cleanedRole.length < 50 &&
-                                            !/^(no|non|basta|stop|te l'ho|l'ho già|già detto)/i.test(cleanedRole)) {
-                                            currentProfile = { ...currentProfile, role: cleanedRole };
-                                            profileChanged = true;
-                                            console.log(`✅ [DATA_COLLECTION] Direct role capture`);
-                                        }
-                                    }
-
-                                    if (!currentProfile[prioritizedField]) {
-                                        const deterministicValue = extractDeterministicFieldValue(prioritizedField, lastMessage.content);
+                                    if (['email', 'phone', 'linkedin', 'portfolio'].includes(prioritizedField)) {
+                                        const deterministicValue = extractDeterministicFieldValue(prioritizedField, rawStructuredValue);
                                         if (deterministicValue) {
-                                            currentProfile = { ...currentProfile, [prioritizedField]: deterministicValue };
-                                            profileChanged = true;
-                                            console.log(`✅ [DATA_COLLECTION] Deterministic extraction for "${prioritizedField}"`);
+                                            extractedValue = deterministicValue;
+                                            extractedConfidence = 'high';
+                                        } else {
+                                            extractedValue = null;
+                                            extractedConfidence = rawStructuredValue ? 'low' : 'none';
                                         }
                                     }
 
-                                    if (!currentProfile[prioritizedField]) {
-                                        const extraction = await extractFieldFromMessage(
-                                            prioritizedField,
-                                            lastMessage.content,
-                                            openAIKey,
-                                            language,
-                                            { onUsage: collectLlmUsage }
-                                        );
-                                        const attemptCount = (state.fieldAttemptCounts?.[prioritizedField] || 0) + 1;
+                                    const attemptCount = (state.fieldAttemptCounts?.[prioritizedField] || 0) + 1;
+                                    const validationResult = validateExtractedField(
+                                        prioritizedField,
+                                        extractedValue,
+                                        extractedConfidence,
+                                        attemptCount,
+                                        language as 'it' | 'en'
+                                    );
 
-                                        // Validate with structured feedback
-                                        const validationResult = validateExtractedField(
-                                            prioritizedField,
-                                            extraction.value,
-                                            extraction.confidence,
-                                            attemptCount,
-                                            language as 'it' | 'en'
-                                        );
+                                    if (validationResult.isValid) {
+                                        currentProfile = { ...currentProfile, [prioritizedField]: extractedValue };
+                                        await prisma.conversation.update({
+                                            where: { id: conversationId },
+                                            data: { candidateProfile: currentProfile }
+                                        });
+                                        console.log(`✅ [DATA_COLLECTION] Structured submission saved for "${prioritizedField}"`);
+                                    } else if (!supervisorInsight.validationFeedback) {
+                                        supervisorInsight.validationFeedback = validationResult;
+                                        supervisorInsight.feedbackMessage = validationResult.feedback;
+                                        console.log(`⚠️ [DATA_COLLECTION] Structured submission invalid for "${prioritizedField}": ${validationResult.reason}`);
+                                    }
+                                } else if (lastMessage?.role === 'user' && !userWantsToSkip && !justAcceptedConsentThisTurn) {
+                                    let profileChanged = false;
 
-                                        console.log(`🔍 [DATA_COLLECTION] Extraction result for "${prioritizedField}": confidence="${extraction.confidence}" feedback="${validationResult.feedback}"`);
-
-                                        if (validationResult.isValid) {
-                                            currentProfile = { ...currentProfile, [prioritizedField]: extraction.value };
+                                    const opportunisticFields = missingFieldIds.filter((fieldName: string) =>
+                                        ['email', 'phone', 'linkedin', 'portfolio'].includes(fieldName) && fieldName !== prioritizedField
+                                    );
+                                    for (const fieldName of opportunisticFields) {
+                                        const deterministicValue = extractDeterministicFieldValue(fieldName, lastMessage.content);
+                                        if (deterministicValue) {
+                                            currentProfile = { ...currentProfile, [fieldName]: deterministicValue };
                                             profileChanged = true;
-                                            console.log(`✅ [DATA_COLLECTION] LLM extraction for "${prioritizedField}"`);
-                                        } else {
-                                            console.log(`⚠️ [DATA_COLLECTION] Could not extract "${prioritizedField}": ${validationResult.reason}`);
+                                            console.log(`✅ [DATA_COLLECTION] Opportunistic deterministic capture for "${fieldName}"`);
+                                        }
+                                    }
 
-                                            // Store validation feedback for supervisor/bot to use
+                                    if (prioritizedField) {
+                                        let extractedValue: string | null = null;
+                                        let extractedConfidence: 'high' | 'low' | 'none' = 'none';
+
+                                        if (!currentProfile[prioritizedField]) {
+                                            const deterministicValue = extractDeterministicFieldValue(prioritizedField, lastMessage.content);
+                                            if (deterministicValue) {
+                                                extractedValue = deterministicValue;
+                                                extractedConfidence = 'high';
+                                                console.log(`✅ [DATA_COLLECTION] Deterministic extraction for "${prioritizedField}"`);
+                                            }
+                                        }
+
+                                        if (!extractedValue && !currentProfile[prioritizedField]) {
+                                            extractedValue = dataCollectionInterpretation.extractedExpectedFieldValue;
+                                            extractedConfidence = dataCollectionInterpretation.extractedExpectedFieldConfidence;
+                                        }
+
+                                        if (extractedValue && !currentProfile[prioritizedField]) {
+                                            const attemptCount = (state.fieldAttemptCounts?.[prioritizedField] || 0) + 1;
+                                            const validationResult = validateExtractedField(
+                                                prioritizedField,
+                                                extractedValue,
+                                                extractedConfidence,
+                                                attemptCount,
+                                                language as 'it' | 'en'
+                                            );
+
+                                            console.log(`🔍 [DATA_COLLECTION] Extraction result for "${prioritizedField}": confidence="${extractedConfidence}" feedback="${validationResult.feedback}"`);
+
+                                            if (validationResult.isValid) {
+                                                currentProfile = { ...currentProfile, [prioritizedField]: extractedValue };
+                                                profileChanged = true;
+                                                console.log(`✅ [DATA_COLLECTION] Semantic extraction for "${prioritizedField}"`);
+                                            } else {
+                                                console.log(`⚠️ [DATA_COLLECTION] Could not extract "${prioritizedField}": ${validationResult.reason}`);
+                                                if (!supervisorInsight.validationFeedback) {
+                                                    supervisorInsight.validationFeedback = validationResult;
+                                                    supervisorInsight.feedbackMessage = validationResult.feedback;
+                                                }
+                                            }
+                                        } else if (!currentProfile[prioritizedField]) {
+                                            const attemptCount = (state.fieldAttemptCounts?.[prioritizedField] || 0) + 1;
+                                            const validationResult = validateExtractedField(
+                                                prioritizedField,
+                                                null,
+                                                'none',
+                                                attemptCount,
+                                                language as 'it' | 'en'
+                                            );
                                             if (!supervisorInsight.validationFeedback) {
                                                 supervisorInsight.validationFeedback = validationResult;
                                                 supervisorInsight.feedbackMessage = validationResult.feedback;
                                             }
                                         }
                                     }
-                                }
 
-                                // Save only when profile changed in this turn.
-                                if (profileChanged) {
+                                    if (profileChanged) {
+                                        await prisma.conversation.update({
+                                            where: { id: conversationId },
+                                            data: { candidateProfile: currentProfile }
+                                        });
+                                        console.log(`✅ [DATA_COLLECTION] Saved profile`);
+                                    }
+                                } else if (justAcceptedConsentThisTurn) {
+                                    console.log(`📋 [DATA_COLLECTION] Consent just accepted: skip extraction this turn and ask first missing field.`);
+                                } else if (userWantsToSkip && prioritizedField) {
+                                    console.log(`📋 [DATA_COLLECTION] User wants to skip "${prioritizedField}"`);
+                                    currentProfile = { ...currentProfile, [prioritizedField]: '__SKIPPED__' };
                                     await prisma.conversation.update({
                                         where: { id: conversationId },
                                         data: { candidateProfile: currentProfile }
                                     });
-                                    console.log(`✅ [DATA_COLLECTION] Saved profile`);
                                 }
-                            } else if (justAcceptedConsentThisTurn) {
-                                console.log(`📋 [DATA_COLLECTION] Consent just accepted: skip extraction this turn and ask first missing field.`);
-                            } else if (userWantsToSkip && state.lastAskedField) {
-                                // User wants to skip this field - mark it as skipped so we don't ask again
-                                console.log(`📋 [DATA_COLLECTION] User wants to skip "${state.lastAskedField}"`);
-                                currentProfile = { ...currentProfile, [state.lastAskedField]: '__SKIPPED__' };
-                                await prisma.conversation.update({
-                                    where: { id: conversationId },
-                                    data: { candidateProfile: currentProfile }
-                                });
-                            }
 
-                            // Find next missing field (skip fields marked as __SKIPPED__ or asked too many times)
-                            const MAX_FIELD_ATTEMPTS = 3; // Skip field if asked more than 3 times
-                            const nextField = getNextMissingCandidateField(
-                                candidateFieldIds,
-                                currentProfile,
-                                state.fieldAttemptCounts,
-                                MAX_FIELD_ATTEMPTS
-                            );
-                            console.log(`📋 [DATA_COLLECTION] Next field to ask: ${nextField || 'NONE - all collected/skipped'}`);
+                                const MAX_FIELD_ATTEMPTS = 3;
+                                const nextField = getNextMissingCandidateField(
+                                    candidateFieldIds,
+                                    currentProfile,
+                                    state.fieldAttemptCounts,
+                                    MAX_FIELD_ATTEMPTS
+                                );
+                                console.log(`📋 [DATA_COLLECTION] Next field to ask: ${nextField || 'NONE - all collected/skipped'}`);
 
-                            if (!nextField) {
-                                // All fields collected or skipped!
-                                console.log(`✅ [DATA_COLLECTION] All fields collected/skipped, letting AI say final goodbye`);
-                                supervisorInsight = { status: 'FINAL_GOODBYE' };
-                                nextState.lastAskedField = null;
-                            } else {
-                                // Set up to ask next field - track attempt count
-                                nextState.lastAskedField = nextField;
-                                nextState.dataCollectionAttempts = state.dataCollectionAttempts + 1;
-                                nextState.consentGiven = true;
-                                nextState.fieldAttemptCounts = {
-                                    ...state.fieldAttemptCounts,
-                                    [nextField]: (state.fieldAttemptCounts[nextField] || 0) + 1
-                                };
-                                supervisorInsight = { status: 'DATA_COLLECTION', nextSubGoal: nextField };
-                            }
+                                if (!nextField) {
+                                    console.log(`✅ [DATA_COLLECTION] All fields collected/skipped, letting AI say final goodbye`);
+                                    supervisorInsight = { status: 'FINAL_GOODBYE' };
+                                    nextState.lastAskedField = null;
+                                } else {
+                                    nextState.lastAskedField = nextField;
+                                    nextState.dataCollectionAttempts = state.dataCollectionAttempts + 1;
+                                    nextState.consentGiven = true;
+                                    nextState.fieldAttemptCounts = {
+                                        ...state.fieldAttemptCounts,
+                                        [nextField]: (state.fieldAttemptCounts[nextField] || 0) + 1
+                                    };
+                                    supervisorInsight = { status: 'DATA_COLLECTION', nextSubGoal: nextField };
+                                }
                             }
                         }
                     }
@@ -1226,10 +1448,10 @@ export async function POST(req: Request) {
         }
 
         // Log supervisor insight and next state transition for visibility
-        console.log(`📊 [SUPERVISOR] Insight: ${supervisorInsight?.status || 'N/A'}, NextSubGoal: ${supervisorInsight?.nextSubGoal || 'N/A'}`);
-        console.log(`🧭 [FLOW] Phase Transition: ${state.phase} -> ${nextState.phase}`);
+        requestLog(`📊 [SUPERVISOR] Insight: ${supervisorInsight?.status || 'N/A'}, NextSubGoal: ${supervisorInsight?.nextSubGoal || 'N/A'}`);
+        requestLog(`🧭 [FLOW] Phase Transition: ${state.phase} -> ${nextState.phase}`);
         if (state.topicIndex !== nextState.topicIndex) {
-            console.log(`🔄 [TOPIC] Pivot: Topic Index ${state.topicIndex} -> ${nextState.topicIndex}`);
+            requestLog(`🔄 [TOPIC] Pivot: Topic Index ${state.topicIndex} -> ${nextState.topicIndex}`);
         }
 
         // ====================================================================
@@ -1241,12 +1463,39 @@ export async function POST(req: Request) {
         const criticalModel = modelRegistry.critical;
         const qualityModel = modelRegistry.quality;
         const dataCollectionModel = modelRegistry.dataCollection;
-        console.log("🧠 [MODEL_ROUTING]", modelRegistry.names);
+        requestLog("🧠 [MODEL_ROUTING]", modelRegistry.names);
         const nextActiveTopics = nextState.phase === 'DEEPEN'
             ? getDeepTopics(botTopics, nextState.deepTopicOrder || state.deepTopicOrder)
             : botTopics;
         const targetTopic = nextActiveTopics[nextState.topicIndex] || currentTopic;
-        const runtimeInterviewKnowledge = await runtimeInterviewKnowledgePromise;
+        const userTurnSignal: UserTurnSignal =
+            topicalUserTurnEvaluation && (nextState.phase === 'EXPLORE' || nextState.phase === 'DEEPEN')
+                ? topicalUserTurnEvaluation.signal
+                : 'none';
+        const shouldRefreshRuntimeKnowledge =
+            (nextState.phase === 'EXPLORE' || nextState.phase === 'DEEPEN') &&
+            !manualInterviewGuide &&
+            !hasLLMRuntimeKnowledge &&
+            canonicalMessages.length >= 2 &&
+            (nextState.turnInTopic <= 1 || userTurnSignal !== 'none');
+        const runtimeInterviewKnowledgeRefreshPromise: Promise<RuntimeInterviewKnowledge | null> | null = shouldRefreshRuntimeKnowledge
+            ? generateRuntimeInterviewKnowledge({
+                model: runtimeModels.quality,
+                signature: runtimeKnowledgeSignature,
+                language,
+                interviewGoal: bot.researchGoal || '',
+                targetAudience: bot.targetAudience || '',
+                topics: interviewPlan.explore.topics.map((topic) => ({
+                    topicId: topic.topicId,
+                    topicLabel: topic.label,
+                    subGoals: topic.subGoals || []
+                })),
+                timeoutMs: tierConfig.knowledge.runtimeKnowledgeTimeoutMs,
+                interviewerQuality: interviewerQuality,
+                onUsage: collectLlmUsage
+            })
+            : null;
+        const runtimeInterviewKnowledge = promptRuntimeInterviewKnowledge;
         if (runtimeInterviewKnowledge) {
             nextState.runtimeInterviewKnowledge = runtimeInterviewKnowledge;
             nextState.runtimeInterviewKnowledgeSignature = runtimeKnowledgeSignature;
@@ -1255,24 +1504,14 @@ export async function POST(req: Request) {
             nextState.runtimeInterviewKnowledgeSignature = null;
         }
 
-        const userTurnSignal: UserTurnSignal = lastMessage?.role === 'user'
-            ? detectUserTurnSignal({
-                userMessage: lastMessage.content,
-                language,
-                phase: nextState.phase,
-                currentTopic,
-                targetTopic,
-                interviewObjective
-            })
-            : 'none';
         // --- CIL PRE-PASS (avanzato only, but not every turn) ---
         const AVANZATO_CIL_RECENT_TURNS = 5;
-        const shouldRunCIL = isAvanzato && (
-            nextState.phase === 'DEEPEN'
-            || userTurnSignal !== 'none'
-        );
+        const shouldRunFreshCIL =
+            isAvanzato &&
+            (nextState.phase === 'DEEPEN' || userTurnSignal !== 'none') &&
+            (userTurnSignal !== 'none' || nextState.turnInTopic % 2 === 1);
 
-        const cilPromise: Promise<CILAnalysis | null> = shouldRunCIL
+        const cilAnalysisPromise: Promise<CILAnalysis | null> | null = shouldRunFreshCIL
             ? (async () => {
                 const topicKnowledge = runtimeInterviewKnowledge?.topics.find(
                     t => t.topicId === currentTopic.id
@@ -1289,7 +1528,7 @@ export async function POST(req: Request) {
                     language: bot.language || 'it'
                 });
             })()
-            : Promise.resolve(null);
+            : null;
 
         const previousAssistantQuestion = extractLastAssistantQuestion(previousAssistantMessage);
         const recentBridgeStems = collectRecentBridgeStems(canonicalMessages, 14);
@@ -1299,16 +1538,7 @@ export async function POST(req: Request) {
             ? getDeepPlanTurns(interviewPlan, plannerTopicId)
             : getScanPlanTurns(interviewPlan, plannerTopicId);
         const plannerUsedSubGoals = (nextState.topicSubGoalHistory || {})[plannerTopicId] || [];
-
-        // Await CIL and apply budget stealing BEFORE building micro-planner so that
-        // plannerMaxTurns already reflects any bonus turns granted by CIL.
-        const cilAnalysis = await cilPromise;
-        cilAnalysisRef.current = cilAnalysis;
-
-        if (cilAnalysis?.budgetSignal && isAvanzato) {
-            const cap = computeCILBonusCap(nextState, (bot as any).cilBonusTurnCapOverride ?? null);
-            nextState = applyCILBudgetSignal(nextState, cilAnalysis.budgetSignal, cap);
-        }
+        const promptCILAnalysis = cilAnalysisRef.current;
 
         const microPlannerDecision = buildMicroPlannerDecision({
             language,
@@ -1370,7 +1600,12 @@ export async function POST(req: Request) {
         if (canonicalMessages.length >= 4) {
             try {
                 const toneAnalyzer = new ToneAnalyzer(openAIKey);
-                const toneProfile = tierConfig.tone.useLlm
+                const shouldUseLlmToneAnalysis =
+                    tierConfig.tone.useLlm &&
+                    canonicalMessages.length >= 8 &&
+                    (nextState.phase === 'DEEPEN' || userTurnSignal !== 'none') &&
+                    nextState.turnInTopic % 3 === 0;
+                const toneProfile = shouldUseLlmToneAnalysis
                     ? await toneAnalyzer.analyzeTone(canonicalMessages, language)
                     : toneAnalyzer.analyzeToHeuristic(canonicalMessages, language);
                 const toneBlock = buildToneAdaptationPrompt(toneProfile, language);
@@ -1383,7 +1618,7 @@ export async function POST(req: Request) {
             }
         }
 
-        console.log("📝 [PROMPT_BUILDER] System Prompt length:", systemPrompt.length);
+        requestLog("📝 [PROMPT_BUILDER] System Prompt length:", systemPrompt.length);
         if (process.env.NODE_ENV === 'development') {
             console.log("📝 [PROMPT_BUILDER] System Prompt snippet:", systemPrompt.substring(0, 1000) + "...");
         }
@@ -1456,12 +1691,38 @@ hard_rules:
                 systemPrompt += `\n\n${runtimeSemanticContext}`;
             }
         }
+        if (
+            lastMessage?.role === 'user' &&
+            (nextState.phase === 'EXPLORE' || nextState.phase === 'DEEPEN') &&
+            topicTurnSignalResult
+        ) {
+            const turnGuidanceBlock = buildTurnGuidanceBlock({
+                language,
+                phase: nextState.phase,
+                signalResult: topicTurnSignalResult,
+                lastUserMessage: lastMessage.content,
+                recentBridgeStems,
+                interviewerQuality,
+                currentTopicLabel: currentTopic.label,
+                targetTopicLabel: targetTopic?.label || currentTopic.label,
+                turnDecision: topicTurnDecision,
+                remainingTargetSubGoals: topicTurnRemainingTargetSubGoals,
+                remainingStretchSubGoals: topicTurnRemainingStretchSubGoals,
+            });
+            if (turnGuidanceBlock) {
+                systemPrompt += `\n\n${turnGuidanceBlock}`;
+            }
+        }
         // Block 6.5 — CIL context (avanzato only) — injected BEFORE micro-planner
-        if (cilAnalysis && isAvanzato) {
+        if (promptCILAnalysis && isAvanzato) {
             const cilBlock = buildCILContextBlock(
-                cilAnalysis,
+                promptCILAnalysis,
                 state.cilState ?? null,
-                interviewerQuality
+                interviewerQuality,
+                {
+                    latestUserMessage: lastMessage?.role === 'user' ? lastMessage.content : null,
+                    freshness: 'stale'
+                }
             );
             if (cilBlock) {
                 systemPrompt += `\n\n${cilBlock}`;
@@ -1479,7 +1740,7 @@ hard_rules:
             if (microPlannerPrompt) {
                 systemPrompt += `\n\n${microPlannerPrompt}`;
             }
-            console.log("🧭 [MICRO_PLANNER]", {
+            requestLog("🧭 [MICRO_PLANNER]", {
                 mode: microPlannerDecision.mode,
                 commentStyle: microPlannerDecision.commentStyle,
                 focusSubGoal: microPlannerDecision.focusSubGoal,
@@ -1505,14 +1766,12 @@ hard_rules:
             }
         }
 
-        if (userTurnSignal === 'clarification') {
-            systemPrompt += language === 'it'
-                ? `\n\n## CLARIFICATION GUARD (OBBLIGATORIO)\nL'utente sta chiedendo un chiarimento: NON ignorarlo.\n1) Rispondi gentilmente chiarendo in modo diretto la domanda precedente, senza formule vaghe.\n2) Se l'utente mette due opzioni (es. "X o Y"), specifica chiaramente quale intendevi.\n3) Dopo il chiarimento, fai UNA sola domanda di follow-up coerente con il topic corrente.`
-                : `\n\n## CLARIFICATION GUARD (MANDATORY)\nThe user is asking for clarification: do NOT ignore it.\n1) Reply kindly by directly clarifying your previous question.\n2) If the user offers two options (e.g. "X or Y"), state clearly which one you meant.\n3) After clarifying, ask ONE coherent follow-up question on the current topic.`;
-        } else if (userTurnSignal === 'off_topic_question') {
-            systemPrompt += language === 'it'
-                ? `\n\n## SCOPE GUARD (OBBLIGATORIO)\nL'utente ha fatto una domanda fuori dallo scopo dell'intervista.\n1) Rispondi con una frase gentile che spieghi che la domanda esula dallo scopo di questa intervista.\n2) Riporta subito il focus al topic corrente con UNA sola domanda mirata.\n3) Non sviluppare il tema fuori scopo in dettaglio.`
-                : `\n\n## SCOPE GUARD (MANDATORY)\nThe user asked a question outside the interview scope.\n1) Reply with one polite sentence stating that the question is outside the scope of this interview.\n2) Immediately redirect to the current topic with ONE focused question.\n3) Do not expand on the off-topic question.`;
+        const guardsBlock = buildGuardsBlock({
+            userTurnSignal: userTurnSignal === 'none' ? null : userTurnSignal,
+            language
+        });
+        if (guardsBlock) {
+            systemPrompt += `\n\n${guardsBlock}`;
         }
 
         const shouldEndWithQuestion = !['COMPLETE_WITHOUT_DATA', 'FINAL_GOODBYE'].includes(supervisorInsight?.status);
@@ -1527,8 +1786,8 @@ hard_rules:
                 : `\n\n## RESPONSE STYLE\nKeep the visible response short: at most 2 sentences. If you bridge, do it in one short concrete sentence, then ask one specific question. Avoid repetitive fillers like "that's interesting" or "that's an important point" unless they add information.`;
             if (interviewerQuality === 'standard') {
                 systemPrompt += (language || '').toLowerCase().startsWith('it')
-                    ? `\n\n## MODALITA STANDARD\nResta naturale e conversazionale, ma lavora come un'intervista diagnostica leggera.\n- Dopo una risposta gia utile, passa al topic successivo invece di fare follow-up opzionali.\n- Preferisci domande concrete e confrontabili: pratica attuale, frequenza, ostacolo, chi decide, canale, metrica, esempio recente o prossimo passo.\n- Evita allargamenti filosofici o troppo esplorativi se non servono.`
-                    : `\n\n## STANDARD MODE\nStay natural and conversational, but act like a lightweight diagnostic interview.\n- Once the user has given a usable answer, move to the next topic instead of asking optional follow-ups.\n- Prefer concrete, comparable questions: current practice, frequency, blocker, owner, channel, metric, recent example, or next step.\n- Avoid philosophical or overly exploratory broadening unless clearly useful.`;
+                    ? `\n\n## MODALITA STANDARD\nResta naturale e conversazionale, ma lavora come un'intervista diagnostica leggera.\n- Copri prima il target previsto del topic corrente; poi passa oltre in modo pulito senza follow-up opzionali.\n- Preferisci domande concrete e confrontabili: pratica attuale, frequenza, ostacolo, chi decide, canale, metrica, esempio recente o prossimo passo.\n- Evita allargamenti filosofici o troppo esplorativi se non servono.`
+                    : `\n\n## STANDARD MODE\nStay natural and conversational, but act like a lightweight diagnostic interview.\n- Cover the planned target of the current topic first; then move on cleanly without optional follow-ups.\n- Prefer concrete, comparable questions: current practice, frequency, blocker, owner, channel, metric, recent example, or next step.\n- Avoid philosophical or overly exploratory broadening unless clearly useful.`;
             } else {
                 systemPrompt += (language || '').toLowerCase().startsWith('it')
                     ? `\n\n## MODALITA AVANZATA\nScegli il filo piu promettente emerso dall'ultima risposta e resta su quello. Meglio una domanda precisa e distintiva che due piste insieme.`
@@ -1576,8 +1835,8 @@ hard_rules:
             console.log(`🧠 [MODEL_ROUTING] Escalating to critical model for this turn. reason=${criticalTurnRouting.reason}`);
         }
 
-        console.log("⏳ [CHAT] Generating response...");
-        console.time("LLM");
+        requestLog("⏳ [CHAT] Generating response...");
+        console.time(llmTimerLabel);
 
         // Integrate validation feedback into system prompt
         const systemPromptWithValidationFeedback = addValidationFeedbackToPrompt(
@@ -1617,7 +1876,12 @@ hard_rules:
                     }
                 });
                 await flushInterviewTokenUsage('timeout_fallback');
-                return Response.json({ text: fallback, currentTopicId: nextTopicId, isCompleted: false });
+                return Response.json({
+                    text: fallback,
+                    currentTopicId: nextTopicId,
+                    isCompleted: false,
+                    serverResponseLatencyMs: Date.now() - startTime
+                });
             }
             const errorName = String(error?.name || '');
             const errorMessage = String(error?.message || '');
@@ -1626,7 +1890,7 @@ hard_rules:
                 errorMessage.includes('No object generated') ||
                 errorMessage.includes('did not match schema');
             if (isObjectValidationFailure) {
-                console.error('⚠️ [LLM] Object schema validation failed. Retrying with fallback strategy.', {
+                requestError('⚠️ [LLM] Object schema validation failed. Retrying with fallback strategy.', {
                     name: errorName,
                     message: errorMessage
                 });
@@ -1643,7 +1907,7 @@ hard_rules:
                     });
                     result = { object: { response: String(retry.object.response || '').trim(), meta_comment: 'minimal_schema_fallback' } };
                 } catch (innerError: any) {
-                    console.error('⚠️ [LLM] Minimal-schema retry failed. Falling back to generateText.', innerError);
+                    requestError('⚠️ [LLM] Minimal-schema retry failed. Falling back to generateText.', innerError);
                     const textFallback = await trackedGenerateText({
                         model: modelForMainResponse,
                         messages: messagesForAI,
@@ -1657,9 +1921,9 @@ hard_rules:
             }
         }
 
-        console.timeEnd("LLM");
+        console.timeEnd(llmTimerLabel);
         let responseText = result.object.response;
-        console.log(`🧠 [LLM_REASONING]: ${result.object.meta_comment || 'N/A'}`);
+        requestLog(`🧠 [LLM_REASONING]: ${result.object.meta_comment || 'N/A'}`);
         if (process.env.NODE_ENV === 'development') {
             console.log(`🤖 [LLM_RESPONSE]: "${responseText.substring(0, 100)}..."`);
             console.log("💬 [BOT] Preview:", responseText.slice(0, 400));
@@ -1696,9 +1960,33 @@ hard_rules:
         const userBridgeHint = lastMessage?.role === 'user'
             ? buildUserBridgeHint(lastMessage.content, language)
             : '';
+        const assistantEvaluationCache = new Map<string, Promise<AssistantTurnEvaluation>>();
+        const evaluateAssistantResponse = (params?: {
+            expectedFieldName?: string | null;
+            userMessage?: string | null;
+        }): Promise<AssistantTurnEvaluation> => {
+            const cacheKey = JSON.stringify({
+                responseText,
+                expectedFieldName: params?.expectedFieldName || null,
+                userMessage: params?.userMessage || null
+            });
+            const cached = assistantEvaluationCache.get(cacheKey);
+            if (cached) return cached;
+            const evaluationPromise = evaluateAssistantTurn({
+                assistantMessage: responseText,
+                apiKey: openAIKey,
+                language,
+                expectedFieldName: params?.expectedFieldName || null,
+                userMessage: params?.userMessage || null,
+                options: { onUsage: collectLlmUsage }
+            });
+            assistantEvaluationCache.set(cacheKey, evaluationPromise);
+            return evaluationPromise;
+        };
 
         if (supervisorInsight?.status === 'DEEP_OFFER_ASK') {
-            if (!isExtensionOfferQuestion(responseText, language)) {
+            const deepOfferEvaluation = await evaluateAssistantResponse();
+            if (!deepOfferEvaluation.isExtensionOffer) {
                 console.log(`⚠️ [SUPERVISOR] Deep offer response not an offer. Regenerating.`);
                 try {
                     const enforcedSystem = `${systemPrompt}\n\nCRITICAL: You must ONLY ask (lightly) if the user wants to extend the interview by a few minutes to continue, and wait for yes/no. Do NOT ask any topic question.`;
@@ -1711,7 +1999,7 @@ hard_rules:
             }
 
             // Hard enforcement: never leave DEEP_OFFER with a topic question.
-            if (!isExtensionOfferQuestion(responseText, language)) {
+            if (!(await evaluateAssistantResponse()).isExtensionOffer) {
                 responseText = await enforceDeepOfferQuestion({
                     model: criticalModel,
                     language,
@@ -1728,7 +2016,10 @@ hard_rules:
         // if the user asked a clarification or an off-topic question,
         // ensure the assistant acknowledges it explicitly before continuing.
         if (nonHardSafetyRegenerationsEnabled && !didRegenerate && (nextState.phase === 'EXPLORE' || nextState.phase === 'DEEPEN') && lastMessage?.role === 'user') {
-            if (userTurnSignal === 'clarification' && !isClarificationHandledResponse(responseText, language)) {
+            const topicalEvaluation = await evaluateAssistantResponse({
+                userMessage: lastMessage.content
+            });
+            if (userTurnSignal === 'clarification' && !topicalEvaluation.isClarificationResponse) {
                 console.log(`⚠️ [SUPERVISOR] Clarification requested but not handled clearly. Regenerating.`);
                 const enforcedSystem = language === 'it'
                     ? `${systemPrompt}\n\nCRITICAL: Rispondi prima al chiarimento in modo diretto e gentile (specifica esattamente cosa intendevi), poi fai UNA sola domanda coerente col topic corrente.`
@@ -1736,7 +2027,7 @@ hard_rules:
                 const retry = await trackedGenerateObject({ model: criticalModel, schema, messages: messagesForAI, system: enforcedSystem, temperature: 0.25 });
                 responseText = retry.object.response?.trim() || responseText;
                 didRegenerate = true;
-            } else if (userTurnSignal === 'off_topic_question' && !isScopeBoundaryHandledResponse(responseText, language)) {
+            } else if (userTurnSignal === 'off_topic_question' && !topicalEvaluation.isScopeBoundaryResponse) {
                 console.log(`⚠️ [SUPERVISOR] Off-topic user question not bounded. Regenerating with scope boundary.`);
                 const enforceTopic = targetTopic?.label || currentTopic.label;
                 const enforcedSystem = language === 'it'
@@ -1817,17 +2108,39 @@ hard_rules:
         // ====================================================================
         // 5.5 POST-PROCESSING: Detect premature closures and vague responses
         // ====================================================================
-        const GOODBYE_PATTERNS_IT = /\b(arrivederci|buona giornata|buona serata|a presto|ci sentiamo|grazie per il tuo tempo|è stato un piacere|ti auguro|in bocca al lupo|ti contatteremo|ti terremo aggiornato)\b/i;
-        const GOODBYE_PATTERNS_EN = /\b(goodbye|see you|take care|have a great day|it was a pleasure|best wishes|all the best|farewell|we will contact you|we'll be in touch)\b/i;
-        const goodbyePattern = language === 'it' ? GOODBYE_PATTERNS_IT : GOODBYE_PATTERNS_EN;
-
-        // Vague data collection patterns - bot is not asking for specific field
-        const VAGUE_DATA_PATTERNS_IT = /\b(quali contatti|che tipo di dati|le informazioni che preferisci|condividi.*contatti|c'è qualcos'altro|qualcos'altro da aggiungere|altri temi|altre domande|vuoi aggiungere)\b/i;
-        const VAGUE_DATA_PATTERNS_EN = /\b(which contact|what type of data|information you prefer|share.*contact|anything else|something to add|other topics|other questions|want to add)\b/i;
-        const vagueDataPattern = language === 'it' ? VAGUE_DATA_PATTERNS_IT : VAGUE_DATA_PATTERNS_EN;
-
-        const isGoodbyeResponse = goodbyePattern.test(responseText);
-        const isVagueDataRequest = vagueDataPattern.test(responseText);
+        const needsSemanticAssistantEvaluation =
+            supervisorInsight?.status === 'DEEP_OFFER_ASK' ||
+            nextState.phase === 'DEEP_OFFER' ||
+            userTurnSignal === 'clarification' ||
+            userTurnSignal === 'off_topic_question';
+        const genericAssistantEvaluation: AssistantTurnEvaluation =
+            nextState.phase === 'DATA_COLLECTION'
+                ? {
+                    isExtensionOffer: false,
+                    isClarificationResponse: false,
+                    isScopeBoundaryResponse: false,
+                    isConsentRequest: nextState.consentGiven === false,
+                    targetsExpectedField: nextState.consentGiven === true,
+                    isClosureResponse: /INTERVIEW_COMPLETED/i.test(responseText),
+                    isVagueDataCollectionRequest: false,
+                    isContactRequest: true,
+                    isPromotionalContent: false
+                }
+                : needsSemanticAssistantEvaluation
+                    ? await evaluateAssistantResponse()
+                    : {
+                        isExtensionOffer: false,
+                        isClarificationResponse: false,
+                        isScopeBoundaryResponse: false,
+                        isConsentRequest: false,
+                        targetsExpectedField: false,
+                        isClosureResponse: /INTERVIEW_COMPLETED/i.test(responseText),
+                        isVagueDataCollectionRequest: false,
+                        isContactRequest: false,
+                        isPromotionalContent: false
+                    };
+        const isGoodbyeResponse = genericAssistantEvaluation.isClosureResponse;
+        const isVagueDataRequest = genericAssistantEvaluation.isVagueDataCollectionRequest;
         const hasNoQuestion = !responseText.includes('?');
         const hasCompletionTag = /INTERVIEW_COMPLETED/i.test(responseText);
 
@@ -1839,15 +2152,12 @@ hard_rules:
         }
 
         // CRITICAL: Detect premature contact requests (bot asking for contacts during SCAN/DEEP)
-        const CONTACT_REQUEST_PATTERNS_IT = /\b(posso chiederti i tuoi contatti|i tuoi dati di contatto|la tua email|il tuo numero|come ti chiami|qual è la tua email|prima di salutarci|prima di concludere.*contatt)/i;
-        const CONTACT_REQUEST_PATTERNS_EN = /\b(may i ask for your contact|your contact details|your email|your phone|what is your name|before we say goodbye.*contact|before we wrap up.*contact)/i;
-        const contactRequestPattern = language === 'it' ? CONTACT_REQUEST_PATTERNS_IT : CONTACT_REQUEST_PATTERNS_EN;
-        const isPrematureContactRequest = contactRequestPattern.test(responseText) && nextState.phase !== 'DATA_COLLECTION';
+        const isPrematureContactRequest = genericAssistantEvaluation.isContactRequest && nextState.phase !== 'DATA_COLLECTION';
         if (isPrematureContactRequest) {
             console.log(`⚠️ [SUPERVISOR] Bot tried to ask for contacts during ${nextState.phase} phase - intercepting!`);
         }
 
-        console.log("🔎 [SUPERVISOR] Flags:", {
+        requestLog("🔎 [SUPERVISOR] Flags:", {
             phase: nextState.phase,
             isGoodbyeResponse,
             isGoodbyeWithQuestion,
@@ -1874,8 +2184,7 @@ hard_rules:
             hasCompletionTag
         });
 
-        const PROMO_PATTERNS = /\b(www\.|https?:\/\/|@|email|scrivi a|contatta|offerta|promo|premio|reward|coupon|sconto)\b/i;
-        const isPromoContent = PROMO_PATTERNS.test(responseText) && (nextState.phase === 'EXPLORE' || nextState.phase === 'DEEPEN' || nextState.phase === 'DEEP_OFFER');
+        const isPromoContent = genericAssistantEvaluation.isPromotionalContent && (nextState.phase === 'EXPLORE' || nextState.phase === 'DEEPEN' || nextState.phase === 'DEEP_OFFER');
         if (isPromoContent) {
             console.log(`⚠️ [SUPERVISOR] Promo/CTA detected during active phase. Regenerating.`);
             const enforceTopic = targetTopic?.label || currentTopic.label;
@@ -1934,20 +2243,8 @@ hard_rules:
                 // CONSENT PHASE: bot should ask for permission
                 const forceConsent = nextState.forceConsentQuestion === true;
                 if ((forceConsent || nextState.consentGiven === false) && !nextState.dataCollectionRefused) {
-                    const openai = createOpenAI({ apiKey: openAIKey });
-                    const consentSchema = z.object({ isConsent: z.boolean() });
-                    let isConsent = false;
-                    try {
-                        const consentCheck = await trackedGenerateObject({
-                            model: openai('gpt-4o-mini'),
-                            schema: consentSchema,
-                            prompt: `Determine if the assistant is explicitly asking for permission to collect contact details and waiting for yes/no.\nAssistant message: "${responseText}"\nReturn { isConsent: true/false }.`,
-                            temperature: 0
-                        });
-                        isConsent = consentCheck.object.isConsent;
-                    } catch (e) {
-                        console.error('Consent validation failed:', e);
-                    }
+                    let assistantEvaluation = await evaluateAssistantResponse();
+                    let isConsent = assistantEvaluation.isConsentRequest;
 
                     if (!isConsent || forceConsent) {
                         console.log(`⚠️ [SUPERVISOR] Bot gave wrong response during DATA_COLLECTION consent. OVERRIDING with consent question.`);
@@ -1955,20 +2252,11 @@ hard_rules:
                         const retry = await trackedGenerateObject({ model: dataCollectionModel, schema, messages: messagesForAI, system: enforcedSystem, temperature: 0.2 });
                         responseText = retry.object.response?.trim() || responseText;
 
-                        try {
-                            const consentCheck2 = await trackedGenerateObject({
-                                model: openai('gpt-4o-mini'),
-                                schema: consentSchema,
-                                prompt: `Determine if the assistant is explicitly asking for permission to collect contact details and waiting for yes/no.\nAssistant message: "${responseText}"\nReturn { isConsent: true/false }.`,
-                                temperature: 0
-                            });
-                            if (!consentCheck2.object.isConsent) {
-                                const enforcedSystem2 = `Write one short linking sentence acknowledging interview closure, then ask a single yes/no question asking permission to collect contact details.`;
-                                const retry2 = await trackedGenerateObject({ model: dataCollectionModel, schema, messages: messagesForAI, system: enforcedSystem2, temperature: 0.1 });
-                                responseText = retry2.object.response?.trim() || responseText;
-                            }
-                        } catch (e) {
-                            console.error('Consent validation retry failed:', e);
+                        assistantEvaluation = await evaluateAssistantResponse();
+                        if (!assistantEvaluation.isConsentRequest) {
+                            const enforcedSystem2 = `Write one short linking sentence acknowledging interview closure, then ask a single yes/no question asking permission to collect contact details.`;
+                            const retry2 = await trackedGenerateObject({ model: dataCollectionModel, schema, messages: messagesForAI, system: enforcedSystem2, temperature: 0.1 });
+                            responseText = retry2.object.response?.trim() || responseText;
                         }
                     }
                     if (forceConsent) {
@@ -1978,12 +2266,13 @@ hard_rules:
                 // FIELD COLLECTION PHASE: bot should ask for specific field
                 else if (nextState.consentGiven === true && missingField) {
                     // Only override if the response doesn't already ask for this field
-                    const fieldMentioned = responseMentionsCandidateField(responseText, missingField);
+                    const fieldMentioned = (await evaluateAssistantResponse({
+                        expectedFieldName: missingField
+                    })).targetsExpectedField;
 
                     if (!fieldMentioned || hasNoQuestion) {
                         console.log(`⚠️ [SUPERVISOR] Bot not asking for specific field "${missingField}". OVERRIDING with field question.`);
-                        const fieldLabel = getFieldLabel(missingField, language);
-                        const enforcedSystem = `${systemPrompt}\n\nCRITICAL: Ask ONLY for ${fieldLabel}. One question only.`;
+                        const enforcedSystem = `${systemPrompt}\n\nCRITICAL: Ask ONLY for the canonical field id "${missingField}". Write the question in the participant's language. One question only.`;
                         const retry = await trackedGenerateObject({ model: dataCollectionModel, schema, messages: messagesForAI, system: enforcedSystem, temperature: 0.3 });
                         responseText = retry.object.response?.trim() || responseText;
                     }
@@ -2010,7 +2299,7 @@ hard_rules:
 
             if (shouldOfferExtraTime) {
                 console.log(`⚠️ [SUPERVISOR] Closure attempt while time is over. Switching to extension offer.`);
-                const returnPhase: 'SCAN' | 'DEEP' = state.phase === 'EXPLORE' ? 'SCAN' : 'DEEP';
+                const returnPhase: 'EXPLORE' | 'DEEPEN' = state.phase === 'EXPLORE' ? 'EXPLORE' : 'DEEPEN';
                 nextState.phase = 'DEEP_OFFER';
                 nextState.deepAccepted = false;
                 nextState.extensionReturnPhase = returnPhase;
@@ -2036,7 +2325,7 @@ hard_rules:
                 if (process.env.NODE_ENV === 'development') console.log("🧭 [SUPERVISOR] Override response:", responseText.slice(0, 300));
 
                 // If the override still isn't a proper question, use fallback question-only generation (MAX 1 retry)
-                const stillBad = !responseText.includes('?') || goodbyePattern.test(responseText);
+                const stillBad = !responseText.includes('?') || (await evaluateAssistantResponse()).isClosureResponse;
                 if (stillBad) {
                     console.log("🧭 [SUPERVISOR] Override still invalid, using fallback question-only generation.");
                     try {
@@ -2079,7 +2368,7 @@ hard_rules:
             } catch (e) {
                 console.error('Deep offer closure regeneration failed:', e);
             }
-            if (!isExtensionOfferQuestion(responseText, language)) {
+            if (!(await evaluateAssistantResponse()).isExtensionOffer) {
                 responseText = await enforceDeepOfferQuestion({
                     model: criticalModel,
                     language,
@@ -2112,8 +2401,8 @@ hard_rules:
         // DEEP_OFFER safety: must be an extension-consent question
         if (nextState.phase === 'DEEP_OFFER') {
             const invalidDeepOffer =
-                !isExtensionOfferQuestion(responseText, language) ||
-                goodbyePattern.test(responseText) ||
+                !(await evaluateAssistantResponse()).isExtensionOffer ||
+                (await evaluateAssistantResponse()).isClosureResponse ||
                 /INTERVIEW_COMPLETED/i.test(responseText);
             if (invalidDeepOffer) {
                 flowTelemetry.deepOfferClosureIntercepted = true;
@@ -2145,17 +2434,15 @@ hard_rules:
             const needsConsentQuestion = nextState.forceConsentQuestion === true || nextState.consentGiven === false;
             const hasQuestionNow = responseText.includes('?');
             const hasCompletionTagNow = /INTERVIEW_COMPLETED/i.test(responseText);
-            const hasGoodbyeNow = goodbyePattern.test(responseText);
+            const hasGoodbyeNow = (await evaluateAssistantResponse()).isClosureResponse;
 
             if (needsConsentQuestion) {
-                const consentCuePattern = language === 'it'
-                    ? /\b(posso|permesso|consenso|contatt|restare in contatto)\b/i
-                    : /\b(may i|permission|consent|contact|stay in touch)\b/i;
+                const assistantEvaluation = await evaluateAssistantResponse();
                 const invalidConsentResponse =
                     !hasQuestionNow ||
                     hasCompletionTagNow ||
                     hasGoodbyeNow ||
-                    !consentCuePattern.test(responseText);
+                    !assistantEvaluation.isConsentRequest;
                 if (invalidConsentResponse) {
                     console.log('🛡️ [FINAL_GUARD] DATA_COLLECTION consent response invalid. Forcing consent question.');
                     try {
@@ -2171,7 +2458,9 @@ hard_rules:
                 }
                 nextState.forceConsentQuestion = false;
             } else if (nextState.consentGiven === true && missingFieldForDataGuard) {
-                const fieldMentioned = responseMentionsCandidateField(responseText, missingFieldForDataGuard);
+                const fieldMentioned = (await evaluateAssistantResponse({
+                    expectedFieldName: missingFieldForDataGuard
+                })).targetsExpectedField;
                 const invalidFieldResponse =
                     !hasQuestionNow ||
                     hasCompletionTagNow ||
@@ -2179,12 +2468,11 @@ hard_rules:
                     !fieldMentioned;
                 if (invalidFieldResponse) {
                     console.log(`🛡️ [FINAL_GUARD] DATA_COLLECTION field response invalid for "${missingFieldForDataGuard}". Forcing field question.`);
-                    const fieldLabel = getFieldLabel(missingFieldForDataGuard, language);
                     try {
                         responseText = await generateFieldQuestionOnly({
                             model: dataCollectionModel,
                             language,
-                            fieldLabel,
+                            fieldLabel: missingFieldForDataGuard,
                             onUsage: collectLlmUsage
                         });
                     } catch (e) {
@@ -2213,7 +2501,66 @@ hard_rules:
             }
         }
 
+        const [refreshedRuntimeInterviewKnowledge, freshCilAnalysis] = await Promise.all([
+            resolveWithin(runtimeInterviewKnowledgeRefreshPromise, SOFT_STATE_ENRICHMENT_WAIT_MS),
+            resolveWithin(cilAnalysisPromise, SOFT_STATE_ENRICHMENT_WAIT_MS)
+        ]);
+        if (refreshedRuntimeInterviewKnowledge) {
+            nextState.runtimeInterviewKnowledge = refreshedRuntimeInterviewKnowledge;
+            nextState.runtimeInterviewKnowledgeSignature = runtimeKnowledgeSignature;
+        }
+        const cilAnalysis = freshCilAnalysis;
+        if (cilAnalysis?.budgetSignal && isAvanzato) {
+            const cap = computeCILBonusCap(nextState, (bot as any).cilBonusTurnCapOverride ?? null);
+            nextState = applyCILBudgetSignal(nextState, cilAnalysis.budgetSignal, cap);
+        }
+
+        let interactionPayload: InterviewInteractionPayload | null = null;
+        if (nextState.phase === 'DATA_COLLECTION' && !nextState.dataCollectionRefused && supervisorInsight?.status !== 'COMPLETE_WITHOUT_DATA') {
+            const candidateFieldsForInteraction = (bot.candidateDataFields as any[]) || [];
+            const candidateFieldIdsForInteraction = normalizeCandidateFieldIds(candidateFieldsForInteraction);
+            const currentProfileForInteraction = await getFreshCandidateProfile();
+            const missingFieldForInteraction = getNextMissingCandidateField(
+                candidateFieldIdsForInteraction,
+                currentProfileForInteraction,
+                nextState.fieldAttemptCounts,
+                3
+            );
+            const interactionId = typeof crypto !== 'undefined' && 'randomUUID' in crypto
+                ? crypto.randomUUID()
+                : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+
+            if (nextState.consentGiven === false && !nextState.forceConsentQuestion) {
+                interactionPayload = buildDataCollectionInteractionPayload({
+                    interactionId,
+                    consentPending: true
+                });
+            } else if (nextState.forceConsentQuestion === true) {
+                interactionPayload = buildDataCollectionInteractionPayload({
+                    interactionId,
+                    consentPending: true
+                });
+            } else if (nextState.consentGiven === true && missingFieldForInteraction) {
+                interactionPayload = buildDataCollectionInteractionPayload({
+                    interactionId,
+                    fieldId: missingFieldForInteraction,
+                    candidateFields: candidateFieldsForInteraction,
+                    allowSkip: true
+                });
+            }
+        }
+
+        nextState.activeInteractionId = interactionPayload?.interactionId ?? null;
+        nextState.activeInteractionKind = interactionPayload?.kind ?? null;
+        nextState.activeInteractionFieldId = interactionPayload?.kind === 'field'
+            ? interactionPayload.fieldId
+            : null;
+
         const buildAssistantMetadata = (isCompletion: boolean = false): Prisma.InputJsonObject => {
+            const plannerPlanTopic = (interviewPlan.explore?.topics || []).find((topic) => topic.topicId === plannerTopicId) || null;
+            const focusedSubGoal = microPlannerDecision?.focusSubGoal || null;
+            const focusedSubGoalPlan = plannerPlanTopic?.subGoalPlans?.find((subGoal) => subGoal.label === focusedSubGoal) || null;
+            const highValueTurn = topicTurnDecision?.highValue ?? ((nextState.lastSignalScore || 0) >= 0.42);
             return {
                 ...(clientMessageId ? { replyToClientMessageId: clientMessageId } : {}),
                 phase: nextState.phase,
@@ -2221,12 +2568,34 @@ hard_rules:
                 reasoning: result?.object?.meta_comment ?? null,
                 topicLabel: targetTopic?.label || currentTopic.label,
                 topicId: targetTopic?.id || currentTopic.id,
+                topicImportanceScore: plannerPlanTopic?.importanceScore ?? null,
+                topicImportanceBand: plannerPlanTopic?.importanceBand ?? null,
+                topicCoverageTierCounts: plannerPlanTopic ? {
+                    target: plannerPlanTopic.targetSubGoalCount,
+                    stretch: plannerPlanTopic.stretchSubGoalCount,
+                    full: plannerPlanTopic.fullCoverageSubGoalCount,
+                } : null,
+                subGoal: focusedSubGoal,
+                subGoalId: focusedSubGoalPlan?.id ?? null,
+                subGoalImportanceScore: focusedSubGoalPlan?.importanceScore ?? null,
+                subGoalImportanceBand: focusedSubGoalPlan?.importanceBand ?? null,
+                subGoalCoverageTier: focusedSubGoalPlan?.coverageTier ?? null,
+                userTurnSignal,
+                responseValue: topicTurnDecision?.responseValue ?? null,
+                deltaType: topicTurnDecision?.deltaType ?? null,
+                narrativeState: topicTurnDecision?.narrativeState ?? null,
+                nextAction: topicTurnDecision?.nextAction ?? null,
+                decisionRationale: topicTurnDecision?.rationale ?? null,
+                remainingTargetSubGoalsAtDecision: topicTurnRemainingTargetSubGoals,
+                remainingStretchSubGoalsAtDecision: topicTurnRemainingStretchSubGoals,
+                highValueTurn,
                 quality: qualityTelemetry as unknown as Prisma.InputJsonValue,
                 flowFlags: flowTelemetry as unknown as Prisma.InputJsonValue,
                 llmUsage: getLlmUsageSnapshot() as unknown as Prisma.InputJsonValue,
                 responseLatencyMs: Date.now() - startTime,
                 simulationMode,
                 abVariant,
+                interactionPayload: interactionPayload as unknown as Prisma.InputJsonValue,
                 ...(isCompletion ? { isCompletion: true } : {})
             };
         };
@@ -2278,9 +2647,8 @@ hard_rules:
                     missingField: missingFieldForCompletion
                 });
                 // Guardrail: consent granted but fields still missing -> ask the specific field, not completion.
-                const fieldLabel = getFieldLabel(missingFieldForCompletion, language);
                 console.log(`⚠️ [SUPERVISOR] Bot said INTERVIEW_COMPLETED but "${missingFieldForCompletion}" is still missing. OVERRIDING with field question.`);
-                const enforcedSystem = `${systemPrompt}\n\nCRITICAL: Do NOT conclude. Ask ONLY for ${fieldLabel}. One question only.`;
+                const enforcedSystem = `${systemPrompt}\n\nCRITICAL: Do NOT conclude. Ask ONLY for the canonical field id "${missingFieldForCompletion}". Write the question in the participant's language. One question only.`;
                 try {
                     const retry = await trackedGenerateObject({ model: dataCollectionModel, schema, messages: messagesForAI, system: enforcedSystem, temperature: 0.2 });
                     responseText = retry.object.response?.trim() || responseText;
@@ -2326,7 +2694,9 @@ hard_rules:
                 return Response.json({
                     text: finalResponseText,
                     currentTopicId: nextTopicId,
-                    isCompleted: true
+                    isCompleted: true,
+                    interactionPayload: null,
+                    serverResponseLatencyMs: Date.now() - startTime
                 });
             }
         }
@@ -2376,8 +2746,8 @@ hard_rules:
         ]);
 
         const totalTime = Date.now() - startTime;
-        console.log(`✅ [CHAT_API] Finished. Response sent. Next Phase: ${nextState.phase}`);
-        console.log(`⏱️ [TIMING] TOTAL REQUEST: ${totalTime}ms`);
+        requestLog(`✅ Finished. Response sent. Next Phase: ${nextState.phase}`);
+        requestLog(`⏱️ TOTAL REQUEST: ${totalTime}ms`);
 
         // Memory update (fire and forget - don't block response)
         if (lastMessage?.role === 'user') {
@@ -2394,7 +2764,9 @@ hard_rules:
         return Response.json({
             text: responseText,
             currentTopicId: nextTopicId,
-            isCompleted: false
+            isCompleted: false,
+            interactionPayload,
+            serverResponseLatencyMs: Date.now() - startTime
         });
 
     } catch (error: any) {
@@ -2407,6 +2779,7 @@ hard_rules:
                 currentTopicId: null,
                 isCompleted: false,
                 degraded: true,
+                serverResponseLatencyMs: Date.now() - startTime,
                 error: String(error?.message || 'unknown_error')
             },
             { status: 200 }

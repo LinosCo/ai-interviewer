@@ -45,4 +45,19 @@ describe('question-dedup', () => {
         expect(result.isDuplicate).toBe(false);
         expect(result.reason).toBe('none');
     });
+
+    it('flags theme fixation when the assistant drags the same motif after the user opens a new angle', () => {
+        const result = findDuplicateQuestionMatch({
+            language: 'it',
+            candidateResponse: 'Quale altro dettaglio sull ordine visivo ti aspetteresti di approfondire ancora?',
+            historyAssistantMessages: [
+                'Hai detto che l ordine visivo è uno degli aspetti più forti del prodotto. In che modo questo ordine visivo ha influenzato la tua percezione complessiva?',
+                'Hai preferito esplorare liberamente o seguire un percorso guidato per approfondire ancora l ordine visivo?'
+            ],
+            lastUserMessage: 'Mi sarebbe piaciuto parlare con qualcuno del team per capire le scelte fatte.'
+        });
+
+        expect(result.isDuplicate).toBe(true);
+        expect(result.reason).toBe('theme_fixation');
+    });
 });

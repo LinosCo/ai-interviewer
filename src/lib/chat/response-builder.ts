@@ -38,6 +38,7 @@ export async function generateConsentQuestionOnly(params: {
         `Language: ${params.language}`,
         `Task: Write a natural transition into data collection and ask exactly ONE yes/no question asking permission to collect contact details for follow-up.`,
         `Structure: (1) one short linking sentence acknowledging content interview closure; (2) one yes/no consent question.`,
+        `Keep the linking sentence short and non-repetitive. Do not recap the interview.`,
         `Do NOT ask for any specific field yet. Do NOT ask topic questions. Do NOT close the interview.`,
         `Keep it natural and concise. End with exactly one question mark.`
     ].join('\n');
@@ -71,6 +72,7 @@ export async function generateFieldQuestionOnly(params: {
         `Language: ${params.language}`,
         `Target field to collect now: ${params.fieldLabel}`,
         `Task: Ask exactly ONE concise question to collect this field only.`,
+        `Do not recap previous answers. Do not mention other fields. Keep the wording minimal and direct.`,
         `Do NOT ask for other fields. Do NOT ask topic questions. Do NOT close the interview.`,
         `Keep it natural and concise. End with exactly one question mark.`
     ].join('\n');
@@ -188,6 +190,7 @@ Istruzioni di coerenza:
 7. Evita aperture generiche/retoriche ("molto interessante", "e un punto importante", "grazie per aver condiviso"): reagisci al merito con un dettaglio concreto.
 8. Se naturale, aggiungi un vincolo leggero (tempo, segmento, canale o metrica). Se risulta forzato o fuori tema, resta su una domanda semplice.
 9. Se l'ultima risposta apre un angolo nuovo, segui quell'angolo. Non trascinare lo stesso motivo interpretativo per inerzia.
+10. Se l'ultima risposta NON apre un angolo nuovo davvero rilevante, non forzare un follow-up: prosegui con il sub-goal o topic successivo e usa il contesto storico solo per rendere la domanda piu precisa.
 ${stemsHintIt}
 ${clarificationRequested
                 ? '- Se l\'utente sta chiedendo un chiarimento, chiarisci prima in modo diretto e poi fai una sola domanda coerente.'
@@ -211,6 +214,7 @@ Coherence instructions:
 7. Avoid generic/ceremonial openers ("very interesting", "that's an important point", "thanks for sharing"): respond to the substance using one concrete detail.
 8. If natural, add one light constraint (timeframe, segment, channel, or metric). If this feels forced or off-topic, keep a simple focused question.
 9. If the latest answer opens a new angle, follow that angle. Do not drag the same interpretive motif forward out of inertia.
+10. If the latest answer does NOT open a genuinely relevant new angle, do not force a follow-up: continue with the next sub-goal or topic and use historical context only to sharpen the question.
 ${stemsHintEn}
 ${clarificationRequested
             ? '- If the user is asking for clarification, clarify first directly, then ask one coherent follow-up question.'

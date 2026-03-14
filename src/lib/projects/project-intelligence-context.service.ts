@@ -2,6 +2,7 @@ import { Role } from '@prisma/client';
 
 import { assertProjectAccess, hasRequiredRole } from '@/lib/domain/workspace';
 import { prisma } from '@/lib/prisma';
+import { isMissingPrismaTable } from '@/lib/prisma-table-errors';
 import { readDerivedTipSuggestions } from '@/lib/projects/project-tip-related-suggestions';
 import type {
   CrossProjectReference,
@@ -26,36 +27,69 @@ export class ProjectIntelligenceContextService {
 
     const access = await assertProjectAccess(viewerUserId, projectId, 'VIEWER');
 
-    const project = await prisma.project.findUnique({
-      where: { id: projectId },
-      include: {
-        strategy: true,
-        methodologyBindings: {
-          include: { methodologyProfile: true },
-          orderBy: [{ role: 'asc' }, { createdAt: 'asc' }],
+    let project: any;
+    try {
+      project = await prisma.project.findUnique({
+        where: { id: projectId },
+        include: {
+          strategy: true,
+          methodologyBindings: {
+            include: { methodologyProfile: true },
+            orderBy: [{ role: 'asc' }, { createdAt: 'asc' }],
+          },
+          dataSourceBindings: {
+            include: { dataSource: true },
+            orderBy: { createdAt: 'desc' },
+            take: limitPerSource,
+          },
+          projectTips: {
+            orderBy: { updatedAt: 'desc' },
+            take: limitPerSource,
+          },
+          tipRoutingRules: {
+            where: { enabled: true },
+            orderBy: [{ priority: 'desc' }, { createdAt: 'desc' }],
+          },
+          cmsConnection: { select: { id: true, name: true, status: true } },
+          mcpConnections: { select: { id: true, name: true, status: true } },
+          n8nConnection: { select: { id: true, name: true, status: true } },
+          cmsShares: { include: { connection: { select: { id: true, name: true, status: true } } } },
+          mcpShares: { include: { connection: { select: { id: true, name: true, status: true } } } },
+          visibilityConfigs: { select: { id: true, brandName: true, isActive: true } },
+          visibilityShares: { include: { config: { select: { id: true, brandName: true, isActive: true } } } },
         },
-        dataSourceBindings: {
-          include: { dataSource: true },
-          orderBy: { createdAt: 'desc' },
-          take: limitPerSource,
+      });
+    } catch (error) {
+      if (
+        !isMissingPrismaTable(error, [
+          'ProjectStrategy',
+          'ProjectMethodologyBinding',
+          'MethodologyProfile',
+          'DataSource',
+          'ProjectDataSourceBinding',
+          'ProjectTip',
+        ])
+      ) {
+        throw error;
+      }
+
+      project = await prisma.project.findUnique({
+        where: { id: projectId },
+        include: {
+          tipRoutingRules: {
+            where: { enabled: true },
+            orderBy: [{ priority: 'desc' }, { createdAt: 'desc' }],
+          },
+          cmsConnection: { select: { id: true, name: true, status: true } },
+          mcpConnections: { select: { id: true, name: true, status: true } },
+          n8nConnection: { select: { id: true, name: true, status: true } },
+          cmsShares: { include: { connection: { select: { id: true, name: true, status: true } } } },
+          mcpShares: { include: { connection: { select: { id: true, name: true, status: true } } } },
+          visibilityConfigs: { select: { id: true, brandName: true, isActive: true } },
+          visibilityShares: { include: { config: { select: { id: true, brandName: true, isActive: true } } } },
         },
-        projectTips: {
-          orderBy: { updatedAt: 'desc' },
-          take: limitPerSource,
-        },
-        tipRoutingRules: {
-          where: { enabled: true },
-          orderBy: [{ priority: 'desc' }, { createdAt: 'desc' }],
-        },
-        cmsConnection: { select: { id: true, name: true, status: true } },
-        mcpConnections: { select: { id: true, name: true, status: true } },
-        n8nConnection: { select: { id: true, name: true, status: true } },
-        cmsShares: { include: { connection: { select: { id: true, name: true, status: true } } } },
-        mcpShares: { include: { connection: { select: { id: true, name: true, status: true } } } },
-        visibilityConfigs: { select: { id: true, brandName: true, isActive: true } },
-        visibilityShares: { include: { config: { select: { id: true, brandName: true, isActive: true } } } },
-      },
-    });
+      });
+    }
 
     if (!project) {
       throw new Error('Project not found');
@@ -76,9 +110,24 @@ export class ProjectIntelligenceContextService {
           channelPriorities: project.strategy.channelPriorities ?? null,
           updatedAt: project.strategy.updatedAt.toISOString(),
         }
+      : project.strategicVision || project.valueProposition
+      ? {
+          projectId: project.id,
+          positioning: project.strategicVision ?? null,
+          valueProposition: project.valueProposition ?? null,
+          targetAudiences: null,
+          strategicGoals: null,
+          priorityKpis: null,
+          keyOffers: null,
+          constraints: null,
+          toneGuidelines: null,
+          editorialPriorities: null,
+          channelPriorities: null,
+          updatedAt: project.updatedAt.toISOString(),
+        }
       : null;
 
-    const methodologies: MethodologyProfileSnapshot[] = project.methodologyBindings.map((binding) => ({
+    const methodologies: MethodologyProfileSnapshot[] = (project.methodologyBindings ?? []).map((binding: any) => ({
       id: binding.methodologyProfile.id,
       organizationId: binding.methodologyProfile.organizationId,
       slug: binding.methodologyProfile.slug,
@@ -90,7 +139,7 @@ export class ProjectIntelligenceContextService {
       status: binding.methodologyProfile.status,
     }));
 
-    const dataSources: DataSourceBindingSnapshot[] = project.dataSourceBindings.map((binding) => ({
+    const dataSources: DataSourceBindingSnapshot[] = (project.dataSourceBindings ?? []).map((binding: any) => ({
       bindingId: binding.id,
       projectId: binding.projectId,
       dataSourceId: binding.dataSource.id,
@@ -104,7 +153,7 @@ export class ProjectIntelligenceContextService {
       metadata: binding.metadata ?? null,
     }));
 
-    const tips: ProjectTipSnapshot[] = project.projectTips.map((tip) => {
+    const tips: ProjectTipSnapshot[] = (project.projectTips ?? []).map((tip: any) => {
       const derivedSuggestions = readDerivedTipSuggestions(tip.suggestedRouting);
 
       return {
@@ -269,37 +318,69 @@ export class ProjectIntelligenceContextService {
   }): Promise<CrossProjectReference[]> {
     const canAccessAllProjects = params.isPlatformAdmin || hasRequiredRole(params.role, 'ADMIN');
 
-    const projects = await prisma.project.findMany({
-      where: {
-        organizationId: params.organizationId,
-        id: { not: params.currentProjectId },
-        ...(canAccessAllProjects
-          ? {}
-          : {
-              OR: [
-                { ownerId: params.viewerUserId },
-                { accessList: { some: { userId: params.viewerUserId } } },
-              ],
-            }),
-      },
-      select: {
-        id: true,
-        name: true,
-        projectTips: {
-          orderBy: [{ priority: 'desc' }, { updatedAt: 'desc' }],
-          take: Math.min(params.limitPerSource, 5),
-          select: { title: true, category: true },
+    let projects: Array<{
+      id: string;
+      name: string;
+      projectTips?: Array<{ title: string; category: string | null }>;
+    }> = [];
+    try {
+      projects = await prisma.project.findMany({
+        where: {
+          organizationId: params.organizationId,
+          id: { not: params.currentProjectId },
+          ...(canAccessAllProjects
+            ? {}
+            : {
+                OR: [
+                  { ownerId: params.viewerUserId },
+                  { accessList: { some: { userId: params.viewerUserId } } },
+                ],
+              }),
         },
-      },
-      orderBy: { updatedAt: 'desc' },
-      take: Math.min(params.limitPerSource, 20),
-    });
+        select: {
+          id: true,
+          name: true,
+          projectTips: {
+            orderBy: [{ priority: 'desc' }, { updatedAt: 'desc' }],
+            take: Math.min(params.limitPerSource, 5),
+            select: { title: true, category: true },
+          },
+        },
+        orderBy: { updatedAt: 'desc' },
+        take: Math.min(params.limitPerSource, 20),
+      });
+    } catch (error) {
+      if (!isMissingPrismaTable(error, ['ProjectTip'])) {
+        throw error;
+      }
+
+      projects = await prisma.project.findMany({
+        where: {
+          organizationId: params.organizationId,
+          id: { not: params.currentProjectId },
+          ...(canAccessAllProjects
+            ? {}
+            : {
+                OR: [
+                  { ownerId: params.viewerUserId },
+                  { accessList: { some: { userId: params.viewerUserId } } },
+                ],
+              }),
+        },
+        select: {
+          id: true,
+          name: true,
+        },
+        orderBy: { updatedAt: 'desc' },
+        take: Math.min(params.limitPerSource, 20),
+      });
+    }
 
     return projects.map((project) => ({
       projectId: project.id,
       name: project.name,
-      topTipTitles: project.projectTips.map((tip) => tip.title),
-      patterns: [...new Set(project.projectTips.map((tip) => tip.category).filter((value): value is string => Boolean(value)))],
+      topTipTitles: (project.projectTips ?? []).map((tip) => tip.title),
+      patterns: [...new Set((project.projectTips ?? []).map((tip) => tip.category).filter((value): value is string => Boolean(value)))],
     }));
   }
 }

@@ -16,6 +16,7 @@ import {
 
 import { assertProjectAccess } from '@/lib/domain/workspace';
 import { prisma } from '@/lib/prisma';
+import { isMissingPrismaTable } from '@/lib/prisma-table-errors';
 import { ProjectTipGroundingService } from '@/lib/projects/project-tip-grounding.service';
 import {
   mergeSuggestedRoutingWithDerivedSuggestions,
@@ -780,30 +781,37 @@ export class ProjectTipService {
     starred?: boolean;
   }): Promise<ProjectTipSnapshot[]> {
     await assertProjectAccess(params.viewerUserId, params.projectId, 'VIEWER');
-    const tips = await prisma.projectTip.findMany({
-      where: {
-        projectId: params.projectId,
-        ...(params.status ? { status: params.status } : {}),
-        ...(params.starred !== undefined ? { starred: params.starred } : {}),
-      },
-      include: {
-        _count: {
-          select: {
-            evidence: true,
-            routes: true,
-            executions: true,
+    try {
+      const tips = await prisma.projectTip.findMany({
+        where: {
+          projectId: params.projectId,
+          ...(params.status ? { status: params.status } : {}),
+          ...(params.starred !== undefined ? { starred: params.starred } : {}),
+        },
+        include: {
+          _count: {
+            select: {
+              evidence: true,
+              routes: true,
+              executions: true,
+            },
           },
         },
-      },
-      orderBy: [{ priority: 'desc' }, { updatedAt: 'desc' }],
-    });
-    return tips.map((tip) =>
-      mapTipSnapshot(tip, {
-        evidenceCount: tip._count.evidence,
-        routeCount: tip._count.routes,
-        executionCount: tip._count.executions,
-      })
-    );
+        orderBy: [{ priority: 'desc' }, { updatedAt: 'desc' }],
+      });
+      return tips.map((tip) =>
+        mapTipSnapshot(tip, {
+          evidenceCount: tip._count.evidence,
+          routeCount: tip._count.routes,
+          executionCount: tip._count.executions,
+        })
+      );
+    } catch (error) {
+      if (!isMissingPrismaTable(error, ['ProjectTip', 'ProjectTipEvidence', 'ProjectTipRoute', 'ProjectTipExecution'])) {
+        throw error;
+      }
+      return [];
+    }
   }
 
   static async getProjectTip(params: {
@@ -812,15 +820,23 @@ export class ProjectTipService {
     viewerUserId: string;
   }): Promise<ProjectTipDetailSnapshot | null> {
     await assertProjectAccess(params.viewerUserId, params.projectId, 'VIEWER');
-    const tip = await prisma.projectTip.findFirst({
-      where: { id: params.tipId, projectId: params.projectId },
-      include: {
-        evidence: { orderBy: [{ sortOrder: 'asc' }, { createdAt: 'asc' }] },
-        revisions: { orderBy: { createdAt: 'desc' } },
-        routes: { orderBy: { createdAt: 'desc' } },
-        executions: { orderBy: { startedAt: 'desc' } },
-      },
-    });
+    let tip;
+    try {
+      tip = await prisma.projectTip.findFirst({
+        where: { id: params.tipId, projectId: params.projectId },
+        include: {
+          evidence: { orderBy: [{ sortOrder: 'asc' }, { createdAt: 'asc' }] },
+          revisions: { orderBy: { createdAt: 'desc' } },
+          routes: { orderBy: { createdAt: 'desc' } },
+          executions: { orderBy: { startedAt: 'desc' } },
+        },
+      });
+    } catch (error) {
+      if (!isMissingPrismaTable(error, ['ProjectTip', 'ProjectTipEvidence', 'ProjectTipRevision', 'ProjectTipRoute', 'ProjectTipExecution'])) {
+        throw error;
+      }
+      return null;
+    }
     if (!tip) return null;
 
     return {
@@ -860,18 +876,34 @@ export class ProjectTipService {
   }): Promise<ProjectTipExecutionSnapshot[]> {
     await assertProjectAccess(params.viewerUserId, params.projectId, 'VIEWER');
 
-    const tip = await prisma.projectTip.findFirst({
-      where: { id: params.tipId, projectId: params.projectId },
-      select: { id: true },
-    });
+    let tip;
+    try {
+      tip = await prisma.projectTip.findFirst({
+        where: { id: params.tipId, projectId: params.projectId },
+        select: { id: true },
+      });
+    } catch (error) {
+      if (!isMissingPrismaTable(error, ['ProjectTip'])) {
+        throw error;
+      }
+      return [];
+    }
     if (!tip) {
       throw new Error('Tip not found');
     }
 
-    const executions = await prisma.projectTipExecution.findMany({
-      where: { tipId: params.tipId },
-      orderBy: { startedAt: 'desc' },
-    });
+    let executions;
+    try {
+      executions = await prisma.projectTipExecution.findMany({
+        where: { tipId: params.tipId },
+        orderBy: { startedAt: 'desc' },
+      });
+    } catch (error) {
+      if (!isMissingPrismaTable(error, ['ProjectTipExecution'])) {
+        throw error;
+      }
+      return [];
+    }
 
     return executions.map(mapTipExecutionSnapshot);
   }
@@ -888,13 +920,21 @@ export class ProjectTipService {
   }>> {
     await assertProjectAccess(params.viewerUserId, params.projectId, 'VIEWER');
 
-    const tips = await prisma.projectTip.findMany({
-      where: { projectId: params.projectId },
-      include: {
-        routes: { select: { status: true } },
-        executions: { select: { id: true } },
-      },
-    });
+    let tips;
+    try {
+      tips = await prisma.projectTip.findMany({
+        where: { projectId: params.projectId },
+        include: {
+          routes: { select: { status: true } },
+          executions: { select: { id: true } },
+        },
+      });
+    } catch (error) {
+      if (!isMissingPrismaTable(error, ['ProjectTip', 'ProjectTipRoute', 'ProjectTipExecution'])) {
+        throw error;
+      }
+      return [];
+    }
 
     const buckets = new Map<
       string,

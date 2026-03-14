@@ -7,19 +7,6 @@ import type { ValidationResponse } from '@/lib/interview/validation-response';
 import type { CILAnalysis, CILState } from '@/lib/interview/cil/types';
 import { sanitize, sanitizeConfig } from '@/lib/llm/prompt-sanitizer';
 
-const FIELD_LABELS: Record<string, { it: string, en: string }> = {
-    name: { it: 'Nome Completo', en: 'Full Name' },
-    email: { it: 'Indirizzo Email', en: 'Email Address' },
-    phone: { it: 'Numero di Telefono', en: 'Phone Number' },
-    company: { it: 'Azienda/Organizzazione', en: 'Company/Organization' },
-    linkedin: { it: 'Profilo LinkedIn/Social', en: 'LinkedIn/Social Profile' },
-    portfolio: { it: 'Portfolio/Sito Web', en: 'Portfolio/Website' },
-    role: { it: 'Ruolo Attuale', en: 'Current Role' },
-    location: { it: 'Città/Località', en: 'City/Location' },
-    budget: { it: 'Budget', en: 'Budget' },
-    availability: { it: 'Disponibilità (Recruiting)', en: 'Availability' }
-};
-
 export class PromptBuilder {
 
     /**
@@ -139,7 +126,7 @@ Tone: "${safeTone || 'Natural, professional, empathetic'}"
 
 ## STANDARD MODE
 - Stay conversational, but diagnostic.
-- Once the user gives a usable answer, advance instead of opening optional threads.
+- Stay on the current topic until the planned target coverage is plausibly satisfied; then move on cleanly instead of opening optional threads.
 - Prefer current practice, frequency, blocker, owner, channel, metric, recent example, or next step.
 - Avoid abstract or philosophical widening unless clearly useful.
 
@@ -258,11 +245,11 @@ ${topicLines}
             const isAvanzatoLocal = ((bot as any)?.interviewerQuality || 'standard') === 'avanzato';
 
             const metodoIT = isAvanzatoLocal
-                ? `Metodo: agganciati a un dettaglio concreto e fai una sola domanda distintiva sul sub-goal più promettente.`
+                ? `Metodo: agganciati a un dettaglio concreto e fai una sola domanda distintiva sul sub-goal più promettente. Se l'utente apre un angolo nuovo, segui quel nuovo angolo invece di trascinare il dettaglio precedente.`
                 : `Metodo: agganciati a un dettaglio concreto appena emerso e fai UNA sola domanda diagnostica, chiara e confrontabile sul sub-goal più utile. Evita opener rituali e domande troppo ampie.`;
 
             const methodEN = isAvanzatoLocal
-                ? `Method: hook into one concrete detail and ask a single distinctive question on the most promising sub-goal.`
+                ? `Method: hook into one concrete detail and ask a single distinctive question on the most promising sub-goal. If the user opens a new angle, follow that new angle instead of dragging the previous detail forward.`
                 : `Method: hook into one concrete detail that just emerged and ask ONE clear, comparable diagnostic question on the most useful sub-goal. Avoid ritual openers and overly broad prompts.`;
 
             return isItalian ? `
@@ -423,22 +410,21 @@ One question only. No topic questions.
         if (status === 'DATA_COLLECTION') {
             const rawFields = (bot?.candidateDataFields as any[]) || ['name', 'email'];
             const fieldIds = rawFields.map((value: any) => typeof value === 'string' ? value : (value.id || value.field));
-            const formattedChecklist = fieldIds.map((id) => {
-                const label = FIELD_LABELS[id];
-                return label ? (isItalian ? label.it : label.en) : String(id);
-            }).join(', ');
+            const formattedChecklist = fieldIds.map((id) => String(id)).join(', ');
             const priorityField = sanitize(supervisorInsight?.nextSubGoal || '', 200).trim();
 
             return isItalian ? `
 ## FASE: RACCOLTA DATI
-Campi: ${formattedChecklist}
+Field IDs canonici: ${formattedChecklist}
 Raccogli un campo per volta. ${priorityField ? `Priorità: ${priorityField}.` : ''}
+Formula sempre la domanda nella lingua del partecipante, non nella lingua dei field id.
 Non dedurre nome da email. Nessun saluto finale finché mancano campi.
 Quando completi: chiudi e aggiungi INTERVIEW_COMPLETED.
 `.trim() : `
 ## PHASE: DATA_COLLECTION
-Fields: ${formattedChecklist}
+Canonical field IDs: ${formattedChecklist}
 Collect one field at a time. ${priorityField ? `Priority: ${priorityField}.` : ''}
+Always phrase the question in the participant's language, not in the language of the field ids.
 Never infer name from email. No goodbye until all fields complete.
 When done: close and append INTERVIEW_COMPLETED.
 `.trim();
@@ -544,7 +530,19 @@ Brief connection, then ONE exploratory question.
                 parts.push(`${label} ${angles.slice(0, cueLimit).join(' | ')}`);
             }
 
-            return `\n## KNOWLEDGE - ${sanitizeConfig(currentTopic.label, 200)}\n${parts.join('\n')}`;
+            const strategicTopicSummary = [
+                `Topic importance: ${currentTopic.importanceBand} (${currentTopic.importanceScore})`,
+                `Planned coverage: target=${currentTopic.targetSubGoalCount}/${currentTopic.fullCoverageSubGoalCount}, stretch=${currentTopic.stretchSubGoalCount}/${currentTopic.fullCoverageSubGoalCount}`,
+                `Editorial order stays fixed. Use grading only to decide what is core, stretch, or marginal.`
+            ];
+
+            const keySubGoals = (currentTopic.subGoalPlans || [])
+                .filter((subGoal) => subGoal.enabled && subGoal.coverageTier !== 'disabled')
+                .sort((a, b) => a.editorialOrderIndex - b.editorialOrderIndex)
+                .slice(0, 5)
+                .map((subGoal) => `${sanitize(subGoal.label, 140)} [${subGoal.coverageTier}|${subGoal.importanceBand}]`);
+
+            return `\n## KNOWLEDGE - ${sanitizeConfig(currentTopic.label, 200)}\n${strategicTopicSummary.join('\n')}\n${keySubGoals.length > 0 ? `Sub-goals: ${keySubGoals.join(' | ')}\n` : ''}${parts.join('\n')}`;
         }
 
         return '';
@@ -563,6 +561,9 @@ Brief connection, then ONE exploratory question.
 - Preferisci domande aperte, narrative e specifiche; evita scale numeriche.
 - Se l'utente esita, chiarisci o rendi la domanda più concreta.
 - Se emerge un collegamento con un tema precedente, integralo brevemente.
+- Valuta sempre il delta tra l'ultimo messaggio utente e il contesto storico disponibile.
+- Se l'ultimo messaggio apre una direzione nuova e rilevante per il topic o per l'obiettivo dell'intervista, fai un follow-up su quel punto.
+- Se l'ultimo messaggio NON apre una direzione nuova davvero rilevante, non forzare un follow-up: prosegui con il sub-goal o topic successivo e usa il contesto storico solo per rendere la domanda più precisa.
 - Se noti fatica o risposte brevi, accorcia e semplifica.
 `.trim() : `
 ## DEEP QUALITATIVE MODE
@@ -570,6 +571,9 @@ Brief connection, then ONE exploratory question.
 - Prefer open, narrative, specific questions; avoid numeric scales.
 - If the user hesitates, clarify or make the question more concrete.
 - If a cross-topic link emerges, weave it in briefly.
+- Always evaluate the delta between the latest user message and the historical context available.
+- If the latest message opens a new direction that is relevant to the topic or interview objective, follow up on that direction.
+- If the latest message does NOT open a genuinely relevant new direction, do not force a follow-up: continue with the next sub-goal or topic and use historical context only to sharpen the question.
 - If the user shows fatigue, shorten and simplify.
 `.trim();
     }
@@ -657,7 +661,11 @@ export function addValidationFeedbackToPrompt(
 export function buildCILContextBlock(
     analysis: CILAnalysis,
     cilState: CILState | null,
-    interviewerQuality: string
+    interviewerQuality: string,
+    options?: {
+        latestUserMessage?: string | null;
+        freshness?: 'fresh' | 'stale';
+    }
 ): string {
     if (interviewerQuality !== 'avanzato') return '';
 
@@ -665,6 +673,8 @@ export function buildCILContextBlock(
     const mediumThreads = analysis.openThreads.filter(t => t.strength === 'medium');
     const themes = analysis.emergingThemes;
     const lra = analysis.lastResponseAnalysis;
+    const latestUserMessage = sanitize(options?.latestUserMessage || '', 280);
+    const freshness = options?.freshness || 'fresh';
     const hasMaterial = highThreads.length > 0 || themes.length > 0 ||
         lra.activeHypotheses.length > 0 || lra.contradictionFlags.length > 0 ||
         lra.interruptedThoughts.length > 0 || lra.emotionalCues.length > 0;
@@ -698,6 +708,24 @@ export function buildCILContextBlock(
     if (signals.length > 0) {
         lines.push('\nLast response — signals:');
         for (const s of signals) lines.push(`• ${s}`);
+    }
+
+    lines.push('\nUse policy:');
+    lines.push('• Treat this CIL block as historical memory, not as the final truth of the current turn.');
+    lines.push('• Before asking the next question, evaluate how the latest participant message confirms, weakens, contradicts, or redirects these threads.');
+    lines.push('• If the latest participant message opens a new concrete angle that is relevant to the topic or interview objective, prioritize that angle and follow up on it.');
+    lines.push('• If the latest participant message does not open a genuinely relevant new angle, do not force a follow-up: follow the supervisor/micro-planner progression and use older threads only to sharpen the next single question.');
+    if (freshness === 'stale') {
+        const lastUpdatedTurnIndex = typeof cilState?.lastUpdatedTurnIndex === 'number'
+            ? cilState.lastUpdatedTurnIndex
+            : null;
+        const freshnessLine = lastUpdatedTurnIndex && lastUpdatedTurnIndex > 0
+            ? `Historical snapshot: this CIL memory was last updated before the current participant message (last merged turn: ${lastUpdatedTurnIndex}).`
+            : 'Historical snapshot: this CIL memory was last updated before the current participant message.';
+        lines.push(`• ${freshnessLine}`);
+    }
+    if (latestUserMessage) {
+        lines.push(`• Latest participant message to evaluate now: "${latestUserMessage}"`);
     }
 
     lines.push(`\nSuggested move: ${analysis.suggestedMove}`);

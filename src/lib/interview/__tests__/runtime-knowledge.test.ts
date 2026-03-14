@@ -14,11 +14,24 @@ const BASE_PLAN: InterviewPlan = {
     meta: {
         generatedAt: '2026-02-14T00:00:00.000Z',
         planLogicVersion: 'v1',
+        budgetSignature: '45:2:2:2:2',
+        objectiveSignature: '',
         maxDurationMins: 3,
         totalTimeSec: 180,
         perTopicTimeSec: 60,
         secondsPerTurn: 45,
-        topicsSignature: 'topic-a||topic-b'
+        topicsSignature: 'topic-a||topic-b',
+        interviewerQuality: 'standard',
+        gradingSource: 'deterministic'
+    },
+    coverage: {
+        targetDurationSec: 180,
+        stretchDurationSec: 216,
+        fullCoverageDurationSec: 270,
+        target: { coveredTopics: 1, coveredSubGoals: 2, totalTopics: 1, totalSubGoals: 2, coverageRate: 1 },
+        stretch: { coveredTopics: 1, coveredSubGoals: 2, totalTopics: 1, totalSubGoals: 2, coverageRate: 1 },
+        full: { coveredTopics: 1, coveredSubGoals: 2, totalTopics: 1, totalSubGoals: 2, coverageRate: 1 },
+        likelyExcludedWithoutDeepOffer: []
     },
     explore: {
         topics: [
@@ -26,10 +39,25 @@ const BASE_PLAN: InterviewPlan = {
                 topicId: 'topic-a',
                 label: 'Contesto aziendale',
                 orderIndex: 0,
+                editorialOrderIndex: 0,
                 subGoals: ['Settore', 'Mercato geografico'],
+                subGoalPlans: [
+                    { id: 'sg-1', label: 'Settore', editorialOrderIndex: 0, importanceScore: 0.8, importanceBand: 'high', coverageTier: 'target', rationale: '', enabled: true },
+                    { id: 'sg-2', label: 'Mercato geografico', editorialOrderIndex: 1, importanceScore: 0.7, importanceBand: 'high', coverageTier: 'target', rationale: '', enabled: true }
+                ],
                 baseTurns: 2,
                 minTurns: 2,
                 maxTurns: 2,
+                importanceScore: 0.8,
+                importanceBand: 'high',
+                rationale: '',
+                enabled: true,
+                targetTurns: 2,
+                stretchTurns: 2,
+                fullCoverageTurns: 2,
+                targetSubGoalCount: 2,
+                stretchSubGoalCount: 2,
+                fullCoverageSubGoalCount: 2,
                 interpretationCues: [],
                 significanceSignals: [],
                 probeAngles: []

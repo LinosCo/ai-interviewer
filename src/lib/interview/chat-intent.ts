@@ -7,7 +7,6 @@
 import { generateObject } from 'ai';
 import { createOpenAI } from '@ai-sdk/openai';
 import { z } from 'zod';
-import { isClarificationSignal } from '@/lib/chat/response-builder';
 
 // ---------------------------------------------------------------------------
 // Shared types (exported so question-generator.ts and interview-completion.ts
@@ -25,6 +24,43 @@ export type LLMUsageCollector = (payload: {
     model?: string | null;
     usage?: LLMUsagePayload | null;
 }) => void;
+
+export type SemanticUserTurnSignal = 'none' | 'clarification' | 'off_topic_question';
+export type ResponseValueBand = 'low' | 'medium' | 'high' | 'very_high';
+export type DeltaType = 'none' | 'refinement' | 'new_direction' | 'contradiction' | 'concrete_example';
+export type NarrativeState = 'open_thread' | 'answered_thread' | 'transition_ready';
+
+export interface TopicalUserTurnInterpretation {
+    wantsToConclude: boolean;
+    closureConfidence: 'high' | 'medium' | 'low';
+    closureReason: string;
+    signal: SemanticUserTurnSignal;
+    responseValue: ResponseValueBand;
+    deltaType: DeltaType;
+    narrativeState: NarrativeState;
+}
+
+export interface AssistantTurnEvaluation {
+    isExtensionOffer: boolean;
+    isClarificationResponse: boolean;
+    isScopeBoundaryResponse: boolean;
+    isConsentRequest: boolean;
+    targetsExpectedField: boolean;
+    isClosureResponse: boolean;
+    isVagueDataCollectionRequest: boolean;
+    isContactRequest: boolean;
+    isPromotionalContent: boolean;
+}
+
+export interface DataCollectionTurnInterpretation {
+    consentIntent: 'ACCEPT' | 'REFUSE' | 'NEUTRAL';
+    wantsToConclude: boolean;
+    closureConfidence: 'high' | 'medium' | 'low';
+    isFrustrated: boolean;
+    wantsToSkipField: boolean;
+    extractedExpectedFieldValue: string | null;
+    extractedExpectedFieldConfidence: 'high' | 'low' | 'none';
+}
 
 // ---------------------------------------------------------------------------
 // extractFieldFromMessage
@@ -109,37 +145,6 @@ export async function checkUserIntent(
     context: 'consent' | 'deep_offer' | 'stop_confirmation',
     options?: { onUsage?: LLMUsageCollector }
 ): Promise<'ACCEPT' | 'REFUSE' | 'NEUTRAL'> {
-    const normalized = String(userMessage || '')
-        .trim()
-        .toLowerCase()
-        .replace(/[!?.,;:()\[\]"]/g, ' ')
-        .replace(/\s+/g, ' ')
-        .trim();
-
-    // Fast-path deterministic intent for extension consent to avoid accidental
-    // accepts on unrelated content replies.
-    if (context === 'deep_offer') {
-        if (isClarificationSignal(userMessage, language)) return 'NEUTRAL';
-
-        const refuseSet = new Set([
-            'no', 'no grazie', 'direi di no', 'anche no', 'non ora',
-            'meglio di no', 'preferisco di no', 'stop', 'basta'
-        ]);
-        const acceptSet = new Set([
-            'si', 'sì', 'yes', 'ok', 'va bene', 'certo', 'volontieri',
-            'continuiamo', 'proseguiamo', 'andiamo avanti'
-        ]);
-
-        if (refuseSet.has(normalized)) return 'REFUSE';
-        if (acceptSet.has(normalized)) return 'ACCEPT';
-
-        const refusePattern = /\b(non voglio continuare|non continuare|abbiamo gia parlato troppo|chiudiamo qui|fermiamoci|preferisco chiudere)\b/i;
-        if (refusePattern.test(normalized)) return 'REFUSE';
-
-        const acceptPattern = /\b(voglio continuare|possiamo continuare|continuiamo|proseguiamo|andiamo avanti|estendiamo)\b/i;
-        if (acceptPattern.test(normalized)) return 'ACCEPT';
-    }
-
     const openai = createOpenAI({ apiKey });
 
     const contextPrompts = {
@@ -174,6 +179,468 @@ export async function checkUserIntent(
     } catch (e) {
         console.error('Intent check failed:', e);
         return 'NEUTRAL';
+    }
+}
+
+export async function detectSemanticUserTurnSignal(params: {
+    userMessage: string;
+    apiKey: string;
+    language: string;
+    phase: 'EXPLORE' | 'DEEPEN' | 'DEEP_OFFER' | 'DATA_COLLECTION';
+    currentTopicLabel?: string | null;
+    targetTopicLabel?: string | null;
+    interviewObjective?: string | null;
+    options?: { onUsage?: LLMUsageCollector };
+}): Promise<SemanticUserTurnSignal> {
+    const text = String(params.userMessage || '').trim();
+    if (!text) return 'none';
+    if (params.phase !== 'EXPLORE' && params.phase !== 'DEEPEN') return 'none';
+
+    const openai = createOpenAI({ apiKey: params.apiKey });
+    const schema = z.object({
+        signal: z.enum(['none', 'clarification', 'off_topic_question']),
+        reason: z.string()
+    });
+
+    try {
+        const result = await generateObject({
+            model: openai('gpt-4o-mini'),
+            schema,
+            prompt: [
+                'Classify the user turn in a multilingual interview flow.',
+                `Participant language: ${params.language}`,
+                `Current phase: ${params.phase}`,
+                `Current topic: "${String(params.currentTopicLabel || '')}"`,
+                `Target topic: "${String(params.targetTopicLabel || '')}"`,
+                `Interview objective: "${String(params.interviewObjective || '')}"`,
+                `User message: "${text}"`,
+                '',
+                'Return "clarification" only if the user is asking the interviewer to clarify or explain the previous question.',
+                'Return "off_topic_question" only if the user is asking a question that is genuinely outside the scope of the interview topic/objective.',
+                'Return "none" for ordinary topical answers, on-topic questions, or ambiguous cases.',
+                'Be semantic and language-agnostic. Avoid keyword-based assumptions.'
+            ].join('\n'),
+            temperature: 0
+        });
+        params.options?.onUsage?.({
+            source: 'detect_semantic_user_turn_signal',
+            model: 'gpt-4o-mini',
+            usage: (result as any)?.usage
+        });
+        return result.object.signal;
+    } catch (e) {
+        console.error('Semantic user-turn signal detection failed:', e);
+        return 'none';
+    }
+}
+
+export async function evaluateTopicalUserTurn(params: {
+    userMessage: string;
+    apiKey: string;
+    language: string;
+    phase: 'EXPLORE' | 'DEEPEN' | 'DEEP_OFFER' | 'DATA_COLLECTION';
+    currentTopicLabel?: string | null;
+    targetTopicLabel?: string | null;
+    interviewObjective?: string | null;
+    options?: { onUsage?: LLMUsageCollector };
+}): Promise<TopicalUserTurnInterpretation> {
+    const text = String(params.userMessage || '').trim();
+    if (!text || (params.phase !== 'EXPLORE' && params.phase !== 'DEEPEN')) {
+        return {
+            wantsToConclude: false,
+            closureConfidence: 'low',
+            closureReason: 'not_applicable',
+            signal: 'none',
+            responseValue: 'low',
+            deltaType: 'none',
+            narrativeState: 'answered_thread'
+        };
+    }
+
+    const openai = createOpenAI({ apiKey: params.apiKey });
+    const schema = z.object({
+        wantsToConclude: z.boolean(),
+        closureConfidence: z.enum(['high', 'medium', 'low']),
+        closureReason: z.string(),
+        signal: z.enum(['none', 'clarification', 'off_topic_question']),
+        responseValue: z.enum(['low', 'medium', 'high', 'very_high']),
+        deltaType: z.enum(['none', 'refinement', 'new_direction', 'contradiction', 'concrete_example']),
+        narrativeState: z.enum(['open_thread', 'answered_thread', 'transition_ready']),
+        reason: z.string()
+    });
+
+    try {
+        const result = await generateObject({
+            model: openai('gpt-4o-mini'),
+            schema,
+            prompt: [
+                'Interpret a user turn in a multilingual interview.',
+                `Participant language: ${params.language}`,
+                `Current phase: ${params.phase}`,
+                `Current topic: "${String(params.currentTopicLabel || '')}"`,
+                `Target topic: "${String(params.targetTopicLabel || '')}"`,
+                `Interview objective: "${String(params.interviewObjective || '')}"`,
+                `User message: "${text}"`,
+                '',
+                'Set wantsToConclude=true only if the user explicitly wants to stop or end now.',
+                'Set signal="clarification" only if the user is asking the interviewer to clarify the previous question.',
+                'Set signal="off_topic_question" only if the user is asking something genuinely outside the interview scope.',
+                'Set signal="none" for ordinary answers, on-topic questions, or ambiguous cases.',
+                'Classify responseValue as: low (generic/brief), medium (usable but limited), high (concrete and relevant), very_high (concrete, relevant, and strategically rich).',
+                'Classify deltaType as: none, refinement, new_direction, contradiction, or concrete_example.',
+                'Classify narrativeState as: open_thread (promising thread worth exploring), answered_thread (point addressed well enough), or transition_ready (little additional value in staying here).',
+                'Use the interview objective and current topic as the reference for relevance and richness.',
+                'Be semantic, strict, multilingual, and avoid keyword-based assumptions.'
+            ].join('\n'),
+            temperature: 0
+        });
+        params.options?.onUsage?.({
+            source: 'evaluate_topical_user_turn',
+            model: 'gpt-4o-mini',
+            usage: (result as any)?.usage
+        });
+        return {
+            wantsToConclude: result.object.wantsToConclude,
+            closureConfidence: result.object.closureConfidence,
+            closureReason: result.object.closureReason,
+            signal: result.object.signal,
+            responseValue: result.object.responseValue,
+            deltaType: result.object.deltaType,
+            narrativeState: result.object.narrativeState
+        };
+    } catch (e) {
+        console.error('Topical user-turn evaluation failed:', e);
+        return {
+            wantsToConclude: false,
+            closureConfidence: 'low',
+            closureReason: 'evaluation_error',
+            signal: 'none',
+            responseValue: 'low',
+            deltaType: 'none',
+            narrativeState: 'answered_thread'
+        };
+    }
+}
+
+export async function isAssistantRequestingField(params: {
+    assistantMessage: string;
+    fieldName: string;
+    apiKey: string;
+    language: string;
+    options?: { onUsage?: LLMUsageCollector };
+}): Promise<boolean> {
+    const message = String(params.assistantMessage || '').trim();
+    if (!message || !params.fieldName) return false;
+
+    const openai = createOpenAI({ apiKey: params.apiKey });
+    const schema = z.object({
+        targetsField: z.boolean(),
+        reason: z.string()
+    });
+
+    try {
+        const result = await generateObject({
+            model: openai('gpt-4o-mini'),
+            schema,
+            prompt: [
+                'Classify an assistant message in a multilingual interview.',
+                `Participant language: ${params.language}`,
+                `Canonical field id: ${params.fieldName}`,
+                `Assistant message: "${message}"`,
+                '',
+                'Return targetsField=true only if the assistant is clearly asking for that exact field now, regardless of wording or language.',
+                'Return false if the assistant is asking for another field, asking for multiple fields, asking for consent only, asking a topic question, or closing the interview.',
+                'Be strict and semantic, not lexical.'
+            ].join('\n'),
+            temperature: 0
+        });
+        params.options?.onUsage?.({
+            source: 'classify_assistant_field_request',
+            model: 'gpt-4o-mini',
+            usage: (result as any)?.usage
+        });
+        return result.object.targetsField;
+    } catch (e) {
+        console.error(`Assistant field-request classification failed for "${params.fieldName}":`, e);
+        return false;
+    }
+}
+
+async function classifyAssistantMessage(params: {
+    assistantMessage: string;
+    apiKey: string;
+    language: string;
+    task: string;
+    source: string;
+    options?: { onUsage?: LLMUsageCollector };
+}): Promise<boolean> {
+    const message = String(params.assistantMessage || '').trim();
+    if (!message) return false;
+
+    const openai = createOpenAI({ apiKey: params.apiKey });
+    const schema = z.object({
+        matches: z.boolean(),
+        reason: z.string()
+    });
+
+    try {
+        const result = await generateObject({
+            model: openai('gpt-4o-mini'),
+            schema,
+            prompt: [
+                'Classify an assistant message in a multilingual interview.',
+                `Participant language: ${params.language}`,
+                `Assistant message: "${message}"`,
+                '',
+                params.task
+            ].join('\n'),
+            temperature: 0
+        });
+        params.options?.onUsage?.({
+            source: params.source,
+            model: 'gpt-4o-mini',
+            usage: (result as any)?.usage
+        });
+        return result.object.matches;
+    } catch (e) {
+        console.error(`Assistant-message classification failed for ${params.source}:`, e);
+        return false;
+    }
+}
+
+export async function isAssistantExtensionOffer(params: {
+    assistantMessage: string;
+    apiKey: string;
+    language: string;
+    options?: { onUsage?: LLMUsageCollector };
+}): Promise<boolean> {
+    return classifyAssistantMessage({
+        ...params,
+        source: 'classify_assistant_extension_offer',
+        task: [
+            'Return matches=true only if the assistant is politely offering to extend the interview by a few more minutes and is asking whether the participant wants to continue.',
+            'Return false for topic questions, consent requests, field collection, generic wrap-up, or any message that does not clearly offer an interview extension.',
+            'Be semantic and language-agnostic.'
+        ].join(' ')
+    });
+}
+
+export async function isAssistantClarificationResponse(params: {
+    assistantMessage: string;
+    userMessage: string;
+    apiKey: string;
+    language: string;
+    options?: { onUsage?: LLMUsageCollector };
+}): Promise<boolean> {
+    return classifyAssistantMessage({
+        assistantMessage: params.assistantMessage,
+        apiKey: params.apiKey,
+        language: params.language,
+        source: 'classify_assistant_clarification_response',
+        options: params.options,
+        task: [
+            `The user had asked for clarification: "${String(params.userMessage || '').trim()}"`,
+            'Return matches=true only if the assistant first clarifies what it meant in a direct and helpful way, then optionally continues the interview coherently.',
+            'Return false if the assistant ignores the clarification request, answers a different question, or only asks another follow-up.'
+        ].join(' ')
+    });
+}
+
+export async function isAssistantScopeBoundaryResponse(params: {
+    assistantMessage: string;
+    userMessage: string;
+    apiKey: string;
+    language: string;
+    options?: { onUsage?: LLMUsageCollector };
+}): Promise<boolean> {
+    return classifyAssistantMessage({
+        assistantMessage: params.assistantMessage,
+        apiKey: params.apiKey,
+        language: params.language,
+        source: 'classify_assistant_scope_boundary_response',
+        options: params.options,
+        task: [
+            `The user had asked an out-of-scope question: "${String(params.userMessage || '').trim()}"`,
+            'Return matches=true only if the assistant politely sets a scope boundary for this interview and then redirects to the interview focus.',
+            'Return false if it answers the off-topic question directly, ignores the boundary, or just continues without acknowledging scope.'
+        ].join(' ')
+    });
+}
+
+export async function evaluateAssistantTurn(params: {
+    assistantMessage: string;
+    apiKey: string;
+    language: string;
+    userMessage?: string | null;
+    expectedFieldName?: string | null;
+    options?: { onUsage?: LLMUsageCollector };
+}): Promise<AssistantTurnEvaluation> {
+    const message = String(params.assistantMessage || '').trim();
+    if (!message) {
+        return {
+            isExtensionOffer: false,
+            isClarificationResponse: false,
+            isScopeBoundaryResponse: false,
+            isConsentRequest: false,
+            targetsExpectedField: false,
+            isClosureResponse: false,
+            isVagueDataCollectionRequest: false,
+            isContactRequest: false,
+            isPromotionalContent: false
+        };
+    }
+
+    const openai = createOpenAI({ apiKey: params.apiKey });
+    const schema = z.object({
+        isExtensionOffer: z.boolean(),
+        isClarificationResponse: z.boolean(),
+            isScopeBoundaryResponse: z.boolean(),
+            isConsentRequest: z.boolean(),
+            targetsExpectedField: z.boolean(),
+            isClosureResponse: z.boolean(),
+            isVagueDataCollectionRequest: z.boolean(),
+            isContactRequest: z.boolean(),
+            isPromotionalContent: z.boolean(),
+            reason: z.string()
+        });
+
+    try {
+        const result = await generateObject({
+            model: openai('gpt-4o-mini'),
+            schema,
+            prompt: [
+                'Classify an assistant message inside a multilingual interview runtime.',
+                `Participant language: ${params.language}`,
+                `Assistant message: "${message}"`,
+                `User message to account for (if relevant): "${String(params.userMessage || '').trim()}"`,
+                `Expected canonical field id (if any): "${String(params.expectedFieldName || '').trim()}"`,
+                '',
+                'Set isExtensionOffer=true only if the assistant is offering to extend the interview by a few minutes and asking whether to continue.',
+                'Set isClarificationResponse=true only if the user asked for clarification and the assistant clearly clarifies before continuing.',
+                'Set isScopeBoundaryResponse=true only if the user asked something out of scope and the assistant politely sets scope boundaries before redirecting.',
+                'Set isConsentRequest=true only if the assistant is explicitly asking permission to collect contact details and waiting for yes/no.',
+                'Set targetsExpectedField=true only if the assistant is clearly asking for the exact expected field now, and not multiple fields.',
+                'Set isClosureResponse=true only if the assistant is clearly closing, greeting goodbye, wrapping up, or ending the interview.',
+                'Set isVagueDataCollectionRequest=true only if the assistant is asking for contact/details in a vague unspecific way instead of the exact consent or exact field requested.',
+                'Set isContactRequest=true only if the assistant is asking for personal/contact details from the participant.',
+                'Set isPromotionalContent=true only if the assistant includes promotional, CTA, coupon, reward-claiming, or external-contacting content beyond the interview need.',
+                'Be semantic, strict, multilingual, and avoid keyword-based assumptions.'
+            ].join('\n'),
+            temperature: 0
+        });
+        params.options?.onUsage?.({
+            source: 'evaluate_assistant_turn',
+            model: 'gpt-4o-mini',
+            usage: (result as any)?.usage
+        });
+        return {
+            isExtensionOffer: result.object.isExtensionOffer,
+            isClarificationResponse: result.object.isClarificationResponse,
+            isScopeBoundaryResponse: result.object.isScopeBoundaryResponse,
+            isConsentRequest: result.object.isConsentRequest,
+            targetsExpectedField: result.object.targetsExpectedField,
+            isClosureResponse: result.object.isClosureResponse,
+            isVagueDataCollectionRequest: result.object.isVagueDataCollectionRequest,
+            isContactRequest: result.object.isContactRequest,
+            isPromotionalContent: result.object.isPromotionalContent
+        };
+    } catch (e) {
+        console.error('Assistant turn evaluation failed:', e);
+        return {
+            isExtensionOffer: false,
+            isClarificationResponse: false,
+            isScopeBoundaryResponse: false,
+            isConsentRequest: false,
+            targetsExpectedField: false,
+            isClosureResponse: false,
+            isVagueDataCollectionRequest: false,
+            isContactRequest: false,
+            isPromotionalContent: false
+        };
+    }
+}
+
+export async function evaluateDataCollectionUserTurn(params: {
+    userMessage: string;
+    apiKey: string;
+    language: string;
+    consentRequested: boolean;
+    expectedFieldName?: string | null;
+    options?: { onUsage?: LLMUsageCollector };
+}): Promise<DataCollectionTurnInterpretation> {
+    const text = String(params.userMessage || '').trim();
+    if (!text) {
+        return {
+            consentIntent: 'NEUTRAL',
+            wantsToConclude: false,
+            closureConfidence: 'low',
+            isFrustrated: false,
+            wantsToSkipField: false,
+            extractedExpectedFieldValue: null,
+            extractedExpectedFieldConfidence: 'none'
+        };
+    }
+
+    const openai = createOpenAI({ apiKey: params.apiKey });
+    const schema = z.object({
+        consentIntent: z.enum(['ACCEPT', 'REFUSE', 'NEUTRAL']),
+        wantsToConclude: z.boolean(),
+        closureConfidence: z.enum(['high', 'medium', 'low']),
+        isFrustrated: z.boolean(),
+        wantsToSkipField: z.boolean(),
+        extractedExpectedFieldValue: z.string().nullable(),
+        extractedExpectedFieldConfidence: z.enum(['high', 'low', 'none']),
+        reason: z.string()
+    });
+
+    try {
+        const result = await generateObject({
+            model: openai('gpt-4o-mini'),
+            schema,
+            prompt: [
+                'Interpret a user message inside the data-collection phase of a multilingual interview.',
+                `Participant language: ${params.language}`,
+                `Consent was explicitly requested this turn: ${params.consentRequested ? 'yes' : 'no'}`,
+                `Expected canonical field id (if any): "${String(params.expectedFieldName || '').trim()}"`,
+                `User message: "${text}"`,
+                '',
+                'Set consentIntent to ACCEPT only if the user clearly agrees to share contact details.',
+                'Set consentIntent to REFUSE only if the user clearly declines sharing contact details.',
+                'Otherwise set consentIntent to NEUTRAL.',
+                'Set wantsToConclude=true only if the user explicitly wants to stop or end now.',
+                'Set isFrustrated=true only if the user is clearly complaining about repetition, looping, or annoyance with the flow.',
+                'Set wantsToSkipField=true only if the user clearly cannot or does not want to provide the currently expected field.',
+                'Set extractedExpectedFieldValue only when the user explicitly provides the expected field value in the message.',
+                'Do not infer values that are not stated.',
+                'Be semantic, strict, multilingual, and domain-agnostic.'
+            ].join('\n'),
+            temperature: 0
+        });
+        params.options?.onUsage?.({
+            source: 'evaluate_data_collection_user_turn',
+            model: 'gpt-4o-mini',
+            usage: (result as any)?.usage
+        });
+        return {
+            consentIntent: result.object.consentIntent,
+            wantsToConclude: result.object.wantsToConclude,
+            closureConfidence: result.object.closureConfidence,
+            isFrustrated: result.object.isFrustrated,
+            wantsToSkipField: result.object.wantsToSkipField,
+            extractedExpectedFieldValue: result.object.extractedExpectedFieldValue,
+            extractedExpectedFieldConfidence: result.object.extractedExpectedFieldConfidence
+        };
+    } catch (e) {
+        console.error('Data-collection user turn evaluation failed:', e);
+        return {
+            consentIntent: 'NEUTRAL',
+            wantsToConclude: false,
+            closureConfidence: 'low',
+            isFrustrated: false,
+            wantsToSkipField: false,
+            extractedExpectedFieldValue: null,
+            extractedExpectedFieldConfidence: 'none'
+        };
     }
 }
 

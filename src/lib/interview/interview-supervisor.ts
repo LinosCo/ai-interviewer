@@ -67,7 +67,7 @@ export interface InterviewStateLike {
   deepAccepted: boolean | null;
   consentGiven: boolean | null;
   dataCollectionAttempts: number;
-  extensionReturnPhase?: 'EXPLORE' | 'DEEPEN' | null;
+  extensionReturnPhase?: 'EXPLORE' | 'DEEPEN' | 'SCAN' | 'DEEP' | null;
   extensionReturnTopicIndex?: number | null;
   extensionReturnTurnInTopic?: number | null;
   extensionOfferAttempts?: number;
@@ -82,7 +82,7 @@ export interface InterviewStateLike {
 
 export interface DeepOfferPhaseDeps {
   checkUserIntent: (userMessage: string, context: 'deep_offer') => Promise<'ACCEPT' | 'REFUSE' | 'NEUTRAL'>;
-  isExtensionOfferQuestion: (message: string) => boolean;
+  isExtensionOfferQuestion: (message: string) => Promise<boolean>;
   buildDeepOfferInsight: (sourceState: InterviewStateLike, validationFeedback?: ValidationResponse) => SupervisorInsight;
   buildDeepPlan: (remainingSec: number) => { deepTopicOrder: string[]; deepTurnsByTopic: Record<string, number> };
   getDeepTopics: (deepOrder?: string[]) => any[];
@@ -118,11 +118,16 @@ export async function runDeepOfferPhase(params: DeepOfferPhaseParams): Promise<D
   const { state, nextState, botTopics, canonicalMessages, lastUserMessage, shouldCollectData, maxDurationMins, effectiveSec, deepExtraTurnCap, deps } = params;
   let supervisorInsight: SupervisorInsight = deps.buildDeepOfferInsight(state);
   let nextTopicId: string | undefined;
+  const normalizeExtensionReturnPhase = (phase: InterviewStateLike['extensionReturnPhase']) => {
+    if (phase === 'SCAN') return 'EXPLORE' as const;
+    if (phase === 'DEEP') return 'DEEPEN' as const;
+    return phase || 'DEEPEN';
+  };
 
   const hasUserReply = String(lastUserMessage || '').trim().length > 0;
   const waitingForAnswer = state.deepAccepted === false || state.deepAccepted === null;
   const lastAssistantMessage = [...canonicalMessages].reverse().find((m) => m.role === 'assistant')?.content || '';
-  const previousWasOffer = deps.isExtensionOfferQuestion(lastAssistantMessage);
+  const previousWasOffer = await deps.isExtensionOfferQuestion(lastAssistantMessage);
 
   const moveToDataCollection = () => {
     nextState.extensionOfferAttempts = 0;
@@ -175,7 +180,7 @@ export async function runDeepOfferPhase(params: DeepOfferPhaseParams): Promise<D
 
   const intent = await deps.checkUserIntent(lastUserMessage, 'deep_offer');
   if (intent === 'ACCEPT') {
-    const returnPhase = state.extensionReturnPhase || 'DEEPEN';
+    const returnPhase = normalizeExtensionReturnPhase(state.extensionReturnPhase);
     nextState.deepAccepted = true;
     nextState.extensionOfferAttempts = 0;
     nextState.deepTurnBudgetRemaining = deepExtraTurnCap;

@@ -10,7 +10,6 @@ import {
     buildSoftDiagnosticHint,
     normalizeSingleQuestion,
     replaceLiteralTopicTitle,
-    isExtensionOfferQuestion,
 } from '@/lib/chat/response-builder';
 import type { LLMUsageCollector } from '@/lib/interview/chat-intent';
 
@@ -85,10 +84,13 @@ export async function generateQuestionOnly(params: {
         `Keep the visible response lean: max 2 sentences total, short acknowledgment, then one question.`,
         `Prefer follow-ups about one of these: obstacle, decision, trade-off, concrete example, measurable impact, or next operational step.`,
         `Choose the single strongest angle and ask only about that; do not stack two different asks in the same turn.`,
+        `Compare the latest user message with the planned topic trajectory.`,
+        `If the latest user message opens a genuinely relevant new direction for the topic or interview objective, follow that direction.`,
+        `If it does not open a genuinely relevant new direction, do not force a follow-up: keep the planned sub-goal/topic progression and use context only to sharpen wording.`,
         `Avoid stock openers like "molto interessante", "e un punto importante", "grazie per aver condiviso", "very interesting", "that's an important point", "thanks for sharing".`,
         `Prefer concrete follow-ups over broad prompts like "cosa ne pensi?" / "what do you think?" unless no better signal is available.`,
         interviewerQuality === 'standard'
-            ? `In standard mode, stay conversational but favor diagnostic, comparable questions. After one usable answer, move on rather than widening or philosophizing.`
+            ? `In standard mode, stay conversational but favor diagnostic, comparable questions. Stay on the current topic until the planned target coverage is plausibly satisfied; then move on cleanly instead of widening or philosophizing.`
             : `In advanced mode, stay specific and insightful, but keep the bridge brief. Prefer one promising thread over broader but vaguer exploration.`,
         diagnosticHint || null,
         structureInstruction,
@@ -162,6 +164,7 @@ export async function generateDeepOfferOnly(params: {
             : `3) Propose to continue and mention one concrete starting point connected to what the user shared.`,
         `4) Explicitly say the user can stop whenever they want by telling you so.`,
         `5) Ask exactly ONE yes/no question asking availability for a few more deep-dive questions.`,
+        `Do not restate the whole interview summary. Mention only the most relevant open angle.`,
         `Do NOT ask topic questions. Do NOT ask for contacts. Do NOT close the interview.`,
         `Keep it natural and concise. End with exactly one question mark.`
     ].filter(Boolean).join('\n');
@@ -198,31 +201,47 @@ export async function enforceDeepOfferQuestion(params: {
     onUsage?: LLMUsageCollector;
 }) {
     const { model, language, currentText, extensionPreview, extensionUserSnippets } = params;
+    const extensionOfferSchema = z.object({
+        matches: z.boolean()
+    });
+    const isSemanticExtensionOffer = async (message: string): Promise<boolean> => {
+        const result = await generateObject({
+            model,
+            schema: extensionOfferSchema,
+            prompt: [
+                'Classify an assistant message in a multilingual interview.',
+                `Participant language: ${language}`,
+                `Assistant message: "${message}"`,
+                '',
+                'Return matches=true only if the assistant is politely offering to extend the interview by a few more minutes and is asking whether the participant wants to continue.',
+                'Return false for topic questions, field collection, consent requests, closure, or ambiguous messages.'
+            ].join('\n'),
+            temperature: 0
+        });
+        params.onUsage?.({
+            source: 'classify_deep_offer_message',
+            model: (model as any)?.modelId || null,
+            usage: (result as any)?.usage
+        });
+        return result.object.matches;
+    };
     const cleanedCurrent = normalizeSingleQuestion(
         String(currentText || '')
             .replace(/INTERVIEW_COMPLETED/gi, '')
             .trim()
     );
 
-    if (isExtensionOfferQuestion(cleanedCurrent, language)) {
+    if (await isSemanticExtensionOffer(cleanedCurrent)) {
         return cleanedCurrent;
     }
 
     try {
         const generated = await generateDeepOfferOnly({ model, language, extensionPreview, extensionUserSnippets, onUsage: params.onUsage });
-        if (isExtensionOfferQuestion(generated, language)) {
+        if (await isSemanticExtensionOffer(generated)) {
             return generated;
         }
     } catch (e) {
         console.error('enforceDeepOfferQuestion generation failed:', e);
     }
-
-    const hintText = (extensionPreview || []).map(v => String(v || '').trim()).filter(Boolean)[0] || '';
-    return language === 'it'
-        ? (hintText
-            ? `Grazie per il tempo e per i contributi condivisi fin qui. Il tempo previsto per l'intervista sarebbe terminato: se vuoi, possiamo continuare con qualche domanda in piu, partendo da uno dei punti emersi, ad esempio ${hintText}. In qualunque momento puoi fermarti dicendolo. Ti va di proseguire ancora per qualche minuto?`
-            : `Grazie per il tempo e per i contributi condivisi fin qui. Il tempo previsto per l'intervista sarebbe terminato: se vuoi, possiamo continuare con qualche domanda in piu su uno dei punti più utili emersi. In qualunque momento puoi fermarti dicendolo. Ti va di proseguire ancora per qualche minuto?`)
-        : (hintText
-            ? `Thank you for your time and the insights shared so far. The planned interview time would now be over: if you want, we can continue with a few extra questions, starting from one point that emerged, for example ${hintText}. You can stop at any time by saying so. Would you like to continue for a few more minutes?`
-            : `Thank you for your time and the insights shared so far. The planned interview time would now be over: if you want, we can continue with a few extra questions on one useful point that emerged. You can stop at any time by saying so. Would you like to continue for a few more minutes?`);
+    return generateDeepOfferOnly({ model, language, extensionPreview, extensionUserSnippets, onUsage: params.onUsage });
 }

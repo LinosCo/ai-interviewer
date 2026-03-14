@@ -472,6 +472,9 @@ Regole:
 2) Se chiarisci, fallo in una frase breve.
 3) Se approfondisci, scegli un solo filo promettente.
 4) Evita aperture generiche; usa un dettaglio concreto.
+5) Confronta sempre l'ultimo messaggio utente con il contesto storico disponibile.
+6) Se l'ultimo messaggio apre una direzione nuova e rilevante per topic o obiettivo intervista, segui quel delta con una domanda concreta.
+7) Se non apre una direzione nuova davvero rilevante, non forzare il follow-up: prosegui con il sub-goal o topic previsto e usa il contesto storico solo per affinare la domanda.
 ${tierHint}
 `.trim();
         }
@@ -492,13 +495,16 @@ Regole operative:
 4) Se strategia=probe_example/probe_impact/probe_constraint, approfondisci quel punto prima di allargare.
 5) Mantieni naturalezza: UNA domanda sola, niente liste, niente chiusure.
 6) Se coerente con il contesto utente, preferisci un follow-up diagnostico concreto con un vincolo leggero (tempo, segmento, canale o metrica). Se forzato, evita.
+7) Confronta sempre l'ultimo messaggio utente con il contesto storico disponibile.
+8) Se l'ultimo messaggio apre una direzione nuova e rilevante per topic o obiettivo intervista, segui quel delta con una domanda concreta.
+9) Se non apre una direzione nuova davvero rilevante, non forzare il follow-up: prosegui con il sub-goal o topic previsto e usa il contesto storico solo per affinare la formulazione.
 ${tierHint}
 `.trim();
     }
 
     const hints = naturalnessHintsEN.length > 0 ? '\n' + naturalnessHintsEN.join('\n') + '\n' : '';
     const tierHint = params.interviewerQuality === 'standard'
-        ? `7) Standard mode: stay conversational, but prefer lean comparable questions. Once the user has given a usable answer, move on instead of digging further.\n8) Prefer concrete diagnostic angles: current practice, frequency, blocker, owner, channel, metric, or next step. Avoid overly broad or speculative prompts.`
+        ? `7) Standard mode: stay conversational, but prefer lean comparable questions. Stay on the current topic until the planned target coverage is plausibly satisfied; then move on cleanly.\n8) Prefer concrete diagnostic angles: current practice, frequency, blocker, owner, channel, metric, or next step. Avoid overly broad or speculative prompts.`
         : `7) If qualitative value is emerging, deepen only the most promising thread.`;
     if (params.interviewerQuality === 'avanzato') {
         return `
@@ -514,6 +520,9 @@ Rules:
 2) If clarifying, do it in one short sentence.
 3) If deepening, choose one promising thread only.
 4) Avoid generic openers; use one concrete detail.
+5) Always compare the latest user message with the historical context available.
+6) If the latest user message opens a new direction that is relevant to the topic or interview objective, follow that delta with one concrete question.
+7) If it does not open a genuinely relevant new direction, do not force a follow-up: continue with the planned sub-goal or topic and use historical context only to sharpen the question.
 ${tierHint}
 `.trim();
     }
@@ -534,6 +543,9 @@ Operational rules:
 4) If strategy=probe_example/probe_impact/probe_constraint, deepen that point before broadening.
 5) Keep it natural: one question only, no lists, no closure cues.
 6) If coherent with user context, prefer a concrete diagnostic follow-up with one light constraint (timeframe, segment, channel, or metric). If forced, skip it.
+7) Always compare the latest user message with the historical context available.
+8) If the latest user message opens a new direction that is relevant to the topic or interview objective, follow that delta with one concrete question.
+9) If it does not open a genuinely relevant new direction, do not force a follow-up: continue with the planned sub-goal or topic and use historical context only to sharpen the wording.
 ${tierHint}
 `.trim();
 }

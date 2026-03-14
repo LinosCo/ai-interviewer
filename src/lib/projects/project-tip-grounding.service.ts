@@ -1,6 +1,7 @@
 import { Prisma, ProjectTipOriginType, ProjectTipStatus } from '@prisma/client';
 
 import { prisma } from '@/lib/prisma';
+import { isMissingPrismaTable } from '@/lib/prisma-table-errors';
 import type { ProjectTipGroundingEvidenceRow, ProjectTipGroundingPayload } from '@/lib/projects/project-intelligence-types';
 
 function safeString(value: unknown): string | null {
@@ -108,30 +109,62 @@ async function buildProjectSummaries(projectId: string): Promise<{
   methodologySummary: string | null;
   methodologyRefsSummary: string[];
 }> {
-  const project = await prisma.project.findUnique({
-    where: { id: projectId },
-    select: {
-      strategy: {
-        select: {
-          positioning: true,
-          valueProposition: true,
+  let project: {
+    strategy?: {
+      positioning: string | null;
+      valueProposition: string | null;
+    } | null;
+    strategicVision?: string | null;
+    valueProposition?: string | null;
+    methodologyBindings?: Array<{
+      methodologyProfile: {
+        name: string;
+        slug: string;
+        category: string;
+      };
+    }>;
+  } | null = null;
+
+  try {
+    project = await prisma.project.findUnique({
+      where: { id: projectId },
+      select: {
+        strategy: {
+          select: {
+            positioning: true,
+            valueProposition: true,
+          },
         },
-      },
-      methodologyBindings: {
-        include: {
-          methodologyProfile: {
-            select: { name: true, slug: true, category: true },
+        methodologyBindings: {
+          include: {
+            methodologyProfile: {
+              select: { name: true, slug: true, category: true },
+            },
           },
         },
       },
-    },
-  });
+    });
+  } catch (error) {
+    if (!isMissingPrismaTable(error, ['ProjectStrategy', 'ProjectMethodologyBinding', 'MethodologyProfile'])) {
+      throw error;
+    }
+
+    project = await prisma.project.findUnique({
+      where: { id: projectId },
+      select: {
+        strategicVision: true,
+        valueProposition: true,
+      },
+    });
+  }
 
   const strategySummary = project?.strategy
     ? [safeString(project.strategy.positioning), safeString(project.strategy.valueProposition)]
         .filter((value): value is string => Boolean(value))
         .join(' | ') || null
-    : null;
+    : [safeString(project?.strategicVision), safeString(project?.valueProposition)]
+        .filter((value): value is string => Boolean(value))
+        .join(' | ') || null;
 
   const methodologyBindings = project?.methodologyBindings ?? [];
   const methodologyRefsSummary = methodologyBindings.map(

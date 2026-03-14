@@ -11,37 +11,6 @@ export function responseMentionsCandidateField(responseText: string, fieldId: st
   const text = String(responseText || '').toLowerCase();
   if (!text || !fieldId) return false;
   if (text.includes(fieldId.toLowerCase())) return true;
-
-  if (fieldId === 'name' || fieldId === 'fullName') {
-    return /\b(nome|cognome|name)\b/i.test(text);
-  }
-  if (fieldId === 'email') {
-    return /\b(email|mail)\b/i.test(text);
-  }
-  if (fieldId === 'phone') {
-    return /\b(telefono|phone|numero)\b/i.test(text);
-  }
-  if (fieldId === 'company') {
-    return /\b(azienda|company|organizzazione)\b/i.test(text);
-  }
-  if (fieldId === 'role') {
-    return /\b(ruolo|role|posizione)\b/i.test(text);
-  }
-  if (fieldId === 'linkedin') {
-    return /\b(linkedin|profilo|profile)\b/i.test(text);
-  }
-  if (fieldId === 'portfolio') {
-    return /\b(portfolio|sito web|website|url)\b/i.test(text);
-  }
-  if (fieldId === 'location') {
-    return /\b(citt[àa]|city|location|localit[àa])\b/i.test(text);
-  }
-  if (fieldId === 'budget') {
-    return /\b(budget)\b/i.test(text);
-  }
-  if (fieldId === 'availability') {
-    return /\b(disponibilit[àa]|availability)\b/i.test(text);
-  }
   return false;
 }
 
@@ -65,26 +34,4 @@ export function extractDeterministicFieldValue(fieldName: string, userMessage: s
   }
 
   return null;
-}
-
-export function isLikelyNonValueAck(userMessage: string): boolean {
-  const text = String(userMessage || '').trim().toLowerCase();
-  if (!text) return true;
-
-  const normalized = text
-    .replace(/[.!?,;:()[\]"'`]/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim();
-
-  // Common confirmations/acknowledgments that must never be stored as profile values.
-  const ackPattern = /^(ok|okay|okey|va bene|va benissimo|bene|perfetto|d accordo|accordo|s[iì]|yes|yep|yeah|sure|certo|volontieri|allora va bene|direi di si|ci sta)$/i;
-  if (ackPattern.test(normalized)) return true;
-
-  // Very short generic confirmations with no identifying signal.
-  const tokens = normalized.split(' ').filter(Boolean);
-  if (tokens.length <= 3 && /^(si|sì|yes|ok|va|bene|certo|perfetto|sure|yep|yeah)+(\s+(si|sì|yes|ok|va|bene|certo|perfetto|sure|yep|yeah))*$/i.test(normalized)) {
-    return true;
-  }
-
-  return false;
 }

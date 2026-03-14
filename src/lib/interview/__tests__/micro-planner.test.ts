@@ -85,4 +85,33 @@ Follow-up suggeriti:
         expect(block).toContain('Active topic: "AI usage"');
         expect(block).toContain('Question strategy');
     });
+
+    it('tells the planner to follow relevant new directions and otherwise advance', () => {
+        const decision = buildMicroPlannerDecision({
+            language: 'en',
+            phase: 'DEEPEN',
+            topicId: 'topic-3',
+            topicLabel: 'Adoption blockers',
+            topicSubGoals: ['Decision process'],
+            usedSubGoals: [],
+            turnInTopic: 1,
+            maxTurnsInTopic: 3,
+            userMessage: 'The real issue is not budget, it is lack of time from the team lead.',
+            userTurnSignal: 'none',
+            manualGuide: null,
+            runtimeKnowledge: null
+        });
+
+        const block = buildMicroPlannerPromptBlock({
+            language: 'en',
+            phase: 'DEEPEN',
+            topicLabel: 'Adoption blockers',
+            decision,
+            interviewerQuality: 'avanzato'
+        });
+
+        expect(block).toContain('Always compare the latest user message with the historical context available');
+        expect(block).toContain('If the latest user message opens a new direction');
+        expect(block).toContain('do not force a follow-up');
+    });
 });

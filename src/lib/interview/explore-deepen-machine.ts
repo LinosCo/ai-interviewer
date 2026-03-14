@@ -8,6 +8,25 @@ import type { InterviewState } from '@/app/api/chat/route';
 import type { SupervisorInsight } from './interview-supervisor';
 import type { InterviewPlan } from './plan-types';
 import { computeSignalScore, computeBudgetAction, stealBonusTurn } from './signal-score';
+import type { TopicTurnDecision } from './turn-decision';
+
+function getPlanTopic(plan: InterviewPlan, topicId: string) {
+    return (plan.explore?.topics || []).find((topic) => topic.topicId === topicId) || null;
+}
+
+function getRemainingPlannedSubGoals(plan: InterviewPlan, topicId: string, history: Record<string, string[]> | undefined, tiers: Array<'target' | 'stretch'> = ['target', 'stretch']) {
+    const planTopic = getPlanTopic(plan, topicId);
+    if (!planTopic?.subGoalPlans?.length) return [];
+    const used = (history || {})[topicId] || [];
+    return planTopic.subGoalPlans
+        .filter((subGoal) =>
+            subGoal.enabled &&
+            tiers.includes(subGoal.coverageTier as 'target' | 'stretch') &&
+            !used.includes(subGoal.label)
+        )
+        .sort((a, b) => a.editorialOrderIndex - b.editorialOrderIndex)
+        .map((subGoal) => subGoal.label);
+}
 
 export interface ExploreDeepResult {
     nextState: Partial<InterviewState>;
@@ -28,7 +47,10 @@ export function handleExplorePhase({
     maxDurationMins,
     effectiveSec,
     bonusTurnCap = 2,
-    advanceAfterUsableFirstAnswer = false
+    advanceAfterUsableFirstAnswer = false,
+    topicSubGoalHistory,
+    interviewerQuality = 'standard',
+    turnDecision = null,
 }: {
     state: InterviewState;
     currentTopic: TopicBlock;
@@ -40,6 +62,9 @@ export function handleExplorePhase({
     effectiveSec: number;
     bonusTurnCap?: number;
     advanceAfterUsableFirstAnswer?: boolean;
+    topicSubGoalHistory?: Record<string, string[]>;
+    interviewerQuality?: 'standard' | 'avanzato';
+    turnDecision?: TopicTurnDecision | null;
 }): ExploreDeepResult {
     const nextState: Partial<InterviewState> = { ...state };
     let supervisorInsight: SupervisorInsight = { status: 'EXPLORING' };
@@ -67,6 +92,22 @@ export function handleExplorePhase({
         return { nextState, supervisorInsight };
     }
 
+    const planTopic = getPlanTopic(interviewPlan, currentTopic.id);
+    const remainingTargetSubGoals = getRemainingPlannedSubGoals(
+        interviewPlan,
+        currentTopic.id,
+        topicSubGoalHistory || state.topicSubGoalHistory,
+        ['target']
+    );
+    const remainingStretchSubGoals = getRemainingPlannedSubGoals(
+        interviewPlan,
+        currentTopic.id,
+        topicSubGoalHistory || state.topicSubGoalHistory,
+        ['target', 'stretch']
+    );
+    const targetTurns = Math.max(1, planTopic?.targetTurns ?? topicBudget.baseTurns);
+    const stretchTurns = Math.max(targetTurns, planTopic?.stretchTurns ?? topicBudget.maxTurns);
+
     // Compute signal score from user message
     const signal = computeSignalScore(lastUserMessage, language);
     nextState.lastSignalScore = signal.score;
@@ -86,8 +127,20 @@ export function handleExplorePhase({
         };
     }
 
-    // Determine budget action
-    let action = computeBudgetAction(signal.band, topicBudget.turnsUsed, topicBudget, bonusTurnCap);
+    // Determine budget action from the turn decision contract, then apply plan coverage constraints.
+    let action: 'continue' | 'advance' | 'bonus' = 'continue';
+    if (turnDecision?.nextAction === 'transition') {
+        action = 'advance';
+    } else if (
+        turnDecision?.nextAction === 'follow_up' &&
+        interviewerQuality === 'avanzato' &&
+        signal.band === 'HIGH' &&
+        topicBudget.turnsUsed >= stretchTurns
+    ) {
+        action = 'bonus';
+    } else if (!turnDecision) {
+        action = computeBudgetAction(signal.band, topicBudget.turnsUsed, topicBudget, bonusTurnCap);
+    }
     const wordCount = String(lastUserMessage || '').split(/\s+/).filter(Boolean).length;
     const looksLikeClarification = /\?\s*$/.test(String(lastUserMessage || '').trim());
     const hasUsableFirstAnswer = wordCount >= 4 || /\b\d{1,4}\b/.test(lastUserMessage) || signal.score >= 0.12;
@@ -101,7 +154,21 @@ export function handleExplorePhase({
         action = 'advance';
     }
 
-    console.log(`📊 [EXPLORE] "${currentTopic.label}" signal=${signal.band} action=${action} turns=${topicBudget.turnsUsed}/${topicBudget.baseTurns} remaining=${remainingSec}s`);
+    const mustCompleteTargetCoverage = remainingTargetSubGoals.length > 0 && topicBudget.turnsUsed < targetTurns;
+    const canUseStretch = remainingStretchSubGoals.length > 0 && topicBudget.turnsUsed < stretchTurns;
+
+    if (mustCompleteTargetCoverage) {
+        action = 'continue';
+    } else if (
+        turnDecision?.nextAction !== 'transition' &&
+        canUseStretch
+    ) {
+        action = 'continue';
+    } else if (!canUseStretch && turnDecision?.nextAction === 'transition') {
+        action = 'advance';
+    }
+
+    console.log(`📊 [EXPLORE] "${currentTopic.label}" signal=${signal.band} value=${turnDecision?.responseValue || 'n/a'} delta=${turnDecision?.deltaType || 'n/a'} action=${action} turns=${topicBudget.turnsUsed}/${targetTurns} remaining=${remainingSec}s`);
 
     if (action === 'continue') {
         // Stay on this topic, increment turn
@@ -110,6 +177,7 @@ export function handleExplorePhase({
             ...state.topicBudgets,
             [currentTopic.id]: topicBudget
         };
+        nextState.turnInTopic = (state.turnInTopic || 0) + 1;
         nextState.turnsUsedTotal = (state.turnsUsedTotal || 0) + 1;
         supervisorInsight = { status: 'EXPLORING' };
         console.log(`  → Continue on "${currentTopic.label}"`);
@@ -128,6 +196,7 @@ export function handleExplorePhase({
                     maxTurns: Math.max(1, state.topicBudgets[donorId].maxTurns - 1)
                 }
             };
+            nextState.turnInTopic = (state.turnInTopic || 0) + 1;
             nextState.turnsUsedTotal = (state.turnsUsedTotal || 0) + 1;
             supervisorInsight = { status: 'EXPLORING_DEEP' };
             console.log(`  → Bonus turn granted (stole from ${donorId})`);
@@ -176,8 +245,15 @@ export function handleExplorePhase({
             // Now calculate uncovered topics from the complete budget set
             const uncoveredTopics = botTopics
                 .filter(t => {
+                    const remaining = getRemainingPlannedSubGoals(
+                        interviewPlan,
+                        t.id,
+                        topicSubGoalHistory || state.topicSubGoalHistory,
+                        ['target', 'stretch']
+                    );
+                    if (remaining.length > 0) return true;
                     const budget = updatedBudgets[t.id];
-                    return budget && budget.turnsUsed < budget.baseTurns;
+                    return Boolean(budget && budget.turnsUsed < budget.baseTurns);
                 })
                 .map(t => t.id)
                 .sort((a, b) => {
@@ -228,7 +304,11 @@ export function handleDeepenPhase({
     maxDurationMins,
     effectiveSec,
     deepenMaxTurnsPerTopic = 2,
-    deepExtraTurnCap = 10
+    deepExtraTurnCap = 10,
+    interviewPlan,
+    topicSubGoalHistory,
+    interviewerQuality = 'standard',
+    turnDecision = null,
 }: {
     state: InterviewState;
     currentTopic: TopicBlock;
@@ -238,6 +318,10 @@ export function handleDeepenPhase({
     effectiveSec: number;
     deepenMaxTurnsPerTopic?: number;
     deepExtraTurnCap?: number;
+    interviewPlan?: InterviewPlan;
+    topicSubGoalHistory?: Record<string, string[]>;
+    interviewerQuality?: 'standard' | 'avanzato';
+    turnDecision?: TopicTurnDecision | null;
 }): ExploreDeepResult {
     const nextState: Partial<InterviewState> = { ...state };
     let supervisorInsight: SupervisorInsight = { status: 'DEEPENING' };
@@ -265,12 +349,40 @@ export function handleDeepenPhase({
 
     const currentUncoveredIndex = uncoveredTopics.indexOf(currentTopic.id);
     const budget = state.topicBudgets[currentTopic.id];
-    const maxTurnsForDeepen = Math.min(
+    const plannedTurnsForDeepen = Math.min(
         deepenMaxTurnsPerTopic,
-        Math.max(1, (budget?.maxTurns || deepenMaxTurnsPerTopic) - (budget?.turnsUsed || 0))
+        Math.max(
+            1,
+            (state.deepTurnsByTopic || {})[currentTopic.id] ||
+            (budget?.maxTurns || deepenMaxTurnsPerTopic) - (budget?.turnsUsed || 0)
+        )
     );
+    const remainingTargetSubGoals = interviewPlan
+        ? getRemainingPlannedSubGoals(interviewPlan, currentTopic.id, topicSubGoalHistory || state.topicSubGoalHistory, ['target'])
+        : [];
+    const remainingStretchSubGoals = interviewPlan
+        ? getRemainingPlannedSubGoals(interviewPlan, currentTopic.id, topicSubGoalHistory || state.topicSubGoalHistory, ['target', 'stretch'])
+        : [];
+    const allowElasticExtraTurn =
+        interviewerQuality === 'avanzato' &&
+        turnDecision?.nextAction === 'follow_up' &&
+        turnDecision.highValue &&
+        deepBudgetRemaining !== null &&
+        deepBudgetRemaining > 0;
+    const maxTurnsForDeepen = allowElasticExtraTurn
+        ? Math.max(plannedTurnsForDeepen, (state.turnInTopic || 0) + 1)
+        : plannedTurnsForDeepen;
+    const shouldAdvance =
+        state.turnInTopic >= maxTurnsForDeepen ||
+        (
+            remainingTargetSubGoals.length === 0 &&
+            (
+                remainingStretchSubGoals.length === 0 ||
+                turnDecision?.nextAction === 'transition'
+            )
+        );
 
-    if (state.turnInTopic >= maxTurnsForDeepen) {
+    if (shouldAdvance) {
         // Move to next uncovered topic
         if (currentUncoveredIndex + 1 < uncoveredTopics.length) {
             nextState.topicIndex = currentUncoveredIndex + 1;
@@ -292,7 +404,7 @@ export function handleDeepenPhase({
         }
         const insight = state.topicKeyInsights[currentTopic.id];
         supervisorInsight = { status: 'DEEPENING', engagingSnippet: insight };
-        console.log(`📊 [DEEPEN] "${currentTopic.label}" turn ${nextState.turnInTopic}/${maxTurnsForDeepen}`);
+        console.log(`📊 [DEEPEN] "${currentTopic.label}" value=${turnDecision?.responseValue || 'n/a'} delta=${turnDecision?.deltaType || 'n/a'} turn ${nextState.turnInTopic}/${maxTurnsForDeepen}`);
     }
 
     // Check time budget

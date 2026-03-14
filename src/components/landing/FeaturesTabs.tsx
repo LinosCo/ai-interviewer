@@ -189,6 +189,10 @@ const INTEGRATION_TAGS = [
   'CRM',
 ];
 
+function getDesktopContentWidthClass(columns: Tab['columns']): string {
+  return columns === 3 ? 'md:max-w-[1120px]' : 'md:max-w-4xl';
+}
+
 function FeatureCardItem({ card }: { card: FeatureCard }): React.JSX.Element {
   const Icon = card.icon;
 
@@ -291,9 +295,12 @@ export function FeaturesTabs(): React.JSX.Element {
   const [openCardIndex, setOpenCardIndex] = useState(0);
   const [isDesktop, setIsDesktop] = useState(false);
   const [isAutoPaused, setIsAutoPaused] = useState(false);
+  const [desktopPanelMinHeight, setDesktopPanelMinHeight] = useState(0);
   const resumeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const panelMeasureRefs = useRef<Record<string, HTMLDivElement | null>>({});
   const activeTab = TABS.find((tab) => tab.id === activeTabId) ?? TABS[0];
   const activeTabIndex = Math.max(0, TABS.findIndex((tab) => tab.id === activeTab.id));
+  const desktopContentWidthClass = getDesktopContentWidthClass(activeTab.columns);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -332,6 +339,39 @@ export function FeaturesTabs(): React.JSX.Element {
     };
   }, []);
 
+  useEffect(() => {
+    if (!isDesktop || typeof window === 'undefined') return;
+
+    let frameId = 0;
+    let timeoutId: number | null = null;
+
+    const measurePanels = () => {
+      const nextHeight = TABS.reduce((maxHeight, tab) => {
+        const measuredHeight = panelMeasureRefs.current[tab.id]?.offsetHeight ?? 0;
+        return Math.max(maxHeight, measuredHeight);
+      }, 0);
+
+      if (nextHeight > 0) {
+        setDesktopPanelMinHeight(nextHeight);
+      }
+    };
+
+    const scheduleMeasure = () => {
+      if (frameId) window.cancelAnimationFrame(frameId);
+      frameId = window.requestAnimationFrame(measurePanels);
+    };
+
+    scheduleMeasure();
+    timeoutId = window.setTimeout(scheduleMeasure, 180);
+    window.addEventListener('resize', scheduleMeasure);
+
+    return () => {
+      window.removeEventListener('resize', scheduleMeasure);
+      if (frameId) window.cancelAnimationFrame(frameId);
+      if (timeoutId) window.clearTimeout(timeoutId);
+    };
+  }, [isDesktop]);
+
   const pauseAutoOnTap = () => {
     setIsAutoPaused(true);
     if (resumeTimerRef.current) clearTimeout(resumeTimerRef.current);
@@ -339,7 +379,7 @@ export function FeaturesTabs(): React.JSX.Element {
   };
 
   return (
-    <>
+    <div className="relative">
       <motion.div
         initial={{ opacity: 0, y: 12 }}
         whileInView={{ opacity: 1, y: 0 }}
@@ -349,48 +389,8 @@ export function FeaturesTabs(): React.JSX.Element {
         onMouseEnter={() => setIsAutoPaused(true)}
         onMouseLeave={() => setIsAutoPaused(false)}
       >
-        <div className="grid grid-cols-2 gap-3 md:hidden">
-          {TABS.map((tab, index) => {
-            const isActive = tab.id === activeTabId;
-            const TabIcon = tab.icon;
-
-            return (
-              <button
-                key={tab.id}
-                type="button"
-                onClick={() => {
-                  setActiveTabId(tab.id);
-                  setOpenCardIndex(0);
-                  pauseAutoOnTap();
-                }}
-                className={`flex min-h-[96px] flex-col items-start justify-between gap-3 rounded-2xl border px-4 py-4 text-left transition-all duration-200 ${
-                  isActive
-                    ? 'gradient-bg text-white shadow-glow border-transparent'
-                    : 'bg-[hsl(var(--card)/0.85)] border-[hsl(var(--border))] text-[hsl(var(--muted-foreground))] hover:border-[hsl(var(--coral)/0.35)]'
-                }`}
-              >
-                <div className="flex items-center gap-2.5">
-                  <span
-                    className={`flex h-7 w-7 items-center justify-center rounded-full border text-xs font-bold ${
-                      isActive
-                        ? 'border-white/30 bg-white/20 text-white'
-                        : 'border-[hsl(var(--border))] bg-[hsl(var(--secondary))] text-[hsl(var(--muted-foreground))]'
-                    }`}
-                  >
-                    {index + 1}
-                  </span>
-                  <TabIcon className="h-4 w-4" />
-                </div>
-                <span className="font-display text-base font-bold tracking-[0.04em]">
-                  {tab.label}
-                </span>
-              </button>
-            );
-          })}
-        </div>
-
-        <div className="hidden md:block overflow-x-auto scrollbar-hide pb-2">
-          <div className="flex gap-3 min-w-max md:mx-auto md:w-fit">
+        <div className="md:hidden">
+          <div className="flex items-stretch gap-2">
             {TABS.map((tab, index) => {
               const isActive = tab.id === activeTabId;
               const TabIcon = tab.icon;
@@ -404,73 +404,149 @@ export function FeaturesTabs(): React.JSX.Element {
                     setOpenCardIndex(0);
                     pauseAutoOnTap();
                   }}
-                  onTouchStart={pauseAutoOnTap}
-                  className={`flex items-center gap-2.5 rounded-2xl border px-6 py-3.5 text-base font-semibold whitespace-nowrap transition-all duration-200 cursor-pointer ${
+                  aria-label={`Fase ${index + 1}: ${tab.label}`}
+                  aria-pressed={isActive}
+                  className={`flex min-w-0 items-center gap-2 rounded-[22px] border px-2.5 py-3 transition-all duration-200 ${
                     isActive
-                      ? 'gradient-bg text-white shadow-glow border-transparent'
-                      : 'bg-[hsl(var(--card)/0.85)] border-[hsl(var(--border))] text-[hsl(var(--muted-foreground))] hover:border-[hsl(var(--coral)/0.35)]'
+                      ? 'flex-[1.9] justify-start gradient-bg text-white shadow-glow border-transparent'
+                      : 'flex-1 justify-center bg-[hsl(var(--card)/0.85)] border-[hsl(var(--border))] text-[hsl(var(--muted-foreground))] hover:border-[hsl(var(--coral)/0.35)]'
                   }`}
                 >
                   <span
-                    className={`flex h-6 w-6 items-center justify-center rounded-full border text-xs font-bold ${
+                    className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full border text-xs font-bold ${
                       isActive
-                        ? 'bg-white/20 border-white/30 text-white'
-                        : 'bg-[hsl(var(--secondary))] border-[hsl(var(--border))] text-[hsl(var(--muted-foreground))]'
+                        ? 'border-white/35 bg-white/16 text-white'
+                        : 'border-[hsl(var(--border))] bg-[hsl(var(--secondary))] text-[hsl(var(--muted-foreground))]'
                     }`}
                   >
                     {index + 1}
                   </span>
-                  <TabIcon className="h-4 w-4" />
-                  {tab.label}
+                  <TabIcon className={`h-4 w-4 shrink-0 ${isActive ? 'text-white' : 'text-current'}`} />
+                  {isActive ? (
+                    <span className="min-w-0 truncate font-display text-[0.72rem] font-bold tracking-[0.12em] text-white">
+                      {tab.label}
+                    </span>
+                  ) : null}
                 </button>
               );
             })}
           </div>
         </div>
 
-        <div className="mt-4 rounded-2xl border border-[hsl(var(--border)/0.55)] bg-[hsl(var(--background)/0.88)] px-4 py-3.5 text-center shadow-soft md:rounded-none md:border-none md:bg-transparent md:px-0 md:py-0 md:shadow-none">
-          <p className="text-sm md:text-base text-[hsl(var(--muted-foreground))]">
-            <span className="font-semibold text-[hsl(var(--foreground))]">
-              Fase {activeTabIndex + 1} di {TABS.length}:
-            </span>{' '}
-            {activeTab.phaseDescription}
-          </p>
-          <p className="text-xs text-[hsl(var(--muted-foreground))] mt-1">
-            I tool qui sotto appartengono alla fase selezionata.
-          </p>
+        <div className="hidden md:flex items-center justify-center gap-3 pb-1">
+          {TABS.map((tab, index) => {
+            const isActive = tab.id === activeTabId;
+            const TabIcon = tab.icon;
+
+            return (
+              <button
+                key={tab.id}
+                type="button"
+                onClick={() => {
+                  setActiveTabId(tab.id);
+                  setOpenCardIndex(0);
+                  pauseAutoOnTap();
+                }}
+                onTouchStart={pauseAutoOnTap}
+                className={`flex items-center gap-2.5 rounded-2xl border px-6 py-3.5 text-base font-semibold whitespace-nowrap transition-all duration-200 cursor-pointer ${
+                  isActive
+                    ? 'gradient-bg text-white shadow-glow border-transparent'
+                    : 'bg-[hsl(var(--card)/0.85)] border-[hsl(var(--border))] text-[hsl(var(--muted-foreground))] hover:border-[hsl(var(--coral)/0.35)]'
+                }`}
+              >
+                <span
+                  className={`flex h-6 w-6 items-center justify-center rounded-full border text-xs font-bold ${
+                    isActive
+                      ? 'bg-white/20 border-white/30 text-white'
+                      : 'bg-[hsl(var(--secondary))] border-[hsl(var(--border))] text-[hsl(var(--muted-foreground))]'
+                  }`}
+                >
+                  {index + 1}
+                </span>
+                <TabIcon className="h-4 w-4" />
+                {tab.label}
+              </button>
+            );
+          })}
+        </div>
+
+        <div className={`mt-4 md:mt-5 md:mx-auto ${desktopContentWidthClass}`}>
+          <div className="glass-card rounded-[26px] border border-[hsl(var(--border)/0.55)] px-4 py-3.5 text-center shadow-soft md:bg-[hsl(var(--card)/0.76)] md:px-6 md:py-5 md:text-left">
+            <p className="text-sm md:text-[1.05rem] text-[hsl(var(--muted-foreground))] leading-relaxed">
+              <span className="font-semibold text-[hsl(var(--foreground))]">
+                Fase {activeTabIndex + 1} di {TABS.length}:
+              </span>{' '}
+              {activeTab.phaseDescription}
+            </p>
+            <p className="mt-1.5 text-xs md:text-sm text-[hsl(var(--muted-foreground))]">
+              I tool qui sotto appartengono alla fase selezionata.
+            </p>
+          </div>
         </div>
       </motion.div>
 
-      <AnimatePresence mode="wait">
-        <motion.div
-          key={activeTab.id}
-          initial={{ opacity: 0, y: 16 }}
-          animate={{ opacity: 1, y: 0 }}
-          exit={{ opacity: 0, y: -12 }}
-          transition={{ duration: 0.3 }}
+      {isDesktop ? (
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-x-0 top-0 -z-10 h-0 overflow-hidden invisible"
         >
-          <div className="md:hidden space-y-4">
-            {activeTab.cards.map((card, index) => (
-              <MobileFeatureAccordion
-                key={card.title}
-                card={card}
-                isOpen={openCardIndex === index}
-                onToggle={() => setOpenCardIndex((current) => (current === index ? -1 : index))}
-              />
-            ))}
-          </div>
+          {TABS.map((tab) => (
+            <div
+              key={`measure-${tab.id}`}
+              ref={(node) => {
+                panelMeasureRefs.current[tab.id] = node;
+              }}
+              className={`mx-auto w-full ${getDesktopContentWidthClass(tab.columns)}`}
+            >
+              <div
+                className={`grid gap-6 ${
+                  tab.columns === 3 ? 'md:grid-cols-2 lg:grid-cols-3' : 'md:grid-cols-2'
+                }`}
+              >
+                {tab.cards.map((card) => (
+                  <FeatureCardItem key={`${tab.id}-${card.title}`} card={card} />
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : null}
 
-          <div
-            className={`hidden md:grid gap-6 ${
-              activeTab.columns === 3 ? 'md:grid-cols-2 lg:grid-cols-3' : 'md:grid-cols-2 max-w-4xl mx-auto'
-            }`}
+      <div
+        className="relative"
+        style={isDesktop && desktopPanelMinHeight > 0 ? { minHeight: `${desktopPanelMinHeight}px` } : undefined}
+      >
+        <AnimatePresence mode="wait">
+          <motion.div
+            key={activeTab.id}
+            initial={{ opacity: 0, y: 16 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -12 }}
+            transition={{ duration: 0.3 }}
           >
-            {activeTab.cards.map((card) => (
-              <FeatureCardItem key={card.title} card={card} />
-            ))}
-          </div>
-        </motion.div>
-      </AnimatePresence>
+            <div className="md:hidden space-y-4">
+              {activeTab.cards.map((card, index) => (
+                <MobileFeatureAccordion
+                  key={card.title}
+                  card={card}
+                  isOpen={openCardIndex === index}
+                  onToggle={() => setOpenCardIndex((current) => (current === index ? -1 : index))}
+                />
+              ))}
+            </div>
+
+            <div
+              className={`hidden md:mx-auto md:grid md:gap-6 ${desktopContentWidthClass} ${
+                activeTab.columns === 3 ? 'md:grid-cols-2 lg:grid-cols-3' : 'md:grid-cols-2'
+              }`}
+            >
+              {activeTab.cards.map((card) => (
+                <FeatureCardItem key={card.title} card={card} />
+              ))}
+            </div>
+          </motion.div>
+        </AnimatePresence>
+      </div>
 
       <motion.div
         initial={{ opacity: 0, y: 30 }}
@@ -537,6 +613,6 @@ export function FeaturesTabs(): React.JSX.Element {
           </div>
         </div>
       </motion.div>
-    </>
+    </div>
   );
 }

@@ -3,6 +3,7 @@ import { NextResponse } from 'next/server';
 import { auth } from '@/auth';
 import { assertProjectAccess, WorkspaceError } from '@/lib/domain/workspace';
 import { prisma } from '@/lib/prisma';
+import { isMissingPrismaTable } from '@/lib/prisma-table-errors';
 
 function toErrorResponse(error: unknown) {
   if (error instanceof WorkspaceError) {
@@ -26,20 +27,7 @@ export async function GET(
     const { projectId } = await params;
     await assertProjectAccess(session.user.id, projectId, 'VIEWER');
 
-    const [
-      project,
-      bots,
-      directVisibilityConfigs,
-      sharedVisibilityConfigs,
-      directMcpConnections,
-      sharedMcpConnections,
-      googleConnection,
-      n8nConnection,
-      sharedCmsConnections,
-      tipCount,
-      routingRulesTotal,
-      routingRulesEnabled,
-    ] = await Promise.all([
+    const baseResults = await Promise.all([
       prisma.project.findUnique({
         where: { id: projectId },
         select: {
@@ -80,9 +68,29 @@ export async function GET(
         where: { projectId },
         select: { connectionId: true },
       }),
-      prisma.projectTip.count({
+    ]);
+    const [
+      project,
+      bots,
+      directVisibilityConfigs,
+      sharedVisibilityConfigs,
+      directMcpConnections,
+      sharedMcpConnections,
+      googleConnection,
+      n8nConnection,
+      sharedCmsConnections,
+    ] = baseResults;
+    let tipCount = 0;
+    try {
+      tipCount = await prisma.projectTip.count({
         where: { projectId },
-      }),
+      });
+    } catch (error) {
+      if (!isMissingPrismaTable(error, ['ProjectTip'])) {
+        throw error;
+      }
+    }
+    const [routingRulesTotal, routingRulesEnabled] = await Promise.all([
       prisma.tipRoutingRule.count({
         where: { projectId },
       }),

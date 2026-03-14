@@ -31,6 +31,19 @@ describe('buildCILContextBlock', () => {
         expect(block).toContain('autonomia vs controllo')
     })
 
+    it('treats CIL as historical memory and prioritizes the latest user message', () => {
+        const block = buildCILContextBlock(baseAnalysis, { openThreads: [], emergingThemes: [], lastResponseAnalysis: null, lastUpdatedTurnIndex: 12 }, 'avanzato', {
+            latestUserMessage: 'In realta il problema non e il controllo, ma la mancanza di tempo operativo.',
+            freshness: 'stale'
+        })
+        expect(block).toContain('Treat this CIL block as historical memory')
+        expect(block).toContain('prioritize that angle and follow up on it')
+        expect(block).toContain('follow the supervisor/micro-planner progression')
+        expect(block).toContain('Latest participant message to evaluate now')
+        expect(block).toContain('mancanza di tempo operativo')
+        expect(block).toContain('last merged turn: 12')
+    })
+
     it('returns empty string when analysis has no material to show', () => {
         const empty: CILAnalysis = {
             ...baseAnalysis,

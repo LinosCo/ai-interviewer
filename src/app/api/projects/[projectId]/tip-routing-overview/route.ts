@@ -1,6 +1,7 @@
 import { auth } from '@/auth';
 import { WorkspaceError, assertProjectAccess } from '@/lib/domain/workspace';
 import { prisma } from '@/lib/prisma';
+import { isMissingPrismaTable } from '@/lib/prisma-table-errors';
 import { NextResponse } from 'next/server';
 import { Prisma } from '@prisma/client';
 import {
@@ -129,31 +130,55 @@ export async function GET(
     );
 
     const categoryCounts = buildEmptyCategoryCounts();
-    const canonicalTips = await prisma.projectTip.findMany({
-      where: { projectId },
-      select: {
-        id: true,
-        title: true,
-        category: true,
-        contentKind: true,
-        updatedAt: true,
-        routes: {
-          select: {
-            status: true,
-            createdAt: true,
-            updatedAt: true,
+    let canonicalTips: Array<{
+      id: string;
+      title: string;
+      category: string | null;
+      contentKind: string | null;
+      updatedAt: Date;
+      routes: Array<{
+        status: string;
+        createdAt: Date;
+        updatedAt: Date;
+      }>;
+      executions: Array<{
+        id: string;
+        status: string;
+        startedAt: Date;
+        completedAt: Date | null;
+      }>;
+    }> = [];
+    try {
+      canonicalTips = await prisma.projectTip.findMany({
+        where: { projectId },
+        select: {
+          id: true,
+          title: true,
+          category: true,
+          contentKind: true,
+          updatedAt: true,
+          routes: {
+            select: {
+              status: true,
+              createdAt: true,
+              updatedAt: true,
+            },
+          },
+          executions: {
+            select: {
+              id: true,
+              status: true,
+              startedAt: true,
+              completedAt: true,
+            },
           },
         },
-        executions: {
-          select: {
-            id: true,
-            status: true,
-            startedAt: true,
-            completedAt: true,
-          },
-        },
-      },
-    });
+      });
+    } catch (error) {
+      if (!isMissingPrismaTable(error, ['ProjectTip', 'ProjectTipRoute', 'ProjectTipExecution'])) {
+        throw error;
+      }
+    }
     const hasCanonicalLedger = canonicalTips.some((tip) => tip.routes.length > 0 || tip.executions.length > 0);
 
     if (hasCanonicalLedger) {

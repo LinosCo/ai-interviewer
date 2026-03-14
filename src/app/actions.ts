@@ -411,7 +411,12 @@ export async function updateBotAction(botId: string, formData: FormData) {
     if (formData.has('tone')) data.tone = getStr('tone');
     if (formData.has('introMessage')) data.introMessage = getStr('introMessage');
     if (formData.has('interviewerQuality')) data.interviewerQuality = getStr('interviewerQuality') as any;
-    const shouldRegeneratePlan = formData.has('maxDurationMins') || formData.has('interviewerQuality');
+    const shouldRegeneratePlan =
+        formData.has('maxDurationMins') ||
+        formData.has('interviewerQuality') ||
+        formData.has('researchGoal') ||
+        formData.has('targetAudience') ||
+        formData.has('introMessage');
     if (formData.has('maxDurationMins')) data.maxDurationMins = Number(formData.get('maxDurationMins'));
 
     // Handle slug update with validation
@@ -783,6 +788,122 @@ export async function generateBotAnalyticsAction(botId: string) {
 
     const data = result.object;
 
+    const topicCoverageAccumulator = new Map<string, {
+        label: string;
+        reachedCount: number;
+        coreCoveredSum: number;
+        coreTotalSum: number;
+        stretchCoveredSum: number;
+        enabledTotalSum: number;
+        evidence: Array<{ quote: string; conversationId: string }>;
+        highValueEvidence: Array<{ quote: string; conversationId: string }>;
+    }>();
+    const subGoalCoverageAccumulator = new Map<string, {
+        topicLabel: string;
+        label: string;
+        coveredCount: number;
+        totalCount: number;
+        evidence: Array<{ quote: string; conversationId: string }>;
+    }>();
+
+    for (const conversation of analyzedConversations) {
+        const metadata = (conversation.analysis?.metadata as Record<string, any> | null) || {};
+        const topicDetails = Array.isArray(metadata.topicDetails) ? metadata.topicDetails : [];
+        const subGoalDetails = Array.isArray(metadata.subGoalDetails) ? metadata.subGoalDetails : [];
+        const highValueTurns = Array.isArray(metadata.highValueTurns) ? metadata.highValueTurns : [];
+
+        for (const topicDetail of topicDetails) {
+            const key = String(topicDetail.label || '').trim();
+            if (!key) continue;
+            const entry = topicCoverageAccumulator.get(key) || {
+                label: key,
+                reachedCount: 0,
+                coreCoveredSum: 0,
+                coreTotalSum: 0,
+                stretchCoveredSum: 0,
+                enabledTotalSum: 0,
+                evidence: [],
+                highValueEvidence: [],
+            };
+
+            if (topicDetail.reached) entry.reachedCount += 1;
+            entry.coreCoveredSum += Number(topicDetail.coreSubGoalsCovered || 0);
+            entry.coreTotalSum += Number(topicDetail.totalCoreSubGoals || 0);
+            entry.stretchCoveredSum += Number(topicDetail.stretchSubGoalsCovered || 0);
+            entry.enabledTotalSum += Number(topicDetail.totalEnabledSubGoals || 0);
+
+            const evidence = Array.isArray(topicDetail.keyEvidence) ? topicDetail.keyEvidence : [];
+            for (const quote of evidence.slice(0, 3)) {
+                if (!entry.evidence.some((item) => item.quote === quote && item.conversationId === conversation.id)) {
+                    entry.evidence.push({ quote, conversationId: conversation.id });
+                }
+            }
+
+            topicCoverageAccumulator.set(key, entry);
+        }
+
+        for (const subGoalDetail of subGoalDetails) {
+            const topicLabel = String(subGoalDetail.topicLabel || '').trim();
+            const label = String(subGoalDetail.label || '').trim();
+            if (!topicLabel || !label) continue;
+            const key = `${topicLabel}::${label}`;
+            const entry = subGoalCoverageAccumulator.get(key) || {
+                topicLabel,
+                label,
+                coveredCount: 0,
+                totalCount: 0,
+                evidence: [],
+            };
+            entry.totalCount += 1;
+            if (subGoalDetail.covered) entry.coveredCount += 1;
+            const evidence = Array.isArray(subGoalDetail.evidence) ? subGoalDetail.evidence : [];
+            for (const quote of evidence.slice(0, 2)) {
+                if (!entry.evidence.some((item) => item.quote === quote && item.conversationId === conversation.id)) {
+                    entry.evidence.push({ quote, conversationId: conversation.id });
+                }
+            }
+            subGoalCoverageAccumulator.set(key, entry);
+        }
+
+        for (const highValueTurn of highValueTurns) {
+            const topicLabel = String(highValueTurn.topicLabel || '').trim();
+            const quote = String(highValueTurn.quote || '').trim();
+            if (!topicLabel || !quote) continue;
+            const entry = topicCoverageAccumulator.get(topicLabel);
+            if (!entry) continue;
+            if (!entry.highValueEvidence.some((item) => item.quote === quote && item.conversationId === conversation.id)) {
+                entry.highValueEvidence.push({ quote, conversationId: conversation.id });
+            }
+        }
+    }
+
+    const totalAnalyzed = analyzedConversations.length;
+    const topicCoverageSummary = bot.topics.map((topic: any) => {
+        const entry = topicCoverageAccumulator.get(topic.label);
+        return {
+            topicId: topic.id,
+            topicLabel: topic.label,
+            reachedRate: entry ? roundMetric(entry.reachedCount / Math.max(1, totalAnalyzed)) : 0,
+            coreCoverageRate: entry && entry.coreTotalSum > 0
+                ? roundMetric(entry.coreCoveredSum / entry.coreTotalSum)
+                : 0,
+            stretchCoverageRate: entry && entry.enabledTotalSum > 0
+                ? roundMetric((entry.coreCoveredSum + entry.stretchCoveredSum) / entry.enabledTotalSum)
+                : 0,
+            topEvidence: (entry?.evidence || []).slice(0, 3),
+            highValueEvidence: (entry?.highValueEvidence || []).slice(0, 3),
+        };
+    });
+
+    const subGoalCoverageSummary = Array.from(subGoalCoverageAccumulator.values())
+        .map((entry) => ({
+            topicLabel: entry.topicLabel,
+            label: entry.label,
+            coverageRate: roundMetric(entry.coveredCount / Math.max(1, entry.totalCount)),
+            evidence: entry.evidence.slice(0, 2),
+        }))
+        .sort((a, b) => b.coverageRate - a.coverageRate);
+
     // Create Themes
     for (const t of data.themes) {
         await prisma.theme.create({
@@ -844,12 +965,18 @@ export async function generateBotAnalyticsAction(botId: string) {
         data: {
             analyticsMetadata: {
                 sentimentScore: data.sentimentScore,
-                lastAnalyzed: new Date().toISOString()
+                lastAnalyzed: new Date().toISOString(),
+                topicCoverageSummary,
+                subGoalCoverageSummary,
             }
         }
     });
 
     revalidatePath(`/dashboard/bots/${botId}/analytics`);
+}
+
+function roundMetric(value: number) {
+    return Math.round(Math.max(0, Math.min(1, value)) * 100) / 100;
 }
 
 

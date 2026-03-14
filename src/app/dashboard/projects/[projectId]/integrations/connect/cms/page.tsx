@@ -42,15 +42,17 @@ export default function ConnectCMSPage() {
       const projectRes = await fetch(`/api/projects/${projectId}`);
       if (projectRes.ok) {
         const projectData = await projectRes.json();
-        if (projectData.project?.organization) {
-          setProjectOrg(projectData.project.organization);
+        // API returns project fields spread at top level (not nested under .project)
+        const org = projectData.organization;
+        if (org) {
+          setProjectOrg(org);
           setCreateForm((current) => ({
             ...current,
-            name: current.name || `${projectData.project.organization.name} CMS`,
+            name: current.name || `${org.name} CMS`,
           }));
 
           // Fetch available CMS connections for this organization
-          const connectionsRes = await fetch(`/api/cms/available?organizationId=${projectData.project.organization.id}`);
+          const connectionsRes = await fetch(`/api/cms/available?organizationId=${org.id}`);
           if (connectionsRes.ok) {
             const connectionsData = await connectionsRes.json();
             setAvailableConnections(connectionsData.connections || []);

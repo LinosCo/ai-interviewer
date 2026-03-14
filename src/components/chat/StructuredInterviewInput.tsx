@@ -3,6 +3,9 @@
 import { useMemo, useState } from 'react';
 import type {
   FieldInteractionPayload,
+  FormInteractionPayload,
+  FormFieldDescriptor,
+  StructuredFormSubmission,
   InterviewInteractionPayload,
   StructuredInterviewSubmission,
 } from '@/lib/interview/structured-interactions';
@@ -55,6 +58,8 @@ export function StructuredInterviewInput({
   const isItalian = language.toLowerCase().startsWith('it');
   const [fieldValue, setFieldValue] = useState('');
   const [selectedOptionId, setSelectedOptionId] = useState<string | null>(null);
+  const [formValues, setFormValues] = useState<Record<string, string>>({});
+  const [formOptionIds, setFormOptionIds] = useState<Record<string, string | null>>({});
 
   const labels = useMemo(() => ({
     consentAccept: isItalian ? 'Acconsento' : 'I agree',
@@ -62,6 +67,91 @@ export function StructuredInterviewInput({
     submit: isItalian ? 'Conferma' : 'Submit',
     skip: isItalian ? 'Salta' : 'Skip',
   }), [isItalian]);
+
+  if (interaction.kind === 'form') {
+    const formInteraction = interaction as FormInteractionPayload;
+    const isItalianForm = language.toLowerCase().startsWith('it');
+
+    const handleFormSubmit = () => {
+      const values: StructuredFormSubmission['values'] = {};
+      for (const field of formInteraction.fields) {
+        const optionId = formOptionIds[field.fieldId] ?? null;
+        const textValue = formValues[field.fieldId]?.trim() || null;
+        if (field.inputType === 'choice') {
+          values[field.fieldId] = optionId
+            ? { action: 'submit', optionId }
+            : { action: 'skip' };
+        } else {
+          values[field.fieldId] = textValue
+            ? { action: 'submit', value: textValue }
+            : { action: 'skip' };
+        }
+      }
+      onSubmit({
+        interactionId: formInteraction.interactionId,
+        kind: 'form',
+        values,
+      } as any);
+    };
+
+    return (
+      <div className="bg-white rounded-[18px] shadow-2xl ring-1 ring-black/5 p-4 md:p-5 space-y-4">
+        {formInteraction.fields.map((field: FormFieldDescriptor) => {
+          const isChoice = field.inputType === 'choice' && Array.isArray(field.options) && field.options!.length > 0;
+          const selectedOption = formOptionIds[field.fieldId];
+          return (
+            <div key={field.fieldId} className="space-y-1">
+              {isChoice ? (
+                <div className="grid grid-cols-1 gap-2">
+                  {field.options!.map((option) => {
+                    const selected = selectedOption === option.id;
+                    return (
+                      <button
+                        key={option.id}
+                        type="button"
+                        disabled={loading}
+                        onClick={() => setFormOptionIds(prev => ({ ...prev, [field.fieldId]: option.id }))}
+                        className={`rounded-xl border px-4 py-2 text-left text-sm font-medium transition-all disabled:opacity-50 ${selected ? 'shadow-sm' : 'border-gray-200 hover:bg-gray-50 text-gray-700'}`}
+                        style={selected ? { borderColor: `${safeColor(brandColor)}88`, background: `${safeColor(brandColor)}12`, color: safeColor(brandColor) } : undefined}
+                      >
+                        {option.label}
+                      </button>
+                    );
+                  })}
+                </div>
+              ) : (
+                <input
+                  type={field.inputType === 'email' ? 'email' : field.inputType === 'tel' ? 'tel' : 'text'}
+                  inputMode={field.inputType === 'email' ? 'email' : field.inputType === 'tel' ? 'tel' : 'text'}
+                  autoComplete={
+                    field.fieldId === 'name' || field.fieldId === 'fullName' ? 'name' :
+                    field.fieldId === 'email' ? 'email' :
+                    field.fieldId === 'company' ? 'organization' :
+                    field.fieldId === 'phone' ? 'tel' : 'off'
+                  }
+                  value={formValues[field.fieldId] || ''}
+                  onChange={(e) => setFormValues(prev => ({ ...prev, [field.fieldId]: e.target.value }))}
+                  disabled={loading}
+                  placeholder={getFieldPlaceholder(field.fieldId, language, field.inputType)}
+                  className="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 disabled:opacity-50"
+                  style={{ ['--tw-ring-color' as any]: `${safeColor(brandColor)}55` }}
+                />
+              )}
+            </div>
+          );
+        })}
+        <button
+          type="button"
+          disabled={loading}
+          onClick={handleFormSubmit}
+          className="w-full rounded-xl px-4 py-3 text-sm font-semibold text-white transition-all disabled:opacity-50"
+          style={{ backgroundColor: safeColor(brandColor) }}
+        >
+          {isItalianForm ? 'Conferma' : 'Submit'}
+        </button>
+      </div>
+    );
+  }
 
   if (interaction.kind === 'consent') {
     return (

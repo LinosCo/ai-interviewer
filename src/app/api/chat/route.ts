@@ -81,6 +81,7 @@ import {
 import {
     StructuredInterviewSubmissionSchema,
     buildDataCollectionInteractionPayload,
+    buildDataCollectionFormPayload,
     type InterviewInteractionPayload,
     type StructuredInterviewSubmission,
 } from '@/lib/interview/structured-interactions';
@@ -649,7 +650,7 @@ export async function POST(req: Request) {
                 conversation.candidateProfile || {},
                 { simulationMode, onLlmUsage: collectLlmUsage, language, effectiveDuration: typeof effectiveDuration === 'number' ? effectiveDuration : null }
             );
-            await prisma.message.create({
+            void prisma.message.create({
                 data: {
                     conversationId,
                     role: 'assistant',
@@ -658,9 +659,10 @@ export async function POST(req: Request) {
                         ? { replyToClientMessageId: clientMessageId, safetyStop: true }
                         : { safetyStop: true }
                 }
-            });
+            }).catch(err => console.error('[persist] message.create failed (safety_cap)', err));
 
-            await flushInterviewTokenUsage('safety_cap_completion');
+            void flushInterviewTokenUsage('safety_cap_completion')
+                .catch(err => console.error('[flush] token usage failed (safety_cap)', err));
             return Response.json({
                 text: safetyMessage,
                 currentTopicId: conversation.currentTopicId,
@@ -734,12 +736,14 @@ export async function POST(req: Request) {
         const structuredSubmissionMatchesActiveInteraction = Boolean(
             requestStructuredSubmission &&
             state.phase === 'DATA_COLLECTION' &&
-            state.activeInteractionId &&
-            requestStructuredSubmission.interactionId === state.activeInteractionId &&
-            requestStructuredSubmission.kind === state.activeInteractionKind &&
             (
-                requestStructuredSubmission.kind !== 'field' ||
-                requestStructuredSubmission.fieldId === state.activeInteractionFieldId
+                requestStructuredSubmission.kind === 'consent' ||
+                (requestStructuredSubmission.kind === 'form' && state.lastAskedField === '__FORM__') ||
+                (requestStructuredSubmission.kind === 'field' && (
+                    !requestStructuredSubmission.fieldId ||
+                    requestStructuredSubmission.fieldId === state.activeInteractionFieldId ||
+                    requestStructuredSubmission.fieldId === state.lastAskedField
+                ))
             )
         );
         if (requestStructuredSubmission && !structuredSubmissionMatchesActiveInteraction) {
@@ -1186,30 +1190,51 @@ export async function POST(req: Request) {
                     if (nextState.consentGiven === true || state.consentGiven === true) {
                         console.log(`📋 [DATA_COLLECTION] Consent given, processing fields`);
                         if (justAcceptedConsentThisTurn) {
-                            const nextFieldAfterConsent = getNextMissingCandidateField(
-                                candidateFieldIds,
-                                currentProfile,
-                                state.fieldAttemptCounts,
-                                3
+                            // After consent: present ALL fields at once as a form instead of asking one by one
+                            const remainingFields = candidateFieldIds.filter((fieldId: string) =>
+                                !currentProfile[fieldId] && currentProfile[fieldId] !== '__SKIPPED__'
                             );
-                            if (nextFieldAfterConsent) {
-                                nextState.lastAskedField = nextFieldAfterConsent;
+                            if (remainingFields.length > 0) {
+                                nextState.lastAskedField = '__FORM__';
                                 nextState.dataCollectionAttempts = state.dataCollectionAttempts + 1;
                                 nextState.consentGiven = true;
-                                nextState.fieldAttemptCounts = {
-                                    ...state.fieldAttemptCounts,
-                                    [nextFieldAfterConsent]: (state.fieldAttemptCounts[nextFieldAfterConsent] || 0) + 1
-                                };
-                                supervisorInsight = { status: 'DATA_COLLECTION', nextSubGoal: nextFieldAfterConsent };
-                                console.log(`📋 [DATA_COLLECTION] Consent accepted this turn. Skipping extraction and asking first field "${nextFieldAfterConsent}".`);
+                                supervisorInsight = { status: 'DATA_COLLECTION_FORM' as any, nextSubGoal: '__FORM__' };
+                                console.log(`📋 [DATA_COLLECTION] Consent accepted. Presenting all ${remainingFields.length} fields as form.`);
                             } else {
                                 supervisorInsight = { status: 'FINAL_GOODBYE' };
                                 nextState.lastAskedField = null;
-                                console.log(`📋 [DATA_COLLECTION] Consent accepted but no missing fields. Closing data collection.`);
+                                console.log(`📋 [DATA_COLLECTION] Consent accepted but no missing fields. Closing.`);
                             }
-                            // Critical: do not process the consent message as field content.
                         } else {
                             let haltCollection = false;
+
+                            // Handle form submission (all fields at once)
+                            const structuredFormSubmission = (
+                                structuredSubmissionMatchesActiveInteraction &&
+                                requestStructuredSubmission?.kind === 'form'
+                            ) ? requestStructuredSubmission as any : null;
+
+                            if (structuredFormSubmission && state.lastAskedField === '__FORM__') {
+                                console.log(`📋 [DATA_COLLECTION] Processing form submission with ${Object.keys(structuredFormSubmission.values).length} fields`);
+                                const updatedProfile = { ...currentProfile };
+                                for (const [fieldId, fieldData] of Object.entries(structuredFormSubmission.values as Record<string, any>)) {
+                                    if (fieldData.action === 'submit' && (fieldData.value || fieldData.optionId)) {
+                                        updatedProfile[fieldId] = String(fieldData.value || fieldData.optionId || '').trim();
+                                    } else if (fieldData.action === 'skip') {
+                                        updatedProfile[fieldId] = '__SKIPPED__';
+                                    }
+                                }
+                                await prisma.conversation.update({
+                                    where: { id: conversationId },
+                                    data: { candidateProfile: updatedProfile }
+                                });
+                                currentProfile = updatedProfile;
+                                nextState.lastAskedField = null;
+                                supervisorInsight = { status: 'FINAL_GOODBYE' };
+                                console.log(`📋 [DATA_COLLECTION] Form processed. Profile: ${JSON.stringify(Object.keys(updatedProfile))}`);
+                                haltCollection = true; // skip further field processing
+                            }
+
                             const missingFieldIds = candidateFieldIds.filter((fieldName: string) =>
                                 !currentProfile[fieldName] && currentProfile[fieldName] !== '__SKIPPED__'
                             );
@@ -2036,7 +2061,7 @@ hard_rules:
                 const fallback = language === 'it'
                     ? "Mi scuso, ho bisogno di un momento. Puoi ripetere?"
                     : "I apologize, I need a moment. Could you repeat that?";
-                await prisma.message.create({
+                void prisma.message.create({
                     data: {
                         conversationId,
                         role: 'assistant',
@@ -2045,8 +2070,9 @@ hard_rules:
                             ? { replyToClientMessageId: clientMessageId, type: 'timeout_fallback' }
                             : { type: 'timeout_fallback' }
                     }
-                });
-                await flushInterviewTokenUsage('timeout_fallback');
+                }).catch(err => console.error('[persist] message.create failed (timeout_fallback)', err));
+                void flushInterviewTokenUsage('timeout_fallback')
+                    .catch(err => console.error('[flush] token usage failed (timeout_fallback)', err));
                 return Response.json({
                     text: fallback,
                     currentTopicId: nextTopicId,
@@ -2713,6 +2739,19 @@ hard_rules:
                     interactionId,
                     consentPending: true
                 });
+            } else if ((supervisorInsight as any)?.status === 'DATA_COLLECTION_FORM' || nextState.lastAskedField === '__FORM__') {
+                // Form payload — all fields at once after consent
+                const freshProfile = (_freshCandidateProfileCache as Record<string, string>) ?? (conversation.candidateProfile as Record<string, string>) ?? {};
+                const remainingFieldIds = candidateFieldIdsForInteraction.filter((fId: string) =>
+                    !freshProfile[fId] && freshProfile[fId] !== '__SKIPPED__'
+                );
+                if (remainingFieldIds.length > 0) {
+                    interactionPayload = buildDataCollectionFormPayload({
+                        interactionId,
+                        fieldIds: remainingFieldIds,
+                        candidateFields: candidateFieldsForInteraction,
+                    });
+                }
             } else if (nextState.consentGiven === true && missingFieldForInteraction) {
                 interactionPayload = buildDataCollectionInteractionPayload({
                     interactionId,

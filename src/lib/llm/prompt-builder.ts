@@ -600,6 +600,8 @@ Brief connection, then ONE exploratory question.
         const isAvanzato = interviewerQuality === 'avanzato';
         const isDataCollection = supervisorInsight?.status === 'DATA_COLLECTION_CONSENT'
             || supervisorInsight?.status === 'DATA_COLLECTION';
+        // DEEP_OFFER_ASK is the offer-extension turn — keep it simple (no deep methodology noise)
+        const isDeepOffer = supervisorInsight?.status === 'DEEP_OFFER_ASK';
         const parts: string[] = [];
 
         // Block 1: Identity
@@ -628,8 +630,10 @@ Brief connection, then ONE exploratory question.
             if (knowledge) parts.push(knowledge);
         }
 
-        // Block 5.5: Avanzato Qualitative Methodology (only for avanzato, not during DATA_COLLECTION)
-        if (isAvanzato && !isDataCollection) {
+        // Block 5.5: Avanzato Qualitative Methodology
+        // Skip for DATA_COLLECTION (form collection — methodology is irrelevant)
+        // Skip for DEEP_OFFER_ASK (simple yes/no offer turn — deep methodology adds noise)
+        if (isAvanzato && !isDataCollection && !isDeepOffer) {
             parts.push(this.buildAvanzatoMethodologyBlock(bot.language));
         }
 

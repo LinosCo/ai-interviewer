@@ -12,7 +12,6 @@ import {
   MoreHorizontal,
   PenLine,
   Plus,
-  Save,
   Sparkles,
   Star,
   Target,
@@ -31,19 +30,12 @@ import {
   type TipOriginCategory,
 } from '@/components/projects/project-tip-ui';
 import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-  DialogFooter,
-} from '@/components/ui/dialog';
-import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { StrategyInterviewWizard } from '@/components/projects/StrategyInterviewWizard';
 
 /* ------------------------------------------------------------------ */
 /*  Constants                                                          */
@@ -98,7 +90,6 @@ export default function InsightHubPage() {
   const [strategicVision, setStrategicVision] = useState('');
   const [valueProposition, setValueProposition] = useState('');
   const [strategyOpen, setStrategyOpen] = useState(false);
-  const [isSavingStrategy, setIsSavingStrategy] = useState(false);
   const [expandedTipId, setExpandedTipId] = useState<string | null>(null);
   const [patchingTipId, setPatchingTipId] = useState<string | null>(null);
 
@@ -162,31 +153,6 @@ export default function InsightHubPage() {
     void fetchStrategy();
   }, [fetchTips, fetchStrategy]);
 
-  /* ---- Save strategy ---- */
-  const handleSaveStrategy = async () => {
-    setIsSavingStrategy(true);
-    try {
-      const url = projectId
-        ? `/api/projects/${projectId}/settings`
-        : '/api/organization/settings';
-      const res = await fetch(url, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ strategicVision, valueProposition }),
-      });
-      if (res.ok) {
-        showToast('Strategia salvata! Verr\u00e0 usata per la prossima analisi.');
-        setStrategyOpen(false);
-      } else {
-        showToast('Errore durante il salvataggio', 'error');
-      }
-    } catch {
-      showToast('Errore di rete', 'error');
-    } finally {
-      setIsSavingStrategy(false);
-    }
-  };
-
   /* ---- Tip PATCH helpers ---- */
   const patchTip = async (tipId: string, body: Record<string, unknown>) => {
     if (!projectId) return;
@@ -217,8 +183,8 @@ export default function InsightHubPage() {
   /* ---- Open Copilot ---- */
   const openCopilot = (tip: ProjectTipSnapshot) => {
     window.dispatchEvent(
-      new CustomEvent('open-copilot', {
-        detail: { prefilledMessage: `Aiutami ad applicare questo tip: "${tip.title}"` },
+      new CustomEvent('bt-copilot-prompt', {
+        detail: { prompt: `Aiutami ad applicare questo tip: "${tip.title}"` },
       }),
     );
   };
@@ -291,6 +257,11 @@ export default function InsightHubPage() {
   /* ---- Strategy state ---- */
   const strategyConfigured = Boolean(strategicVision.trim() || valueProposition.trim());
 
+  const handleStrategySaved = (vision: string, value: string) => {
+    setStrategicVision(vision);
+    setValueProposition(value);
+  };
+
   /* ---- Render ---- */
   return (
     <div className="min-h-screen bg-slate-50/60">
@@ -356,9 +327,14 @@ export default function InsightHubPage() {
             >
               <div className="flex items-center gap-3">
                 <Target className="h-5 w-5 shrink-0 text-emerald-500" />
-                <p className="flex-1 min-w-0 text-sm text-slate-700 truncate">
-                  {strategicVision || valueProposition}
-                </p>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm text-slate-700 truncate">
+                    {strategicVision || valueProposition}
+                  </p>
+                  <p className="text-xs text-slate-500 mt-0.5">
+                    Strategia configurata
+                  </p>
+                </div>
                 <span className="shrink-0 text-xs font-medium text-slate-400 hover:text-slate-600">
                   Modifica
                 </span>
@@ -420,8 +396,8 @@ export default function InsightHubPage() {
             type="button"
             onClick={() => {
               window.dispatchEvent(
-                new CustomEvent('open-copilot', {
-                  detail: { prefilledMessage: 'Crea un nuovo tip per questo progetto' },
+                new CustomEvent('bt-copilot-prompt', {
+                  detail: { prompt: 'Crea un nuovo tip per questo progetto' },
                 }),
               );
             }}
@@ -491,59 +467,16 @@ export default function InsightHubPage() {
         </div>
       </ProjectWorkspaceShell>
 
-      {/* ---- Strategy Dialog ---- */}
-      <Dialog open={strategyOpen} onOpenChange={setStrategyOpen}>
-        <DialogContent className="sm:max-w-lg">
-          <DialogHeader>
-            <DialogTitle>Strategia del progetto</DialogTitle>
-            <DialogDescription>
-              Definisci visione strategica e value proposition per migliorare la qualit&agrave; dei tips.
-            </DialogDescription>
-          </DialogHeader>
-
-          <div className="space-y-4 py-2">
-            <div>
-              <label className="block text-xs font-medium text-slate-700 mb-1">
-                Visione strategica
-              </label>
-              <textarea
-                value={strategicVision}
-                onChange={(e) => setStrategicVision(e.target.value)}
-                placeholder="Descrivi la direzione strategica del progetto..."
-                rows={3}
-                className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 placeholder:text-slate-400 focus:outline-none focus:ring-1 focus:ring-amber-300 resize-none"
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-medium text-slate-700 mb-1">
-                Value proposition
-              </label>
-              <textarea
-                value={valueProposition}
-                onChange={(e) => setValueProposition(e.target.value)}
-                placeholder="Qual \u00e8 il valore unico offerto?"
-                rows={3}
-                className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 placeholder:text-slate-400 focus:outline-none focus:ring-1 focus:ring-amber-300 resize-none"
-              />
-            </div>
-          </div>
-
-          <DialogFooter>
-            <Button
-              onClick={handleSaveStrategy}
-              disabled={isSavingStrategy}
-              className="gap-1.5 bg-amber-600 hover:bg-amber-700 text-white"
-            >
-              {isSavingStrategy ? (
-                <RefreshCw className="h-3.5 w-3.5 animate-spin" />
-              ) : (
-                <Save className="h-3.5 w-3.5" />
-              )}
-              Salva strategia
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      {/* ---- Strategy Interview Wizard ---- */}
+      <StrategyInterviewWizard
+        open={strategyOpen}
+        onOpenChange={setStrategyOpen}
+        projectId={projectId}
+        organizationId={organizationId}
+        existingVision={strategicVision}
+        existingValue={valueProposition}
+        onSaved={handleStrategySaved}
+      />
     </div>
   );
 }

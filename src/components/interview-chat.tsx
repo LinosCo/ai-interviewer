@@ -1239,8 +1239,8 @@ export default function InterviewChat({
                 style={{ paddingBottom: `${chatBottomPaddingPx}px` }}
             >
 
-                {/* Previous Answer Context - Moved outside keyed motion.div to prevent duplication */}
-                {messages.length > 1 && messages[messages.length - 2]?.role === 'user' && !isLoading && !showDockedQuestion && (
+                {/* Previous Answer Context — visible both during loading and between questions */}
+                {messages.length > 1 && messages[messages.length - 2]?.role === 'user' && !showDockedQuestion && (
                     <div className={`w-full max-w-2xl ${isMobileKeyboardOpen ? 'mb-2' : 'mb-4'}`}>
                         <motion.div
                             key={`answer-${messages[messages.length - 2].id}`}
@@ -1256,6 +1256,20 @@ export default function InterviewChat({
                             </div>
                         </motion.div>
                     </div>
+                )}
+
+                {/* Elapsed / estimated time badge — shown during loading in the body (mobile-prominent) */}
+                {isLoading && currentQuestion && !showDockedQuestion && (
+                    <motion.div
+                        initial={{ opacity: 0, y: 4 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        className="mb-3 flex items-center gap-1.5 text-[11px] font-semibold text-gray-400"
+                    >
+                        <Icons.Clock size={11} className="text-gray-300" />
+                        <span>{elapsedMinutes}m</span>
+                        <span className="text-gray-200">/</span>
+                        <span className="text-gray-300 font-medium">~{estimatedMinutes}m</span>
+                    </motion.div>
                 )}
 
                 {isLoading && currentQuestion && !showDockedQuestion && renderLoadingIndicator(false)}
@@ -1313,7 +1327,7 @@ export default function InterviewChat({
                         </div>
                     )}
 
-                    {showDockedQuestion && !isCompleted && (
+                    {showDockedQuestion && !isCompleted && !isLoading && (
                         <div className="mb-3 pointer-events-auto">
                             {renderQuestionCard(true)}
                         </div>

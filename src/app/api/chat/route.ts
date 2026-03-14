@@ -253,6 +253,7 @@ type ClientMessage = z.infer<typeof ChatRequestSchema>['messages'][number];
 export async function POST(req: Request) {
     const startTime = Date.now();
     let flushInterviewTokenUsage: (operationSuffix: string) => Promise<void> = async () => {};
+    let conversationId: string | undefined; // hoisted for finally-block lock release
     try {
         const simulationMode = isLocalSimulationRequest(req);
         const abVariantHeader = String(req.headers.get('x-interview-ab') || '').trim().toLowerCase();
@@ -274,13 +275,14 @@ export async function POST(req: Request) {
 
         const {
             messages: incomingMessages,
-            conversationId,
+            conversationId: _parsedConversationId,
             botId,
             effectiveDuration,
             introMessage,
             clientMessageId,
             structuredSubmission
         } = parsedBody.data;
+        conversationId = _parsedConversationId; // assign to hoisted let for finally block
         const requestTag = `[CHAT_API conversation=${conversationId}]`;
         const requestLog = (...args: any[]) => console.log(requestTag, ...args);
         const requestError = (...args: any[]) => console.error(requestTag, ...args);
@@ -3036,6 +3038,6 @@ hard_rules:
         );
     } finally {
         // Always release the per-conversation lock so the next request can proceed
-        _conversationLocks.delete(conversationId);
+        if (conversationId) _conversationLocks.delete(conversationId);
     }
 }

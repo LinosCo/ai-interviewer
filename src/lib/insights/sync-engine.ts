@@ -650,15 +650,17 @@ AZIONI CHE RICHIEDONO CONSULENZA (l'utente può richiedere supporto):
                     where: { id: existing.id },
                     data
                 });
-                try {
-                    await ProjectTipService.materializeFromCrossChannelInsight(updated.id);
-                } catch (error) {
-                    if (isMissingPrismaTable(error, ['ProjectTip', 'ProjectStrategy', 'ProjectMethodologyBinding', 'MethodologyProfile'])) {
-                        console.info('[project-tip-dual-write] skipped because canonical project intelligence tables are not available yet', {
-                            insightId: updated.id,
-                        });
-                    } else {
-                        console.warn('[project-tip-dual-write] cross-channel materialization failed', { insightId: updated.id, error });
+                if (updated.projectId) {
+                    try {
+                        await ProjectTipService.materializeFromCrossChannelInsight(updated.id);
+                    } catch (error) {
+                        if (isMissingPrismaTable(error, ['ProjectTip', 'ProjectStrategy', 'ProjectMethodologyBinding', 'MethodologyProfile'])) {
+                            console.info('[project-tip-dual-write] skipped because canonical project intelligence tables are not available yet', {
+                                insightId: updated.id,
+                            });
+                        } else {
+                            console.warn('[project-tip-dual-write] cross-channel materialization failed', { insightId: updated.id, error });
+                        }
                     }
                 }
                 existingByTopic.set(topicName, updated);
@@ -674,15 +676,17 @@ AZIONI CHE RICHIEDONO CONSULENZA (l'utente può richiedere supporto):
                     ...data
                 }
             });
-            try {
-                await ProjectTipService.materializeFromCrossChannelInsight(created.id);
-            } catch (error) {
-                if (isMissingPrismaTable(error, ['ProjectTip', 'ProjectStrategy', 'ProjectMethodologyBinding', 'MethodologyProfile'])) {
-                    console.info('[project-tip-dual-write] skipped because canonical project intelligence tables are not available yet', {
-                        insightId: created.id,
-                    });
-                } else {
-                    console.warn('[project-tip-dual-write] cross-channel materialization failed', { insightId: created.id, error });
+            if (created.projectId) {
+                try {
+                    await ProjectTipService.materializeFromCrossChannelInsight(created.id);
+                } catch (error) {
+                    if (isMissingPrismaTable(error, ['ProjectTip', 'ProjectStrategy', 'ProjectMethodologyBinding', 'MethodologyProfile'])) {
+                        console.info('[project-tip-dual-write] skipped because canonical project intelligence tables are not available yet', {
+                            insightId: created.id,
+                        });
+                    } else {
+                        console.warn('[project-tip-dual-write] cross-channel materialization failed', { insightId: created.id, error });
+                    }
                 }
             }
             existingByTopic.set(topicName, created);

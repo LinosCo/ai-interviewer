@@ -1,4 +1,5 @@
 import { prisma } from '@/lib/prisma';
+import { isMissingPrismaTable } from '@/lib/prisma-table-errors';
 import { getSystemLLM } from '@/lib/visibility/llm-providers';
 import { SerpMonitoringEngine } from '@/lib/visibility/serp-monitoring-engine';
 import { CONTENT_KIND_LABELS, type ContentKind } from '@/lib/cms/content-kinds';
@@ -652,7 +653,13 @@ AZIONI CHE RICHIEDONO CONSULENZA (l'utente può richiedere supporto):
                 try {
                     await ProjectTipService.materializeFromCrossChannelInsight(updated.id);
                 } catch (error) {
-                    console.warn('[project-tip-dual-write] cross-channel materialization failed', { insightId: updated.id, error });
+                    if (isMissingPrismaTable(error, ['ProjectTip', 'ProjectStrategy', 'ProjectMethodologyBinding', 'MethodologyProfile'])) {
+                        console.info('[project-tip-dual-write] skipped because canonical project intelligence tables are not available yet', {
+                            insightId: updated.id,
+                        });
+                    } else {
+                        console.warn('[project-tip-dual-write] cross-channel materialization failed', { insightId: updated.id, error });
+                    }
                 }
                 existingByTopic.set(topicName, updated);
                 return updated;
@@ -670,7 +677,13 @@ AZIONI CHE RICHIEDONO CONSULENZA (l'utente può richiedere supporto):
             try {
                 await ProjectTipService.materializeFromCrossChannelInsight(created.id);
             } catch (error) {
-                console.warn('[project-tip-dual-write] cross-channel materialization failed', { insightId: created.id, error });
+                if (isMissingPrismaTable(error, ['ProjectTip', 'ProjectStrategy', 'ProjectMethodologyBinding', 'MethodologyProfile'])) {
+                    console.info('[project-tip-dual-write] skipped because canonical project intelligence tables are not available yet', {
+                        insightId: created.id,
+                    });
+                } else {
+                    console.warn('[project-tip-dual-write] cross-channel materialization failed', { insightId: created.id, error });
+                }
             }
             existingByTopic.set(topicName, created);
             return created;

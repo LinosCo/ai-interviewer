@@ -6,6 +6,7 @@ import { useState } from 'react';
 import { showToast } from '@/components/toast';
 import { colors } from '@/lib/design-system';
 import RefineInput from '@/components/RefineInput';
+import type { InterviewPlan } from '@/lib/interview/plan-types';
 
 type BotWithRelations = Bot & {
     topics: TopicBlock[];
@@ -18,7 +19,128 @@ import { Info, Check, Lock } from 'lucide-react';
 import { UpgradeModal } from '@/components/modals/UpgradeModal';
 import Link from 'next/link';
 
-export default function BotConfigForm({ bot, canUseBranding = false, canUseAdvancedInterview = false, currentPlan = 'TRIAL' }: { bot: BotWithRelations, canUseBranding?: boolean, canUseAdvancedInterview?: boolean, currentPlan?: string }) {
+function coveragePercent(value?: number) {
+    return Math.round(Math.max(0, Math.min(1, value || 0)) * 100);
+}
+
+function bandClass(band?: string | null) {
+    switch (band) {
+        case 'critical':
+            return 'bg-red-50 text-red-700 border-red-200';
+        case 'high':
+            return 'bg-amber-50 text-amber-700 border-amber-200';
+        case 'medium':
+            return 'bg-blue-50 text-blue-700 border-blue-200';
+        default:
+            return 'bg-gray-50 text-gray-600 border-gray-200';
+    }
+}
+
+function PlanCoverageSummaryCard({ botId, plan }: { botId: string; plan: InterviewPlan | null }) {
+    if (!plan) {
+        return (
+            <div className="mt-4 rounded-lg border border-dashed border-gray-300 bg-gray-50 p-4">
+                <div className="flex items-center justify-between gap-3">
+                    <div>
+                        <div className="text-sm font-semibold text-gray-900">Piano strategico non ancora generato</div>
+                        <p className="mt-1 text-xs text-gray-500">
+                            Apri il Plan Studio per generare grading, coverage prevista e aree che rischiano di restare escluse.
+                        </p>
+                    </div>
+                    <Link
+                        href={`/dashboard/bots/${botId}/plan`}
+                        className="inline-flex items-center rounded-lg border border-gray-300 bg-white px-3 py-2 text-xs font-semibold text-gray-700 hover:bg-gray-50"
+                    >
+                        Apri Plan Studio
+                    </Link>
+                </div>
+            </div>
+        );
+    }
+
+    const excluded = plan.coverage?.likelyExcludedWithoutDeepOffer || [];
+    const targetRate = coveragePercent(plan.coverage?.target?.coverageRate);
+    const stretchRate = coveragePercent(plan.coverage?.stretch?.coverageRate);
+    const fullRate = coveragePercent(plan.coverage?.full?.coverageRate);
+
+    return (
+        <div className="mt-4 rounded-xl border border-amber-200 bg-gradient-to-br from-amber-50 to-white p-4">
+            <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+                <div>
+                    <div className="flex items-center gap-2">
+                        <span className="text-sm font-semibold text-gray-900">Piano strategico</span>
+                        <span className={`rounded-full border px-2 py-0.5 text-[10px] font-bold uppercase ${bandClass(plan.meta.interviewerQuality === 'avanzato' ? 'high' : 'medium')}`}>
+                            {plan.meta.interviewerQuality}
+                        </span>
+                    </div>
+                    <p className="mt-1 max-w-2xl text-xs text-gray-600">
+                        L&apos;ordine dei topic resta editoriale. Il piano stima quanta copertura puoi ottenere nel tempo attuale, cosa rientra nello stretch e cosa rischia di restare fuori senza deep offer.
+                    </p>
+                </div>
+                <Link
+                    href={`/dashboard/bots/${botId}/plan`}
+                    className="inline-flex items-center rounded-lg border border-amber-300 bg-white px-3 py-2 text-xs font-semibold text-amber-700 hover:bg-amber-50"
+                >
+                    Apri Plan Studio
+                </Link>
+            </div>
+
+            <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-4">
+                <div className="rounded-lg border border-white/80 bg-white p-3">
+                    <div className="text-[11px] uppercase tracking-wide text-gray-500">Target</div>
+                    <div className="mt-1 text-lg font-semibold text-gray-900">{Math.round(plan.coverage.targetDurationSec / 60)} min</div>
+                    <div className="mt-1 text-xs text-gray-500">{targetRate}% coverage stimata</div>
+                </div>
+                <div className="rounded-lg border border-white/80 bg-white p-3">
+                    <div className="text-[11px] uppercase tracking-wide text-gray-500">Stretch</div>
+                    <div className="mt-1 text-lg font-semibold text-gray-900">{Math.round(plan.coverage.stretchDurationSec / 60)} min</div>
+                    <div className="mt-1 text-xs text-gray-500">{stretchRate}% coverage con extra tempo</div>
+                </div>
+                <div className="rounded-lg border border-white/80 bg-white p-3">
+                    <div className="text-[11px] uppercase tracking-wide text-gray-500">Copertura totale</div>
+                    <div className="mt-1 text-lg font-semibold text-gray-900">{Math.max(1, Math.round(plan.coverage.fullCoverageDurationSec / 60))} min</div>
+                    <div className="mt-1 text-xs text-gray-500">{fullRate}% con tempo pieno</div>
+                </div>
+                <div className="rounded-lg border border-white/80 bg-white p-3">
+                    <div className="text-[11px] uppercase tracking-wide text-gray-500">Aree a rischio</div>
+                    <div className="mt-1 text-lg font-semibold text-gray-900">{excluded.length}</div>
+                    <div className="mt-1 text-xs text-gray-500">probabili esclusioni senza deep offer</div>
+                </div>
+            </div>
+
+            {excluded.length > 0 && (
+                <div className="mt-4">
+                    <div className="mb-2 text-[11px] font-bold uppercase tracking-wide text-gray-500">Più probabilmente escluse</div>
+                    <div className="flex flex-wrap gap-2">
+                        {excluded.slice(0, 6).map((item) => (
+                            <span
+                                key={`${item.topicId}:${item.subGoalId}`}
+                                className={`inline-flex items-center gap-2 rounded-full border px-2.5 py-1 text-[11px] ${bandClass(item.importanceBand)}`}
+                            >
+                                <span className="font-semibold">{item.topicLabel}</span>
+                                <span className="opacity-70">{item.subGoalLabel}</span>
+                            </span>
+                        ))}
+                    </div>
+                </div>
+            )}
+        </div>
+    );
+}
+
+export default function BotConfigForm({
+    bot,
+    canUseBranding = false,
+    canUseAdvancedInterview = false,
+    currentPlan = 'TRIAL',
+    planSnapshot = null,
+}: {
+    bot: BotWithRelations,
+    canUseBranding?: boolean,
+    canUseAdvancedInterview?: boolean,
+    currentPlan?: string,
+    planSnapshot?: InterviewPlan | null,
+}) {
     const updateAction = updateBotAction.bind(null, bot.id);
     const [quality, setQuality] = useState(() => {
         const saved = bot.interviewerQuality;
@@ -117,6 +239,7 @@ export default function BotConfigForm({ bot, canUseBranding = false, canUseAdvan
 
             <section>
                 <h2 className="text-lg font-semibold mb-4 border-b pb-2">Constraints & Features</h2>
+                <PlanCoverageSummaryCard botId={bot.id} plan={planSnapshot} />
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="col-span-1 md:col-span-2">
                         <label className="block text-sm font-medium mb-3">Interview Quality</label>

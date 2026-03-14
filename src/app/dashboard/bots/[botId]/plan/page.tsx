@@ -27,8 +27,8 @@ export default async function InterviewPlanPage({ params }: { params: Promise<{ 
     <div className="space-y-6">
       <div className="flex flex-col lg:flex-row lg:justify-between lg:items-center gap-4">
         <div>
-          <h1 className="text-2xl font-bold">Piano Intervista: {bot.name}</h1>
-          <p className="text-sm text-gray-500">Configura la distribuzione delle domande e le regole di approfondimento.</p>
+          <h1 className="text-2xl font-bold">Plan Studio: {bot.name}</h1>
+          <p className="text-sm text-gray-500">Grading, coverage prevista, esclusioni probabili e regole di deepen senza alterare l&apos;ordine editoriale dei topic.</p>
         </div>
         <div className="flex gap-2">
           <Link href={`/dashboard/bots/${bot.id}`} className="px-3 py-2 border rounded hover:bg-gray-50">

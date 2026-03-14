@@ -1,5 +1,6 @@
 import { auth } from '@/auth';
 import { prisma } from '@/lib/prisma';
+import { isMissingPrismaTable } from '@/lib/prisma-table-errors';
 import ProjectAnalytics from '@/components/analytics/ProjectAnalytics';
 import { redirect } from 'next/navigation';
 import { ProjectWorkspaceShell } from '@/components/projects/ProjectWorkspaceShell';
@@ -12,7 +13,7 @@ export default async function AnalyticsPage(props: { params: Promise<{ projectId
         redirect('/login');
     }
 
-    const [project, bots, tipCount, enabledRoutingCount] = await Promise.all([
+    const [project, bots, enabledRoutingCount] = await Promise.all([
         prisma.project.findUnique({
             where: { id: params.projectId },
             select: { id: true, name: true },
@@ -21,9 +22,14 @@ export default async function AnalyticsPage(props: { params: Promise<{ projectId
             where: { projectId: params.projectId },
             select: { id: true, name: true, botType: true } as any
         }),
-        prisma.projectTip.count({ where: { projectId: params.projectId } }),
         prisma.tipRoutingRule.count({ where: { projectId: params.projectId, enabled: true } }),
     ]);
+    let tipCount = 0;
+    try {
+        tipCount = await prisma.projectTip.count({ where: { projectId: params.projectId } });
+    } catch (error: any) {
+        if (!isMissingPrismaTable(error, ['ProjectTip'])) throw error;
+    }
 
     if (!project) {
         redirect('/dashboard/projects');

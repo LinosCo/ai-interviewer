@@ -1,106 +1,90 @@
-'use client';
+import { MarketingHomeClient } from '@/components/landing';
+import { HOME_PAGE_DESCRIPTION, HOME_PAGE_TITLE, SITE_NAME, SITE_URL } from '@/lib/seo';
+import { getLandingArticles, getLandingFaqs } from '@/lib/business-tuner-content';
 
-import {
-  FluidBackground,
-  HeroSection,
-  TrustStrip,
-  ProblemSection,
-  HowItWorks,
-  FeaturesSection,
-  TargetSection,
-  WhySection,
-  PricingSection,
-  FAQSection,
-  CTASection,
-} from '@/components/landing';
-import { useEffect } from 'react';
+export default async function LandingPage() {
+  const [faqs, articles] = await Promise.all([
+    getLandingFaqs(),
+    getLandingArticles(6),
+  ]);
 
-const CHATBOT_BOT_ID = 'cmkfq2fuq0001q5yy3wnk6yvq';
+  const homepageJsonLd = {
+    '@context': 'https://schema.org',
+    '@graph': [
+      {
+        '@type': 'Organization',
+        '@id': `${SITE_URL}/#organization`,
+        name: SITE_NAME,
+        url: SITE_URL,
+        logo: {
+          '@type': 'ImageObject',
+          url: `${SITE_URL}/logo.png`,
+        },
+        sameAs: ['https://www.linkedin.com/company/business-tuner'],
+      },
+      {
+        '@type': 'WebSite',
+        '@id': `${SITE_URL}/#website`,
+        url: SITE_URL,
+        name: SITE_NAME,
+        inLanguage: 'it-IT',
+      },
+      {
+        '@type': 'WebPage',
+        '@id': `${SITE_URL}/#webpage`,
+        url: SITE_URL,
+        name: `${SITE_NAME} - ${HOME_PAGE_TITLE}`,
+        description: HOME_PAGE_DESCRIPTION,
+        isPartOf: { '@id': `${SITE_URL}/#website` },
+        about: { '@id': `${SITE_URL}/#organization` },
+        inLanguage: 'it-IT',
+      },
+      {
+        '@type': 'FAQPage',
+        '@id': `${SITE_URL}/#faq`,
+        mainEntity: faqs.slice(0, 10).map((faq) => ({
+          '@type': 'Question',
+          name: faq.question,
+          acceptedAnswer: {
+            '@type': 'Answer',
+            text: faq.answer,
+          },
+        })),
+      },
+      ...(articles.length > 0
+        ? [
+            {
+              '@type': 'Blog',
+              '@id': `${SITE_URL}/insights#blog`,
+              url: `${SITE_URL}/insights`,
+              name: `${SITE_NAME} Insights`,
+              description: 'Approfondimenti, FAQ e contenuti pubblicati dal CMS di Business Tuner.',
+              blogPost: articles.map((article) => ({
+                '@type': 'BlogPosting',
+                headline: article.title,
+                url: article.url.startsWith('http') ? article.url : `${SITE_URL}/insights/${article.slug}`,
+                datePublished: article.publishedAt,
+                dateModified: article.updatedAt,
+                description: article.metaDescription || article.excerpt,
+                author: {
+                  '@type': 'Organization',
+                  name: SITE_NAME,
+                },
+              })),
+            },
+          ]
+        : []),
+    ],
+  };
 
-function LandingChatbotScript() {
-  useEffect(() => {
-    const configuredBase = (process.env.NEXT_PUBLIC_APP_URL || '').replace(/\/+$/, '');
-    const scriptBase =
-      configuredBase ||
-      (typeof window !== 'undefined' ? window.location.origin : '');
-    const chatbotScriptSrc = `${scriptBase}/embed/chatbot.js`;
-
-    const existing = document.querySelector(`script[src="${chatbotScriptSrc}"][data-bot-id="${CHATBOT_BOT_ID}"]`);
-    if (existing) return;
-
-    const script = document.createElement('script');
-    script.src = chatbotScriptSrc;
-    script.defer = true;
-    script.setAttribute('data-bot-id', CHATBOT_BOT_ID);
-    script.setAttribute('data-domain', scriptBase);
-    script.setAttribute('data-force-consent', 'true');
-    document.body.appendChild(script);
-
-    return () => {
-      script.remove();
-      // Best-effort cleanup if widget injected DOM nodes/iframes
-      document.querySelectorAll(`iframe[src*="${scriptBase}"], script[src="${chatbotScriptSrc}"]`).forEach((el) => el.remove());
-    };
-  }, []);
-
-  return null;
-}
-
-export default function LandingPage() {
   return (
-    <div className="min-h-screen overflow-x-hidden relative">
-      <FluidBackground />
-      <main className="relative">
-        {/* 1. Hero (colored) */}
-        <HeroSection />
-
-        {/* 2. Trust Strip */}
-        <TrustStrip />
-
-        {/* 3. Il Problema */}
-        <ProblemSection />
-
-        {/* Colored -> White */}
-        <div className="h-16 section-fade-from-transparent" />
-
-        {/* 4. Il Ciclo in Azione (slider multi-scenario) */}
-        <HowItWorks />
-
-        {/* White -> Colored */}
-        <div className="h-16 section-fade-to-transparent" />
-
-        {/* 5. Gli Strumenti (tab-based) */}
-        <FeaturesSection />
-
-        {/* Colored -> White */}
-        <div className="h-16 section-fade-from-transparent" />
-
-        {/* 6. Per Chi */}
-        <TargetSection />
-
-        {/* White -> Colored */}
-        <div className="h-16 section-fade-to-transparent" />
-
-        {/* 7. Perché BT */}
-        <WhySection />
-
-        {/* Colored -> White */}
-        <div className="h-16 section-fade-from-transparent" />
-
-        {/* 8. Pricing */}
-        <PricingSection />
-
-        {/* White -> Colored */}
-        <div className="h-16 section-fade-to-transparent" />
-
-        {/* 9. FAQ + CTA Finale */}
-        <FAQSection />
-
-        {/* Colored -> White */}
-        <div className="h-16 section-fade-from-transparent" />
-        <CTASection />
-      </main>
-      <LandingChatbotScript />
-    </div>
+    <>
+      <script
+        id="home-jsonld"
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(homepageJsonLd) }}
+      />
+      <MarketingHomeClient faqs={faqs} />
+    </>
   );
 }

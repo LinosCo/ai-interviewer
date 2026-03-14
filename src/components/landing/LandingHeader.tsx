@@ -7,11 +7,12 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Icons } from '@/components/ui/business-tuner/Icons';
 
 const navLinks = [
-  { label: 'Come funziona', href: '#come-funziona' },
-  { label: 'Strumenti', href: '#strumenti' },
-  { label: 'Per chi', href: '#per-chi' },
-  { label: 'Pricing', href: '#pricing' },
-  { label: 'FAQ', href: '#faq' },
+  { label: 'Come funziona', href: '/#come-funziona' },
+  { label: 'Strumenti', href: '/#strumenti' },
+  { label: 'Insights', href: '/insights' },
+  { label: 'Per chi', href: '/#per-chi' },
+  { label: 'Pricing', href: '/#pricing' },
+  { label: 'FAQ', href: '/faq' },
 ];
 
 interface LandingHeaderProps {
@@ -49,13 +50,13 @@ export function LandingHeader({ session }: LandingHeaderProps) {
         {/* Desktop Navigation */}
         <nav className="hidden xl:flex items-center gap-6 min-w-0">
           {navLinks.map((link) => (
-            <a
+            <Link
               key={link.href}
               href={link.href}
               className="text-[hsl(var(--muted-foreground))] hover:text-[hsl(var(--foreground))] transition-colors font-medium"
             >
               {link.label}
-            </a>
+            </Link>
           ))}
         </nav>
 
@@ -105,14 +106,14 @@ export function LandingHeader({ session }: LandingHeaderProps) {
           >
             <nav className="max-w-7xl mx-auto px-6 py-4 flex flex-col gap-4">
               {navLinks.map((link) => (
-                <a
+                <Link
                   key={link.href}
                   href={link.href}
                   className="text-[hsl(var(--muted-foreground))] hover:text-[hsl(var(--foreground))] transition-colors font-medium py-2"
                   onClick={() => setIsMobileMenuOpen(false)}
                 >
                   {link.label}
-                </a>
+                </Link>
               ))}
               <div className="flex flex-col gap-2 pt-4 border-t border-[hsl(var(--border))]">
                 <Link

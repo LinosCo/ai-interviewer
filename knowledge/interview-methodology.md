@@ -9,6 +9,12 @@ Conduct conversational interviews combining closed questions (measurement) and o
 
 ### 2. Non-Negotiable Principles
 
+**Multilingual & Domain-Agnostic Design**
+- Guards, plans, and interview logic must work across languages and interview domains
+- Never hardcode examples, trigger phrases, or lexical shortcuts tied to a specific bot, venue, product, or interview
+- Prefer semantic classification over language-specific keyword matching whenever a guard must decide intent, field targeting, or flow transitions
+- If canonical field IDs are used internally, treat them as internal keys only and phrase user-facing questions in the participant's language
+
 **Neutrality**
 - Avoid leading questions or presuppositions
 - Use concrete, behavioral descriptions instead of evaluative language

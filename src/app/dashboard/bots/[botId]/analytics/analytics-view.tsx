@@ -16,6 +16,12 @@ export default function AnalyticsView({ bot, themes, insights }: any) {
     // Sentiment Score from metadata
     const sentimentScore = bot.analyticsMetadata?.sentimentScore || 0;
     const hasMetadata = !!bot.analyticsMetadata;
+    const topicCoverageSummary = Array.isArray(bot.analyticsMetadata?.topicCoverageSummary)
+        ? bot.analyticsMetadata.topicCoverageSummary
+        : [];
+    const subGoalCoverageSummary = Array.isArray(bot.analyticsMetadata?.subGoalCoverageSummary)
+        ? bot.analyticsMetadata.subGoalCoverageSummary
+        : [];
 
     // Prepare Chart Data (Last 20 conversations)
     // Create a copy to reverse without mutating original prop if strict mode
@@ -161,6 +167,126 @@ export default function AnalyticsView({ bot, themes, insights }: any) {
                 </div>
             </div>
 
+            <div className="grid grid-cols-1 xl:grid-cols-[1.4fr_1fr] gap-6">
+                <div className="bg-white p-6 rounded shadow">
+                    <h3 className="font-semibold mb-4 text-gray-800 flex items-center gap-2">
+                        <TrendingUp className="w-5 h-5 text-amber-600" />
+                        Coverage per topic
+                    </h3>
+                    {topicCoverageSummary.length === 0 ? (
+                        <p className="text-gray-400 text-sm">Nessun dato di coverage disponibile. Esegui l&apos;analisi AI dopo alcune interviste completate.</p>
+                    ) : (
+                        <div className="space-y-4">
+                            {topicCoverageSummary.map((topic: any) => (
+                                <div key={topic.topicId} className="rounded-lg border border-gray-100 p-4 bg-gray-50/50">
+                                    <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
+                                        <div>
+                                            <div className="font-medium text-gray-900">{topic.topicLabel}</div>
+                                            <div className="text-xs text-gray-500 mt-1">
+                                                Reach {Math.round((topic.reachedRate || 0) * 100)}% • Core {Math.round((topic.coreCoverageRate || 0) * 100)}% • Stretch {Math.round((topic.stretchCoverageRate || 0) * 100)}%
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div className="mt-3 space-y-2">
+                                        {[
+                                            { label: 'Reach', value: topic.reachedRate || 0, color: 'bg-gray-700' },
+                                            { label: 'Core coverage', value: topic.coreCoverageRate || 0, color: 'bg-green-500' },
+                                            { label: 'Stretch coverage', value: topic.stretchCoverageRate || 0, color: 'bg-blue-500' },
+                                        ].map((metric) => (
+                                            <div key={metric.label}>
+                                                <div className="flex justify-between text-[11px] uppercase tracking-wide text-gray-500 mb-1">
+                                                    <span>{metric.label}</span>
+                                                    <span>{Math.round(metric.value * 100)}%</span>
+                                                </div>
+                                                <div className="h-2 rounded-full bg-gray-100">
+                                                    <div className={`h-2 rounded-full ${metric.color}`} style={{ width: `${Math.round(metric.value * 100)}%` }} />
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+
+                                    {(topic.highValueEvidence?.length > 0 || topic.topEvidence?.length > 0) && (
+                                        <div className="mt-4 grid grid-cols-1 gap-3 lg:grid-cols-2">
+                                            <div>
+                                                <div className="text-[11px] font-bold uppercase tracking-wide text-gray-500 mb-2">Best evidence</div>
+                                                <div className="space-y-2">
+                                                    {(topic.topEvidence || []).slice(0, 2).map((evidence: any, index: number) => (
+                                                        <div key={index} className="rounded border border-gray-100 bg-white p-2 text-xs text-gray-600">
+                                                            <div className="italic">&quot;{evidence.quote}&quot;</div>
+                                                            {evidence.conversationId && (
+                                                                <Link href={`/dashboard/bots/${bot.id}/conversations/${evidence.conversationId}`} className="mt-1 inline-flex items-center gap-1 text-amber-600 hover:text-amber-800">
+                                                                    Vai alla fonte <ExternalLink className="w-3 h-3" />
+                                                                </Link>
+                                                            )}
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                            <div>
+                                                <div className="text-[11px] font-bold uppercase tracking-wide text-gray-500 mb-2">High value turns</div>
+                                                <div className="space-y-2">
+                                                    {(topic.highValueEvidence || []).slice(0, 2).map((evidence: any, index: number) => (
+                                                        <div key={index} className="rounded border border-amber-100 bg-amber-50 p-2 text-xs text-amber-800">
+                                                            <div className="italic">&quot;{evidence.quote}&quot;</div>
+                                                            {evidence.conversationId && (
+                                                                <Link href={`/dashboard/bots/${bot.id}/conversations/${evidence.conversationId}`} className="mt-1 inline-flex items-center gap-1 text-amber-700 hover:text-amber-900">
+                                                                    Vai alla fonte <ExternalLink className="w-3 h-3" />
+                                                                </Link>
+                                                            )}
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+                            ))}
+                        </div>
+                    )}
+                </div>
+
+                <div className="bg-white p-6 rounded shadow">
+                    <h3 className="font-semibold mb-4 text-gray-800 flex items-center gap-2">
+                        <Sparkles className="w-5 h-5 text-amber-600" />
+                        Coverage per subgoal
+                    </h3>
+                    {subGoalCoverageSummary.length === 0 ? (
+                        <p className="text-gray-400 text-sm">Nessun dettaglio subgoal disponibile.</p>
+                    ) : (
+                        <div className="space-y-3">
+                            {subGoalCoverageSummary.slice(0, 12).map((entry: any, index: number) => (
+                                <div key={`${entry.topicLabel}:${entry.label}:${index}`} className="rounded-lg border border-gray-100 bg-gray-50/50 p-3">
+                                    <div className="text-xs font-bold uppercase tracking-wide text-gray-500">{entry.topicLabel}</div>
+                                    <div className="mt-1 text-sm font-medium text-gray-900">{entry.label}</div>
+                                    <div className="mt-2 flex items-center justify-between text-xs text-gray-500">
+                                        <span>Coverage</span>
+                                        <span>{Math.round((entry.coverageRate || 0) * 100)}%</span>
+                                    </div>
+                                    <div className="mt-1 h-2 rounded-full bg-gray-100">
+                                        <div className="h-2 rounded-full bg-blue-500" style={{ width: `${Math.round((entry.coverageRate || 0) * 100)}%` }} />
+                                    </div>
+                                    {(entry.evidence || []).length > 0 && (
+                                        <div className="mt-2 space-y-2">
+                                            {entry.evidence.slice(0, 1).map((evidence: any, evidenceIndex: number) => (
+                                                <div key={evidenceIndex} className="rounded border border-gray-100 bg-white p-2 text-xs text-gray-600">
+                                                    <div className="italic">&quot;{evidence.quote}&quot;</div>
+                                                    {evidence.conversationId && (
+                                                        <Link href={`/dashboard/bots/${bot.id}/conversations/${evidence.conversationId}`} className="mt-1 inline-flex items-center gap-1 text-amber-600 hover:text-amber-800">
+                                                            Vai alla fonte <ExternalLink className="w-3 h-3" />
+                                                        </Link>
+                                                    )}
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
+                                </div>
+                            ))}
+                        </div>
+                    )}
+                </div>
+            </div>
+
             {/* Qualitative Insights */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {/* Golden Quotes - New Feature */}
@@ -292,7 +418,7 @@ export default function AnalyticsView({ bot, themes, insights }: any) {
             </div>
 
             {/* Approfondimento temi - Word cloud */}
-            < div className="bg-white p-6 rounded shadow" >
+            <div className="bg-white p-6 rounded shadow">
                 <h3 className="font-semibold mb-6 flex items-center gap-2 text-gray-800">
                     <BrainCircuit className="w-5 h-5 text-amber-600" />
                     Analisi temi e word cloud
@@ -343,7 +469,7 @@ export default function AnalyticsView({ bot, themes, insights }: any) {
                         </div>
                     )
                 }
-            </div >
+            </div>
 
             {/* Sessioni recenti e trascrizioni */}
             <div className="bg-white p-6 rounded shadow">

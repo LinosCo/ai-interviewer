@@ -6,11 +6,12 @@ import { Mail } from 'lucide-react';
 import { Icons } from '@/components/ui/business-tuner/Icons';
 
 const productLinks = [
-  { label: 'Come funziona', href: '#come-funziona' },
-  { label: 'Strumenti', href: '#strumenti' },
-  { label: 'Per chi', href: '#per-chi' },
-  { label: 'Pricing', href: '#pricing' },
-  { label: 'FAQ', href: '#faq' },
+  { label: 'Come funziona', href: '/#come-funziona' },
+  { label: 'Strumenti', href: '/#strumenti' },
+  { label: 'Insights', href: '/insights' },
+  { label: 'Per chi', href: '/#per-chi' },
+  { label: 'Pricing', href: '/#pricing' },
+  { label: 'FAQ', href: '/faq' },
 ];
 
 const companyLinks = [

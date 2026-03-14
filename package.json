@@ -11,7 +11,6 @@
     "test:interview:agentic:stage": "bash scripts/run-interview-agentic-stage.sh",
     "test": "vitest",
     "test:run": "vitest run",
-    "test:interview:agentic": "npx ts-node --compiler-options '{\"module\":\"CommonJS\"}' scripts/interview-agentic-regression.ts",
     "test:training-smoke": "RUN_TRAINING_SMOKE=1 vitest run src/lib/training/__tests__/training-smoke.test.ts",
     "test:coverage": "vitest run --coverage",
     "workspace:repair": "npx ts-node --compiler-options '{\"module\":\"CommonJS\"}' scripts/repair-workspace-consistency.ts",

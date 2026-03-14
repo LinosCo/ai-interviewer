@@ -134,8 +134,8 @@ export function IntegrationsGrid({
   });
   const [googleEditSaving, setGoogleEditSaving] = useState(false);
 
-  const canRead = ['PRO', 'BUSINESS', 'PARTNER'].includes(userPlan);
-  const canWrite = ['BUSINESS', 'PARTNER'].includes(userPlan);
+  const canRead = ['PRO', 'BUSINESS', 'PARTNER', 'ENTERPRISE', 'ADMIN'].includes(userPlan);
+  const canWrite = ['BUSINESS', 'PARTNER', 'ENTERPRISE', 'ADMIN'].includes(userPlan);
 
   // Find existing connections
   const wpConnection = mcpConnections.find(c => c.type === 'WORDPRESS');

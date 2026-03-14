@@ -659,9 +659,22 @@ BUSINESS_TUNER_URL=${process.env.NEXT_PUBLIC_APP_URL || 'https://app.businesstun
             : '';
         const fallbackBase = process.env.NEXT_PUBLIC_APP_URL || 'https://businesstuner.voler.ai';
         const baseUrl = (baseCandidate.startsWith('http') ? baseCandidate : fallbackBase).replace(/\/+$/, '');
+        const host = (() => {
+            try {
+                return new URL(baseUrl).host;
+            } catch {
+                return '';
+            }
+        })();
         const slug = suggestion.slug || suggestion.id;
         const section = String(suggestion.targetSection || routing.targetSection || '').toLowerCase();
-        const previewPath = section.includes('news') ? `/#news-${slug}` : '/#news';
+        const previewPath = routing.contentKind === 'FAQ_PAGE' || section.includes('faq')
+            ? '/faq'
+            : section.includes('news') || routing.contentKind === 'NEWS_ARTICLE' || routing.contentKind === 'BLOG_POST'
+                ? host === 'voler.ai' || host.endsWith('.voler.ai')
+                    ? `/blog/${slug}`
+                    : `/insights/${slug}`
+                : '/';
 
         await this.logWebhook(
             suggestion.connectionId,

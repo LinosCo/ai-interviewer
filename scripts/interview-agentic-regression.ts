@@ -9,6 +9,11 @@ import {
     evaluateTranscriptSemanticFlow,
     type TranscriptSemanticTurn,
 } from '../src/lib/interview/transcript-semantic-evaluator';
+import {
+    getStructuredSubmissionDisplayText,
+    type InterviewInteractionPayload,
+    type StructuredInterviewSubmission,
+} from '../src/lib/interview/structured-interactions';
 
 dotenv.config({ path: '.env.local' });
 dotenv.config();
@@ -54,11 +59,17 @@ type RuntimeMetadata = {
     topicId?: string;
     responseLatencyMs?: number;
     flowFlags?: Record<string, unknown>;
+    interactionPayload?: InterviewInteractionPayload | null;
 };
 
 type ObservedAssistantTurn = {
     content: string;
     metadata: RuntimeMetadata;
+};
+
+type UserReply = {
+    text: string;
+    structuredSubmission?: StructuredInterviewSubmission | null;
 };
 
 type ScenarioRunState = {
@@ -429,7 +440,15 @@ async function callChat(params: {
     messages: Array<{ role: 'user' | 'assistant' | 'system'; content: string }>;
     effectiveDuration: number;
     clientMessageId?: string;
-}): Promise<{ text: string; isCompleted: boolean; currentTopicId?: string | null }> {
+    structuredSubmission?: StructuredInterviewSubmission | null;
+}): Promise<{
+    text: string;
+    isCompleted: boolean;
+    currentTopicId?: string | null;
+    interactionPayload?: InterviewInteractionPayload | null;
+    roundTripLatencyMs: number;
+}> {
+    const requestStartedAt = Date.now();
     const response = await fetch(`${params.baseUrl}/api/chat`, {
         method: 'POST',
         headers: {
@@ -442,10 +461,12 @@ async function callChat(params: {
             messages: params.messages,
             effectiveDuration: params.effectiveDuration,
             ...(params.clientMessageId ? { clientMessageId: params.clientMessageId } : {}),
+            ...(params.structuredSubmission ? { structuredSubmission: params.structuredSubmission } : {}),
         }),
     });
 
     const payload = await response.json();
+    const roundTripLatencyMs = Date.now() - requestStartedAt;
     if (!response.ok) {
         throw new Error(`CHAT_API_${response.status}: ${JSON.stringify(payload)}`);
     }
@@ -454,6 +475,10 @@ async function callChat(params: {
         text: String(payload.text || ''),
         isCompleted: Boolean(payload.isCompleted),
         currentTopicId: payload.currentTopicId,
+        interactionPayload: (payload.interactionPayload && typeof payload.interactionPayload === 'object')
+            ? (payload.interactionPayload as InterviewInteractionPayload)
+            : null,
+        roundTripLatencyMs,
     };
 }
 
@@ -500,6 +525,9 @@ async function fetchAssistantTurn(
             topicId: typeof metadata.topicId === 'string' ? metadata.topicId : undefined,
             responseLatencyMs: typeof metadata.responseLatencyMs === 'number' ? metadata.responseLatencyMs : undefined,
             flowFlags: typeof metadata.flowFlags === 'object' ? (metadata.flowFlags as Record<string, unknown>) : undefined,
+            interactionPayload: (metadata.interactionPayload && typeof metadata.interactionPayload === 'object')
+                ? (metadata.interactionPayload as InterviewInteractionPayload)
+                : null,
         },
     };
 }
@@ -582,6 +610,63 @@ function fieldResponseForDirective(params: {
     return persona.values[field] || invalidFieldValue(field, language);
 }
 
+function buildStructuredUserReply(params: {
+    assistant: ObservedAssistantTurn;
+    language: string;
+    text: string;
+    fieldId?: string;
+    directive?: FieldDirective;
+}): UserReply {
+    const { assistant, language, text, fieldId, directive } = params;
+    const interactionPayload = assistant.metadata.interactionPayload;
+
+    if (!interactionPayload) {
+        return { text };
+    }
+
+    if (interactionPayload.kind === 'consent') {
+        const normalized = text.trim().toLowerCase();
+        const action = /^(s[iì]|yes|ok|certo|va bene|accetto)/i.test(normalized) ? 'accept' : 'refuse';
+        const structuredSubmission: StructuredInterviewSubmission = {
+            kind: 'consent',
+            interactionId: interactionPayload.interactionId,
+            action,
+        };
+        return {
+            text: getStructuredSubmissionDisplayText(structuredSubmission, language),
+            structuredSubmission,
+        };
+    }
+
+    if (interactionPayload.kind === 'field' && fieldId && interactionPayload.fieldId === fieldId) {
+        const action = directive === 'skip' ? 'skip' : 'submit';
+        const structuredSubmission: StructuredInterviewSubmission = {
+            kind: 'field',
+            interactionId: interactionPayload.interactionId,
+            fieldId,
+            action,
+            ...(action === 'submit'
+                ? (
+                    interactionPayload.inputType === 'choice'
+                        ? {
+                            optionId: interactionPayload.options?.find((option) =>
+                                option.id === text || option.label === text
+                            )?.id || interactionPayload.options?.[0]?.id || null,
+                        }
+                        : { value: text }
+                )
+                : {}),
+        };
+
+        return {
+            text: getStructuredSubmissionDisplayText(structuredSubmission, language),
+            structuredSubmission,
+        };
+    }
+
+    return { text };
+}
+
 async function generateUserReply(params: {
     openai: ReturnType<typeof createOpenAI>;
     model: string;
@@ -592,40 +677,51 @@ async function generateUserReply(params: {
     runState: ScenarioRunState;
     fieldPlan: Record<string, FieldDirective>;
     rand: () => number;
-}): Promise<string> {
+}): Promise<UserReply> {
     const { assistant, language, scenario, runState, fieldPlan, persona } = params;
     const phase = String(assistant.metadata.phase || '').toUpperCase();
 
     if (phase === 'DEEP_OFFER') {
         const intent = nextIntent(scenario.deepOfferPlan, runState.deepOfferIndex);
         runState.deepOfferIndex += 1;
-        return intentToText(intent, language, 'deep_offer');
+        const text = intentToText(intent, language, 'deep_offer');
+        return buildStructuredUserReply({ assistant, language, text });
     }
 
     if (phase === 'DATA_COLLECTION' && isConsentPrompt(assistant.content, language)) {
         const intent = nextIntent(scenario.consentPlan, runState.consentIndex);
         runState.consentIndex += 1;
-        return intentToText(intent, language, 'consent');
+        const text = intentToText(intent, language, 'consent');
+        return buildStructuredUserReply({ assistant, language, text });
     }
 
     if (phase === 'DATA_COLLECTION') {
-        const field = inferAskedField(assistant.content, language);
+        const field = assistant.metadata.interactionPayload?.kind === 'field'
+            ? assistant.metadata.interactionPayload.fieldId
+            : inferAskedField(assistant.content, language);
         if (field) {
             const directive = fieldPlan[field] || 'valid';
             const attempt = runState.fieldAttempts[field] || 0;
             runState.fieldAttempts[field] = attempt + 1;
-            return fieldResponseForDirective({
+            const text = fieldResponseForDirective({
                 directive,
                 field,
                 language,
                 persona,
                 attempt,
             });
+            return buildStructuredUserReply({
+                assistant,
+                language,
+                text,
+                fieldId: field,
+                directive,
+            });
         }
     }
 
     runState.topicTurns += 1;
-    return generateTopicAnswer(params);
+    return { text: await generateTopicAnswer(params) };
 }
 
 async function judgeRun(params: {
@@ -794,6 +890,7 @@ function buildMarkdownReport(params: {
     lines.push(`- botName: ${params.botName}`);
     lines.push(`- intervieweeModel: ${params.intervieweeModel}`);
     lines.push(`- judgeModel: ${params.judgeModel || 'disabled'}`);
+    lines.push(`- latencyMetric: client_request_roundtrip_ms`);
     lines.push(`- runs: ${params.runs.length}`);
     lines.push('');
 
@@ -870,6 +967,7 @@ function buildJsonReport(params: {
         judgeModel: args.judgeModel,
         cleanup: args.cleanup,
         fatalError: fatalError || null,
+        latencyMetric: 'client_request_roundtrip_ms',
         runs,
         summary: {
             totalRuns: runs.length,
@@ -982,9 +1080,7 @@ async function runScenario(params: {
             };
         }
         transcriptLocal.push({ role: 'assistant', content: firstAssistant.content });
-        if (typeof firstAssistant.metadata.responseLatencyMs === 'number') {
-            assistantLatencies.push(firstAssistant.metadata.responseLatencyMs);
-        }
+        assistantLatencies.push(firstReply.roundTripLatencyMs);
         if (firstAssistant.metadata.phase) phasesSeen.add(firstAssistant.metadata.phase);
         completed = firstReply.isCompleted;
         let currentAssistant = firstAssistant;
@@ -994,7 +1090,7 @@ async function runScenario(params: {
                 userTurns: transcriptLocal.filter((turn) => turn.role === 'user').length,
                 phase: currentAssistant.metadata.phase || null,
             });
-            const userText = await generateUserReply({
+            const userReply = await generateUserReply({
                 openai,
                 model: args.intervieweeModel,
                 language,
@@ -1005,6 +1101,7 @@ async function runScenario(params: {
                 fieldPlan,
                 rand,
             });
+            const userText = userReply.text;
 
             transcriptLocal.push({ role: 'user', content: userText });
             effectiveDuration += estimateEffectiveSeconds(userText, rand, scenario.forceTimePressure);
@@ -1021,6 +1118,7 @@ async function runScenario(params: {
                 messages: transcriptLocal,
                 effectiveDuration,
                 clientMessageId,
+                structuredSubmission: userReply.structuredSubmission,
             });
             logScenarioDebug(scenario.id, 'callChat.turn.done', {
                 clientMessageId,
@@ -1034,9 +1132,7 @@ async function runScenario(params: {
                 phase: assistant.metadata.phase || null,
                 textLength: String(assistant.content || '').length,
             });
-            const latency = typeof assistant.metadata.responseLatencyMs === 'number'
-                ? assistant.metadata.responseLatencyMs
-                : Date.now() - startedAt;
+            const latency = chatReply.roundTripLatencyMs || (Date.now() - startedAt);
             assistantLatencies.push(latency);
             if (assistant.metadata.phase) phasesSeen.add(assistant.metadata.phase);
             transcriptLocal.push({ role: 'assistant', content: assistant.content });

@@ -3,12 +3,37 @@
 import { TopicBlock } from '@prisma/client';
 import { addTopicAction, deleteTopicAction, updateTopicAction } from '@/app/actions';
 import { useState } from 'react';
+import type { InterviewPlan } from '@/lib/interview/plan-types';
 
 import { Icons } from '@/components/ui/business-tuner/Icons';
 import Link from 'next/link';
 
-export default function TopicsEditor({ botId, topics, canUseConditionalLogic = false }: { botId: string, topics: TopicBlock[], canUseConditionalLogic?: boolean }) {
+function bandClass(band?: string | null) {
+    switch (band) {
+        case 'critical':
+            return 'bg-red-50 text-red-700 border-red-200';
+        case 'high':
+            return 'bg-amber-50 text-amber-700 border-amber-200';
+        case 'medium':
+            return 'bg-blue-50 text-blue-700 border-blue-200';
+        default:
+            return 'bg-gray-50 text-gray-600 border-gray-200';
+    }
+}
+
+export default function TopicsEditor({
+    botId,
+    topics,
+    canUseConditionalLogic = false,
+    planSnapshot = null,
+}: {
+    botId: string,
+    topics: TopicBlock[],
+    canUseConditionalLogic?: boolean,
+    planSnapshot?: InterviewPlan | null,
+}) {
     const [editingId, setEditingId] = useState<string | null>(null);
+    const topicPlanById = new Map((planSnapshot?.explore?.topics || []).map((topic) => [topic.topicId, topic]));
 
     const handleAdd = async () => {
         const nextIndex = topics.length;
@@ -38,6 +63,7 @@ export default function TopicsEditor({ botId, topics, canUseConditionalLogic = f
                         key={topic.id}
                         topic={topic}
                         index={index}
+                        planTopic={topicPlanById.get(topic.id) || null}
                         botId={botId}
                         isEditing={editingId === topic.id}
                         onEdit={() => setEditingId(topic.id)}
@@ -51,9 +77,9 @@ export default function TopicsEditor({ botId, topics, canUseConditionalLogic = f
 }
 
 import { RefinableField } from '@/components/refinable-field';
-import { Plus, Trash2, GripVertical, GitBranch, Lock, Edit } from 'lucide-react';
+import { Plus, Trash2, GitBranch, Lock, Edit } from 'lucide-react';
 
-function TopicCard({ topic, index, botId, isEditing, onEdit, onCancel, canUseConditionalLogic }: any) {
+function TopicCard({ topic, index, planTopic, botId, isEditing, onEdit, onCancel, canUseConditionalLogic }: any) {
     const updateAction = updateTopicAction.bind(null, topic.id, botId);
 
     // Parse subgoals from array (or string if legacy) to manageable state
@@ -211,19 +237,59 @@ function TopicCard({ topic, index, botId, isEditing, onEdit, onCancel, canUseCon
                     <span className="text-[10px] font-bold uppercase tracking-wide text-gray-500 bg-gray-100 px-2 py-1 rounded-full border border-gray-200">
                         ~{topic.maxTurns} turns
                     </span>
+                    {planTopic && (
+                        <>
+                            <span className={`text-[10px] font-bold uppercase tracking-wide px-2 py-1 rounded-full border ${bandClass(planTopic.importanceBand)}`}>
+                                {planTopic.importanceBand}
+                            </span>
+                            <span className="text-[10px] font-semibold uppercase tracking-wide text-gray-600 bg-gray-50 px-2 py-1 rounded-full border border-gray-200">
+                                {Math.round((planTopic.importanceScore || 0) * 100)}/100
+                            </span>
+                        </>
+                    )}
                 </div>
                 <div className="pl-11 pr-4">
                     {topic.description && (
                         <p className="text-sm text-gray-600 mb-3 leading-relaxed">{topic.description}</p>
                     )}
 
+                    {planTopic && (
+                        <div className="mb-3 flex flex-wrap gap-2">
+                            <span className="inline-flex items-center rounded-full border border-amber-200 bg-amber-50 px-2.5 py-1 text-[11px] font-medium text-amber-700">
+                                target {planTopic.targetSubGoalCount}/{planTopic.subGoalPlans.filter((subGoal: any) => subGoal.enabled).length} subgoal
+                            </span>
+                            <span className="inline-flex items-center rounded-full border border-blue-200 bg-blue-50 px-2.5 py-1 text-[11px] font-medium text-blue-700">
+                                stretch {planTopic.stretchSubGoalCount}
+                            </span>
+                        </div>
+                    )}
+
                     {topic.subGoals && topic.subGoals.length > 0 && (
                         <div className="flex flex-wrap gap-2">
-                            {topic.subGoals.map((sg: string, i: number) => (
-                                <span key={i} className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-50 text-green-700 border border-green-100">
-                                    {sg}
-                                </span>
-                            ))}
+                            {topic.subGoals.map((sg: string, i: number) => {
+                                const planned = planTopic?.subGoalPlans?.[i];
+                                return (
+                                    <span
+                                        key={i}
+                                        className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium border ${
+                                            planned?.coverageTier === 'target'
+                                                ? 'bg-green-50 text-green-700 border-green-100'
+                                                : planned?.coverageTier === 'stretch'
+                                                    ? 'bg-blue-50 text-blue-700 border-blue-100'
+                                                    : planned?.coverageTier === 'overflow'
+                                                        ? 'bg-gray-50 text-gray-600 border-gray-200'
+                                                        : 'bg-gray-50 text-gray-400 border-gray-200'
+                                        }`}
+                                    >
+                                        <span>{sg}</span>
+                                        {planned && (
+                                            <span className="text-[10px] uppercase opacity-70">
+                                                {planned.coverageTier}
+                                            </span>
+                                        )}
+                                    </span>
+                                );
+                            })}
                         </div>
                     )}
                 </div>

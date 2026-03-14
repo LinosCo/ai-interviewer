@@ -1,8 +1,8 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { ArrowLeft, Link2, Check, AlertCircle, Building2 } from 'lucide-react';
+import { ArrowLeft, Link2, AlertCircle, Building2, PlusCircle } from 'lucide-react';
 
 interface CMSConnection {
   id: string;
@@ -28,12 +28,15 @@ export default function ConnectCMSPage() {
   const [selectedConnectionId, setSelectedConnectionId] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [projectOrg, setProjectOrg] = useState<{ id: string; name: string } | null>(null);
+  const [creating, setCreating] = useState(false);
+  const [createForm, setCreateForm] = useState({
+    name: '',
+    cmsPublicUrl: '',
+    cmsDashboardUrl: '',
+    notes: '',
+  });
 
-  useEffect(() => {
-    fetchData();
-  }, [projectId]);
-
-  const fetchData = async () => {
+  const fetchData = useCallback(async () => {
     try {
       // Fetch project info to get organization
       const projectRes = await fetch(`/api/projects/${projectId}`);
@@ -41,6 +44,10 @@ export default function ConnectCMSPage() {
         const projectData = await projectRes.json();
         if (projectData.project?.organization) {
           setProjectOrg(projectData.project.organization);
+          setCreateForm((current) => ({
+            ...current,
+            name: current.name || `${projectData.project.organization.name} CMS`,
+          }));
 
           // Fetch available CMS connections for this organization
           const connectionsRes = await fetch(`/api/cms/available?organizationId=${projectData.project.organization.id}`);
@@ -50,13 +57,17 @@ export default function ConnectCMSPage() {
           }
         }
       }
-    } catch (err) {
-      console.error('Error fetching data:', err);
+    } catch (error) {
+      console.error('Error fetching data:', error);
       setError('Errore nel caricamento dei dati');
     } finally {
       setLoading(false);
     }
-  };
+  }, [projectId]);
+
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]);
 
   const handleAssociate = async () => {
     if (!selectedConnectionId) {
@@ -83,10 +94,51 @@ export default function ConnectCMSPage() {
         const data = await res.json();
         setError(data.error || 'Errore durante l\'associazione');
       }
-    } catch (err) {
+    } catch {
       setError('Errore di rete');
     } finally {
       setAssociating(false);
+    }
+  };
+
+  const handleCreateConnection = async () => {
+    if (!projectOrg) {
+      setError('Organizzazione del progetto non trovata');
+      return;
+    }
+
+    if (!createForm.name.trim() || !createForm.cmsPublicUrl.trim()) {
+      setError('Inserisci almeno nome connessione e URL pubblico del sito');
+      return;
+    }
+
+    setCreating(true);
+    setError(null);
+
+    try {
+      const res = await fetch(`/api/admin/projects/${projectId}/cms/create`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: createForm.name.trim(),
+          cmsApiUrl: 'internal://landing',
+          cmsPublicUrl: createForm.cmsPublicUrl.trim(),
+          cmsDashboardUrl: createForm.cmsDashboardUrl.trim() || undefined,
+          notes: createForm.notes.trim() || `Connessione interna per ${projectOrg.name}`,
+        }),
+      });
+
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setError(data.error || 'Errore durante la creazione della connessione CMS');
+        return;
+      }
+
+      router.push(`/dashboard/projects/${projectId}/integrations`);
+    } catch {
+      setError('Errore di rete');
+    } finally {
+      setCreating(false);
     }
   };
 
@@ -149,7 +201,8 @@ export default function ConnectCMSPage() {
 
       {/* Available Connections */}
       {availableConnections.length > 0 ? (
-        <div className="space-y-4">
+        <div className="space-y-8">
+          <div className="space-y-4">
           <h2 className="font-semibold text-gray-900">Connessioni disponibili</h2>
 
           <div className="space-y-3">
@@ -208,19 +261,129 @@ export default function ConnectCMSPage() {
               </>
             )}
           </button>
+          </div>
+
+          <div className="border-t border-gray-200 pt-6">
+            <h2 className="font-semibold text-gray-900 mb-2">Oppure crea una nuova connessione</h2>
+            <p className="text-sm text-gray-500 mb-4">
+              Per siti custom come voler.ai usa la connessione interna e imposta l&apos;URL pubblico del sito.
+            </p>
+            <div className="space-y-4">
+              <input
+                type="text"
+                value={createForm.name}
+                onChange={(e) => setCreateForm((current) => ({ ...current, name: e.target.value }))}
+                placeholder="Nome connessione"
+                className="w-full rounded-lg border border-gray-200 px-4 py-3"
+              />
+              <input
+                type="url"
+                value={createForm.cmsPublicUrl}
+                onChange={(e) => setCreateForm((current) => ({ ...current, cmsPublicUrl: e.target.value }))}
+                placeholder="https://voler.ai"
+                className="w-full rounded-lg border border-gray-200 px-4 py-3"
+              />
+              <input
+                type="url"
+                value={createForm.cmsDashboardUrl}
+                onChange={(e) => setCreateForm((current) => ({ ...current, cmsDashboardUrl: e.target.value }))}
+                placeholder="URL dashboard CMS (opzionale)"
+                className="w-full rounded-lg border border-gray-200 px-4 py-3"
+              />
+              <textarea
+                value={createForm.notes}
+                onChange={(e) => setCreateForm((current) => ({ ...current, notes: e.target.value }))}
+                placeholder="Note interne (opzionale)"
+                rows={3}
+                className="w-full rounded-lg border border-gray-200 px-4 py-3"
+              />
+              <button
+                onClick={handleCreateConnection}
+                disabled={creating}
+                className="w-full bg-amber-600 text-white px-6 py-3 rounded-lg hover:bg-amber-700 disabled:opacity-50 transition-colors font-medium flex items-center justify-center gap-2"
+              >
+                {creating ? (
+                  <>
+                    <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent" />
+                    Creazione in corso...
+                  </>
+                ) : (
+                  <>
+                    <PlusCircle className="w-4 h-4" />
+                    Crea connessione CMS
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
         </div>
       ) : (
-        <div className="text-center py-12 bg-gray-50 rounded-xl">
-          <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-gray-100 flex items-center justify-center">
-            <Link2 className="w-8 h-8 text-gray-400" />
+        <div className="space-y-6">
+          <div className="text-center py-12 bg-gray-50 rounded-xl">
+            <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-gray-100 flex items-center justify-center">
+              <Link2 className="w-8 h-8 text-gray-400" />
+            </div>
+            <h3 className="text-lg font-medium text-gray-900 mb-2">
+              Nessuna connessione disponibile
+            </h3>
+            <p className="text-gray-500 max-w-md mx-auto">
+              Non ci sono ancora connessioni CMS per questa organizzazione. Puoi crearne una qui sotto.
+            </p>
           </div>
-          <h3 className="text-lg font-medium text-gray-900 mb-2">
-            Nessuna connessione disponibile
-          </h3>
-          <p className="text-gray-500 max-w-md mx-auto">
-            Non ci sono connessioni CMS disponibili per questa organizzazione.
-            Contatta il supporto per configurare una nuova connessione CMS.
-          </p>
+
+          <div className="border border-gray-200 rounded-xl p-6 bg-white">
+            <h2 className="font-semibold text-gray-900 mb-2">Crea una nuova connessione CMS</h2>
+            <p className="text-sm text-gray-500 mb-4">
+              Usa questa opzione per collegare siti custom come voler.ai alla pipeline CMS del progetto.
+            </p>
+            <div className="space-y-4">
+              <input
+                type="text"
+                value={createForm.name}
+                onChange={(e) => setCreateForm((current) => ({ ...current, name: e.target.value }))}
+                placeholder="Nome connessione"
+                className="w-full rounded-lg border border-gray-200 px-4 py-3"
+              />
+              <input
+                type="url"
+                value={createForm.cmsPublicUrl}
+                onChange={(e) => setCreateForm((current) => ({ ...current, cmsPublicUrl: e.target.value }))}
+                placeholder="https://voler.ai"
+                className="w-full rounded-lg border border-gray-200 px-4 py-3"
+              />
+              <input
+                type="url"
+                value={createForm.cmsDashboardUrl}
+                onChange={(e) => setCreateForm((current) => ({ ...current, cmsDashboardUrl: e.target.value }))}
+                placeholder="URL dashboard CMS (opzionale)"
+                className="w-full rounded-lg border border-gray-200 px-4 py-3"
+              />
+              <textarea
+                value={createForm.notes}
+                onChange={(e) => setCreateForm((current) => ({ ...current, notes: e.target.value }))}
+                placeholder="Note interne (opzionale)"
+                rows={3}
+                className="w-full rounded-lg border border-gray-200 px-4 py-3"
+              />
+              <button
+                onClick={handleCreateConnection}
+                disabled={creating}
+                className="w-full bg-amber-600 text-white px-6 py-3 rounded-lg hover:bg-amber-700 disabled:opacity-50 transition-colors font-medium flex items-center justify-center gap-2"
+              >
+                {creating ? (
+                  <>
+                    <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent" />
+                    Creazione in corso...
+                  </>
+                ) : (
+                  <>
+                    <PlusCircle className="w-4 h-4" />
+                    Crea connessione CMS
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>

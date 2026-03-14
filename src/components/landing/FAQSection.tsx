@@ -5,6 +5,11 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { ChevronDown } from 'lucide-react';
 import { LANDING_FAQS } from './landing-faq-data';
 
+type FAQEntry = {
+  question: string;
+  answer: string;
+};
+
 function FAQItem({ question, answer, isOpen, onClick }: {
   question: string;
   answer: string;
@@ -42,7 +47,7 @@ function FAQItem({ question, answer, isOpen, onClick }: {
   );
 }
 
-export function FAQSection() {
+export function FAQSection({ faqs = LANDING_FAQS }: { faqs?: readonly FAQEntry[] }) {
   const [openIndex, setOpenIndex] = useState<number | null>(null);
 
   return (
@@ -72,7 +77,7 @@ export function FAQSection() {
           transition={{ duration: 0.5, delay: 0.2 }}
           className="space-y-4"
         >
-          {LANDING_FAQS.map((faq, index) => (
+          {faqs.map((faq, index) => (
             <FAQItem
               key={index}
               question={faq.question}

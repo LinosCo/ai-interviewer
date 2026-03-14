@@ -24,6 +24,7 @@ export default async function BotEditorPage({ params }: { params: Promise<{ botI
     const bot = await prisma.bot.findUnique({
         where: { id: botId },
         include: {
+            interviewPlan: true,
             topics: { orderBy: { orderIndex: 'asc' } },
             knowledgeSources: true,
             rewardConfig: true,
@@ -96,10 +97,21 @@ export default async function BotEditorPage({ params }: { params: Promise<{ botI
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
                 <div className="lg:col-span-2 space-y-8">
-                    <BotConfigForm bot={bot} canUseBranding={canUseBranding} canUseAdvancedInterview={canUseAdvancedInterview} currentPlan={bot.project.organization?.plan || 'TRIAL'} />
+                    <BotConfigForm
+                        bot={bot}
+                        canUseBranding={canUseBranding}
+                        canUseAdvancedInterview={canUseAdvancedInterview}
+                        currentPlan={bot.project.organization?.plan || 'TRIAL'}
+                        planSnapshot={(bot.interviewPlan?.basePlan as any) ?? null}
+                    />
                     {/* Updated Landing/Branding Editor */}
                     <LandingPageEditor bot={bot} plan={bot.project.organization?.plan || 'TRIAL'} />
-                    <TopicsEditor botId={bot.id} topics={bot.topics} canUseConditionalLogic={canUseConditionalLogic} />
+                    <TopicsEditor
+                        botId={bot.id}
+                        topics={bot.topics}
+                        canUseConditionalLogic={canUseConditionalLogic}
+                        planSnapshot={(bot.interviewPlan?.basePlan as any) ?? null}
+                    />
                 </div>
 
                 <div className="space-y-8">

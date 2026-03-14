@@ -1,5 +1,6 @@
 import type { MetadataRoute } from 'next';
 import { absoluteUrl } from '@/lib/seo';
+import { getLandingArticles } from '@/lib/business-tuner-content';
 
 type StaticPage = {
   path: string;
@@ -13,6 +14,7 @@ const STATIC_MARKETING_PAGES: StaticPage[] = [
   { path: '/pricing', changeFrequency: 'weekly', priority: 0.9 },
   { path: '/features', changeFrequency: 'monthly', priority: 0.8 },
   { path: '/faq', changeFrequency: 'monthly', priority: 0.8 },
+  { path: '/insights', changeFrequency: 'weekly', priority: 0.85 },
   { path: '/templates', changeFrequency: 'monthly', priority: 0.7 },
   { path: '/methodology', changeFrequency: 'monthly', priority: 0.6 },
   { path: '/sales', changeFrequency: 'monthly', priority: 0.6 },
@@ -25,13 +27,23 @@ const STATIC_MARKETING_PAGES: StaticPage[] = [
   { path: '/sales-terms', changeFrequency: 'yearly', priority: 0.4 },
 ];
 
-export default function sitemap(): MetadataRoute.Sitemap {
+export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const now = new Date();
+  const articles = await getLandingArticles(100);
 
-  return STATIC_MARKETING_PAGES.map((page) => ({
+  const staticEntries = STATIC_MARKETING_PAGES.map((page) => ({
     url: absoluteUrl(page.path),
     lastModified: now,
     changeFrequency: page.changeFrequency,
     priority: page.priority,
   }));
+
+  const articleEntries = articles.map((article) => ({
+    url: absoluteUrl(`/insights/${article.slug}`),
+    lastModified: new Date(article.updatedAt),
+    changeFrequency: 'weekly' as const,
+    priority: 0.7,
+  }));
+
+  return [...staticEntries, ...articleEntries];
 }

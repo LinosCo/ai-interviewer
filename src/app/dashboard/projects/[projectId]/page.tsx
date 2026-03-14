@@ -1,5 +1,6 @@
 import { auth } from '@/auth';
 import { prisma } from '@/lib/prisma';
+import { isMissingPrismaTable } from '@/lib/prisma-table-errors';
 import { notFound, redirect } from 'next/navigation';
 import { cookies } from 'next/headers';
 import {
@@ -84,7 +85,7 @@ export default async function ProjectCockpitPage({ params }: { params: Promise<{
 
     const interviews = project.bots.filter(b => (b as any).botType === 'interview' || !(b as any).botType);
     const chatbots = project.bots.filter(b => (b as any).botType === 'chatbot');
-    const [trackers, tipCount, enabledRoutingCount] = await Promise.all([
+    const [trackers, enabledRoutingCount] = await Promise.all([
         (async () => {
             try {
                 return await prisma.visibilityConfig.findMany({
@@ -110,9 +111,14 @@ export default async function ProjectCockpitPage({ params }: { params: Promise<{
                 });
             }
         })(),
-        prisma.projectTip.count({ where: { projectId } }),
         prisma.tipRoutingRule.count({ where: { projectId, enabled: true } }),
     ]);
+    let tipCount = 0;
+    try {
+        tipCount = await prisma.projectTip.count({ where: { projectId } });
+    } catch (error: any) {
+        if (!isMissingPrismaTable(error, ['ProjectTip'])) throw error;
+    }
 
     const activationLabel = tipCount > 0 && enabledRoutingCount > 0
         ? 'Pronto a eseguire'

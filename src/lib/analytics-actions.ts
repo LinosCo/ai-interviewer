@@ -41,6 +41,19 @@ export async function generateConversationInsightAction(conversationId: string) 
 
     // 3. Prepare Transcript
     const transcript = conversation.messages.map((m: any) => `${m.role}: "${m.content}"`).join("\n");
+    const structuredTurns = conversation.messages
+        .filter((message: any) => message.role === 'assistant' && message.metadata)
+        .map((message: any) => {
+            const metadata = (message.metadata as Record<string, any>) || {};
+            return {
+                topicLabel: metadata.topicLabel || null,
+                topicImportanceBand: metadata.topicImportanceBand || null,
+                subGoal: metadata.subGoal || null,
+                subGoalCoverageTier: metadata.subGoalCoverageTier || null,
+                highValueTurn: Boolean(metadata.highValueTurn),
+            };
+        })
+        .filter((turn: any) => turn.topicLabel || turn.subGoal);
 
     // 4. Analyze
     const schema = z.object({
@@ -51,7 +64,25 @@ export async function generateConversationInsightAction(conversationId: string) 
         topicDetails: z.array(z.object({
             label: z.string(),
             summary: z.string(),
-            keywords: z.array(z.string())
+            keywords: z.array(z.string()),
+            reached: z.boolean().optional(),
+            coreSubGoalsCovered: z.number().int().optional(),
+            totalCoreSubGoals: z.number().int().optional(),
+            stretchSubGoalsCovered: z.number().int().optional(),
+            totalEnabledSubGoals: z.number().int().optional(),
+            keyEvidence: z.array(z.string()).optional(),
+        })).optional().describe("Breakdown of what was discussed per topic"),
+        subGoalDetails: z.array(z.object({
+            topicLabel: z.string(),
+            label: z.string(),
+            covered: z.boolean(),
+            coverageTier: z.enum(['target', 'stretch', 'overflow', 'disabled']).optional(),
+            evidence: z.array(z.string()).optional(),
+        })).optional(),
+        highValueTurns: z.array(z.object({
+            topicLabel: z.string().optional(),
+            subGoal: z.string().optional(),
+            quote: z.string(),
         })).optional().describe("Breakdown of what was discussed per topic")
     });
 
@@ -67,6 +98,9 @@ export async function generateConversationInsightAction(conversationId: string) 
             
             TOPICS DEFINED:
             ${topicsContext}
+
+            ASSISTANT STRUCTURED COVERAGE HINTS:
+            ${JSON.stringify(structuredTurns).slice(0, 12000)}
 
             Transcript:
             ${transcript.substring(0, 50000)}
@@ -86,14 +120,24 @@ export async function generateConversationInsightAction(conversationId: string) 
                 topicCoverage: object.topicCoverage,
                 sentimentScore: object.sentimentScore,
                 keyQuotes: object.keyQuotes as any,
-                metadata: { summary: object.summary, topicDetails: (object as any).topicDetails } as any
+                metadata: {
+                    summary: object.summary,
+                    topicDetails: (object as any).topicDetails,
+                    subGoalDetails: (object as any).subGoalDetails,
+                    highValueTurns: (object as any).highValueTurns,
+                } as any
             },
             create: {
                 conversationId,
                 topicCoverage: object.topicCoverage,
                 sentimentScore: object.sentimentScore,
                 keyQuotes: object.keyQuotes as any,
-                metadata: { summary: object.summary, topicDetails: (object as any).topicDetails } as any
+                metadata: {
+                    summary: object.summary,
+                    topicDetails: (object as any).topicDetails,
+                    subGoalDetails: (object as any).subGoalDetails,
+                    highValueTurns: (object as any).highValueTurns,
+                } as any
             }
         });
 

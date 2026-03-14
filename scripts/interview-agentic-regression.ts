@@ -1102,7 +1102,8 @@ async function runScenario(params: {
     const conversation = { id: conversationId };
     logScenarioDebug(scenario.id, 'conversation.create.done', { conversationId: conversation.id });
 
-    const transcriptLocal: Array<{ role: 'assistant' | 'user'; content: string }> = [];
+    // Richer local transcript — includes phase + topicLabel from HTTP response (used as DB fallback)
+    const transcriptLocal: Array<{ role: 'assistant' | 'user'; content: string; phase?: string; topicLabel?: string }> = [];
     const assistantLatencies: number[] = [];
     const phasesSeen = new Set<string>();
     let effectiveDuration = 0;
@@ -1144,7 +1145,12 @@ async function runScenario(params: {
                 },
             };
         }
-        transcriptLocal.push({ role: 'assistant', content: firstAssistant.content });
+        transcriptLocal.push({
+            role: 'assistant',
+            content: firstAssistant.content,
+            phase: firstAssistant.metadata.phase,
+            topicLabel: firstAssistant.metadata.topicLabel,
+        });
         assistantLatencies.push(firstReply.roundTripLatencyMs);
         if (firstAssistant.metadata.phase) phasesSeen.add(firstAssistant.metadata.phase);
         completed = firstReply.isCompleted;
@@ -1216,7 +1222,12 @@ async function runScenario(params: {
             const latency = chatReply.roundTripLatencyMs || (Date.now() - startedAt);
             assistantLatencies.push(latency);
             if (assistant.metadata.phase) phasesSeen.add(assistant.metadata.phase);
-            transcriptLocal.push({ role: 'assistant', content: assistant.content });
+            transcriptLocal.push({
+                role: 'assistant',
+                content: assistant.content,
+                phase: assistant.metadata.phase,
+                topicLabel: assistant.metadata.topicLabel,
+            });
             completed = chatReply.isCompleted;
             currentAssistant = assistant;
         }
@@ -1244,21 +1255,29 @@ async function runScenario(params: {
             ? (conversationSnapshot.candidateProfile as Record<string, string>)
             : {};
 
-        const transcript = (conversationSnapshot?.messages || [])
-            .filter((message) => message.role === 'assistant' || message.role === 'user')
-            .map((message) => {
-                const metadata = (message.metadata && typeof message.metadata === 'object')
-                    ? (message.metadata as Record<string, unknown>)
-                    : {};
-                const phase = typeof metadata.phase === 'string' ? metadata.phase : undefined;
-                const topicLabel = typeof metadata.topicLabel === 'string' ? metadata.topicLabel : undefined;
-                return {
-                    role: message.role,
-                    text: String(message.content || '').replace(/\s+/g, ' ').trim(),
-                    phase,
-                    topicLabel,
-                };
-            });
+        const transcript = conversationSnapshot
+            ? (conversationSnapshot.messages || [])
+                .filter((message) => message.role === 'assistant' || message.role === 'user')
+                .map((message) => {
+                    const metadata = (message.metadata && typeof message.metadata === 'object')
+                        ? (message.metadata as Record<string, unknown>)
+                        : {};
+                    const phase = typeof metadata.phase === 'string' ? metadata.phase : undefined;
+                    const topicLabel = typeof metadata.topicLabel === 'string' ? metadata.topicLabel : undefined;
+                    return {
+                        role: message.role,
+                        text: String(message.content || '').replace(/\s+/g, ' ').trim(),
+                        phase,
+                        topicLabel,
+                    };
+                })
+            // No DB — fall back to the enriched local transcript (phase populated from HTTP response)
+            : transcriptLocal.map((t) => ({
+                role: t.role,
+                text: t.content.replace(/\s+/g, ' ').trim(),
+                phase: t.phase,
+                topicLabel: t.topicLabel,
+            }));
 
         const semanticTurns: TranscriptSemanticTurn[] = transcript.map((turn) => ({
             role: turn.role as 'assistant' | 'user',

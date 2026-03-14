@@ -519,6 +519,10 @@ export default function InterviewChat({
             });
 
             if (!response.ok) {
+                // 429 = concurrent request rejected by server lock — silently drop, do not show error
+                if (response.status === 429) {
+                    return;
+                }
                 let payload: unknown = null;
                 try {
                     payload = await response.json();

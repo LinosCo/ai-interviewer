@@ -227,6 +227,11 @@ interface FlowGuardTelemetry {
     questionDedupIntercepted: boolean;
 }
 
+// Per-conversation in-flight lock — prevents concurrent requests from racing on the same state.
+// TTL of 45s covers even the slowest LLM calls; lock is released in the finally block.
+const _conversationLocks = new Map<string, number>();
+const CONVERSATION_LOCK_TTL_MS = 45_000;
+
 const ChatRequestSchema = z.object({
     messages: z.array(z.object({
         role: z.enum(['user', 'assistant', 'system']),
@@ -279,6 +284,19 @@ export async function POST(req: Request) {
         const requestTag = `[CHAT_API conversation=${conversationId}]`;
         const requestLog = (...args: any[]) => console.log(requestTag, ...args);
         const requestError = (...args: any[]) => console.error(requestTag, ...args);
+
+        // Acquire per-conversation lock — reject concurrent requests to prevent state race conditions
+        const _lockNow = Date.now();
+        const _existingLock = _conversationLocks.get(conversationId);
+        if (_existingLock && _lockNow - _existingLock < CONVERSATION_LOCK_TTL_MS) {
+            requestLog(`⛔ [LOCK] Concurrent request rejected (lock age=${_lockNow - _existingLock}ms)`);
+            return Response.json({
+                text: '',
+                isCompleted: false,
+                serverResponseLatencyMs: Date.now() - startTime
+            }, { status: 429 });
+        }
+        _conversationLocks.set(conversationId, _lockNow);
         const llmTimerLabel = `${requestTag} LLM ${clientMessageId || startTime}`;
         const requestStructuredSubmission = structuredSubmission ?? null;
         const normalizeExtensionReturnPhase = (phase: unknown): InterviewState['extensionReturnPhase'] => {
@@ -1506,14 +1524,27 @@ export async function POST(req: Request) {
         requestLog(`📊 [SUPERVISOR] Insight: ${supervisorInsight?.status || 'N/A'}, NextSubGoal: ${supervisorInsight?.nextSubGoal || 'N/A'}`);
 
         // Guard: DEEP_OFFER must be presented at least once before DATA_COLLECTION.
-        // state.deepAccepted === null means the offer has never been made this conversation.
+        // Fires when:
+        //   (a) deepAccepted===null — offer never initiated, or
+        //   (b) deepAccepted===false AND extensionOfferAttempts===0 — DEEP_OFFER was entered but
+        //       the LLM errored before the offer text was delivered; treat as "not yet shown".
         // We skip the guard when state.phase is already DEEP_OFFER (i.e., the offer was just refused
         // and we are legitimately exiting to DATA_COLLECTION).
-        if (nextState.phase === 'DATA_COLLECTION' && state.deepAccepted === null && state.phase !== 'DEEP_OFFER') {
+        const _offerNeverDelivered =
+            state.deepAccepted === null ||
+            (state.deepAccepted === false && (state.extensionOfferAttempts ?? 0) === 0);
+        if (nextState.phase === 'DATA_COLLECTION' && _offerNeverDelivered && state.phase !== 'DEEP_OFFER') {
             requestLog(`🛡️ [FLOW] Redirecting DATA_COLLECTION → DEEP_OFFER (offer not yet seen)`);
             nextState.phase = 'DEEP_OFFER';
             nextState.deepAccepted = null;
             supervisorInsight = createDefaultSupervisorInsight();
+        }
+
+        // Freeze topicIndex/turnInTopic during DEEP_OFFER — the offer is phase-level, not topic-level.
+        // Prevents spurious topic pivots that confuse the prompt and the logs.
+        if (nextState.phase === 'DEEP_OFFER') {
+            nextState.topicIndex = state.phase === 'DEEP_OFFER' ? state.topicIndex : nextState.topicIndex;
+            // do not reset turnInTopic — keep it so return-to-topic is correct
         }
 
         requestLog(`🧭 [FLOW] Phase Transition: ${state.phase} -> ${nextState.phase}`);
@@ -3003,5 +3034,8 @@ hard_rules:
             },
             { status: 200 }
         );
+    } finally {
+        // Always release the per-conversation lock so the next request can proceed
+        _conversationLocks.delete(conversationId);
     }
 }
